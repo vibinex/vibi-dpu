@@ -15,3 +15,6 @@
 
 # github folder
 .github/
+
+# service account file
+pubsub-sa.json
