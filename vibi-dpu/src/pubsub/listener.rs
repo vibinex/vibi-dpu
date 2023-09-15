@@ -21,6 +21,40 @@ struct InstallCallback {
 }
 
 
+async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<u8>) {
+    let msgtype_opt = attributes.get("msgtype");
+    if msgtype_opt.is_none() {
+        eprintln!("msgtype attribute not found in message : {:?}", attributes);
+    }
+    let msgtype = msgtype_opt.expect("Empty msgtype");
+    match msgtype.as_str() {
+        "install_callback" => {
+            println!("Processing install callback message");
+            let msg_data_res =  serde_json::from_slice::<InstallCallback>(data_bytes);
+            if msg_data_res.is_err() {
+                eprintln!("Error deserializing install callback: {:?}",
+                    msg_data_res.expect_err("No error in msg_data"));
+                    return;
+            }
+            let data = msg_data_res.expect("msg_data not found");
+            let code_async = data.installation_code.clone();
+            task::spawn(async move {
+                // handle_install_bitbucket(&code_async).await;
+                println!("Processed install callback message");
+            });
+        },
+        "webhook_callback" => {
+            task::spawn(async move {
+                // process_review(&data_bytes).await;
+                println!("Processed webhook callback message");
+            });
+        }
+        _ => {
+            eprintln!("Message type not found for message : {:?}", attributes);
+        }
+    };
+}
+
 pub async fn get_pubsub_client_config(keypath: &str) -> ClientConfig {
     let credfile = CredentialsFile::new_from_file(keypath.to_string()).await
         .expect("Failed to locate credentials file");
@@ -60,6 +94,7 @@ async fn setup_subscription(keypath: &str, topicname: &str) -> Subscription{
     println!("sub = {:?}", &subscription);
     subscription
 }
+
 pub async fn listen_messages(keypath: &str, topicname: &str) {
     let queue_cap = 100;
     let mut message_hashes = VecDeque::with_capacity(queue_cap);
@@ -83,38 +118,4 @@ pub async fn listen_messages(keypath: &str, topicname: &str) {
         // Ack or Nack message.
         let _ = message.ack().await;
     }
-}
-
-async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<u8>) {
-    let msgtype_opt = attributes.get("msgtype");
-    if msgtype_opt.is_none() {
-        eprintln!("msgtype attribute not found in message : {:?}", attributes);
-    }
-    let msgtype = msgtype_opt.expect("Empty msgtype");
-    match msgtype.as_str() {
-        "install_callback" => {
-            println!("Processing install callback message");
-            let msg_data_res =  serde_json::from_slice::<InstallCallback>(data_bytes);
-            if msg_data_res.is_err() {
-                eprintln!("Error deserializing install callback: {:?}",
-                    msg_data_res.expect_err("No error in msg_data"));
-                    return;
-            }
-            let data = msg_data_res.expect("msg_data not found");
-            let code_async = data.installation_code.clone();
-            task::spawn(async move {
-                // handle_install_bitbucket(&code_async).await;
-                println!("Processed install callback message");
-            });
-        },
-        "webhook_callback" => {
-            task::spawn(async move {
-                // process_review(&data_bytes).await;
-                println!("Processed webhook callback message");
-            });
-        }
-        _ => {
-            eprintln!("Message type not found for message : {:?}", attributes);
-        }
-    };
 }
