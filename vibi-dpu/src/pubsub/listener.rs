@@ -25,6 +25,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
     let msgtype_opt = attributes.get("msgtype");
     if msgtype_opt.is_none() {
         eprintln!("msgtype attribute not found in message : {:?}", attributes);
+        return;
     }
     let msgtype = msgtype_opt.expect("Empty msgtype");
     match msgtype.as_str() {
