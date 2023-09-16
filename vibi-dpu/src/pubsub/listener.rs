@@ -32,9 +32,8 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             println!("Processing install callback message");
             let msg_data_res =  serde_json::from_slice::<InstallCallback>(data_bytes);
             if msg_data_res.is_err() {
-                eprintln!("Error deserializing install callback: {:?}",
-                    msg_data_res.expect_err("No error in msg_data"));
-                    return;
+                eprintln!("Error deserializing install callback: {:?}", msg_data_res);
+                return;
             }
             let data = msg_data_res.expect("msg_data not found");
             let code_async = data.installation_code.clone();
