@@ -17,7 +17,14 @@ new_patch = int(version_parts[2]) + 1
 new_version = f"{version_parts[0]}.{version_parts[1]}.{new_patch}"
 
 # Update the Cargo.toml file with the new version number
+in_package_section = False
 for line in fileinput.input("devprofiler/Cargo.toml", inplace=True):
-    line = re.sub(r'^version\s*=\s*".*?"', f'version = "{new_version}"', line.rstrip())
+    if line.strip() == "[package]":
+        in_package_section = True
+    elif line.strip().startswith("["):
+        in_package_section = False
+
+    if in_package_section:
+        line = re.sub(r'^version\s*=\s*".*?"', f'version = "{new_version}"', line.rstrip())
     print(line)
 
