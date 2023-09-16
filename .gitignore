@@ -13,8 +13,5 @@
 # VS code folder
 .vscode/
 
-# github folder
-.github/
-
 # service account file
 pubsub-sa.json
