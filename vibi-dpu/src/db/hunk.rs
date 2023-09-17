@@ -7,21 +7,26 @@ pub fn get_hunk_from_db(review: &Review) -> Option<HunkMap> {
 	let db = get_db();
 	let key = format!("{}/{}/{}", review.db_key(), 
 		review.base_head_commit(), review.pr_head_commit());
-	let hunkmap_val = db.get(&key);
-	match hunkmap_val {
-		Ok(hunkmap_val) => {
-			match hunkmap_val {
-				Some(hunkmap_json) => {
-					match serde_json::from_slice(&hunkmap_json) {
-						Ok(hunkmap) => {
-							return Some(hunkmap);},
-						Err(e) => {eprintln!("Error deserializing hunkmap: {}", e);},
-					};
-				}, None => {eprintln!("No hunkmap stored in db for key: {}", &key)}
-			};
-		}, Err(e) => {eprintln!("Error getting hunkmap from db, key: {}, err: {e}", &key);}
-	};
-	return None;
+	let hunkmap_res = db.get(&key);
+	if hunkmap_res.is_err() {
+		let e = hunkmap_res.expect_err("No error in hunkmap_res");
+		eprintln!("Error getting hunkmap from db, key: {:?}, err: {:?}", &key, e);
+		return None;
+	}
+	let hunkmap_opt = hunkmap_res.expect("Uncaught error in hunkmap_res");
+	if hunkmap_opt.is_none() {
+		eprintln!("No hunkmap stored in db for key: {}", &key);
+		return None;
+	}
+	let hunkmap_ivec = hunkmap_opt.expect("Empty hunkmap_opt");
+	let hunkmap_res = serde_json::from_slice(&hunkmap_ivec);
+	if hunkmap_res.is_err() {
+		let e = hunkmap_res.expect_err("No error in hunkmap_res");
+		eprintln!("Error deserializing hunkmap: {:?}", e);
+		return None;
+	}
+	let hunkmap = hunkmap_res.expect("Uncaught error in hunkmap_res");
+	return Some(hunkmap);
 }
 
 pub fn store_hunkmap_to_db(hunkmap: &HunkMap, review: &Review) {
