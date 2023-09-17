@@ -35,6 +35,7 @@ pub async fn process_review(message_data: &Vec<u8>) {
 fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review) {
 	if hunkmap_opt.is_some() {
 		let hunkmap = hunkmap_opt.to_owned().expect("hunkmap_opt is empty");
+		println!("HunkMap = {:?}", &hunkmap);
 		store_hunkmap_to_db(&hunkmap, review);
 		publish_hunkmap(&hunkmap);
 		// let hunkmap_async = hunkmap.clone();
