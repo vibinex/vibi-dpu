@@ -26,11 +26,15 @@ pub fn commit_exists(commit: &str) -> bool {
 		.output();
 	if output_res.is_err() {
 		let e = output_res.expect_err("No error in output_res");
-		eprintln!("Failed to execute git rev-list: {:?}", e);
+		eprintln!("Failed to start git rev-list: {:?}", e);
 		return false;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
-	return output.status.success()
+	if !output.status.success() {
+		eprintln!("Failed to execute git rev-list, exit code: {:?}", output.status.code());
+		return false;
+	}
+	return true;
 }
 
 pub async fn git_pull(review: &Review) {
