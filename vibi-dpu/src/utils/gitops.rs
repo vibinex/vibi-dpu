@@ -354,11 +354,14 @@ async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize,
 		let ln = blamelines[lnum];
 		let wordvec: Vec<&str> = ln.split(" ").collect();
         let commit = wordvec[0];
-        let lineitem = get_commit_bb(commit, repo_name, repo_owner).await;
-		linemap.insert(
-			linenum + lnum,
-			lineitem
-		);
+        let lineitem_opt = get_commit_bb(commit, repo_name, repo_owner).await;
+		if lineitem_opt.is_some() {
+			let lineitem = lineitem_opt.expect("Empty linemap_opt");
+			linemap.insert(
+				linenum + lnum,
+				lineitem
+			);
+		}
 	}
 	return linemap;
 }

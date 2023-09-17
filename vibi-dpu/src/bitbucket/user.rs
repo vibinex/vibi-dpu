@@ -23,14 +23,20 @@ pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str
     }
 }
 
-pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> LineItem{
+pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> Option<LineItem>{
     let base_url = bitbucket_base_url();
     let commits_url = format!("{}/repositories/{repo_owner}/{repo_name}/commit/{commit}", &base_url);
     println!("commits url = {}", &commits_url);
     let authinfo: AuthInfo =  auth_info();
     let access_token = authinfo.access_token();
     let response = call_get_api(&commits_url, access_token, &None).await;
-    let response_json = response.expect("No response").json::<serde_json::Value>().await.expect("Error in deserializing json");
+    let parse_res = response.expect("No response").json::<serde_json::Value>().await;//.expect("Error in deserializing json");
+    if parse_res.is_err() {
+        let e = parse_res.expect_err("No error in parse_res");
+        eprintln!("Error in deserializing json: {:?}", e);
+        return None;
+    }
+    let response_json = parse_res.expect("Uncaught error in parse_res");
     let timestamp_str = &response_json["date"].to_string().replace('"', "");
     println!("timestamp_str = {}", timestamp_str);
     // Explicitly specify the format
@@ -54,5 +60,5 @@ pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> L
             author_name, repo_owner.to_string(), None);
         save_user_to_db(&user);
     }
-    return LineItem::new(author_id, unix_timestamp_str);
+    return Some(LineItem::new(author_id, unix_timestamp_str));
 }
