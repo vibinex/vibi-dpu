@@ -66,16 +66,16 @@ async fn process_add_webhook_response(response: Result<Response, Error>){
     }
     let res = response.expect("Uncaught error in response");
     if !res.status().is_success() {
-        println!("Failed to add webhook. Status code: {}, Text: {:?}",
+        eprintln!("Failed to add webhook. Status code: {}, Text: {:?}",
             res.status(), res.text().await);
         return;
     }
     let webhook_res = res.json::<WebhookResponse>().await;
     if webhook_res.is_err() {
         let err = webhook_res.expect_err("No error in webhook response");
+        eprintln!("Failed to parse webhook_res: {:?}", err);
         return;
     }
-    
     let webhook = webhook_res.expect("Uncaught error in webhook response");
     let webhook_data = Webhook::new(
         webhook.uuid().to_string(),
