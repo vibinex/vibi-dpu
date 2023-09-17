@@ -17,7 +17,7 @@ pub fn save_user_to_db(user: &User) {
     let insert_res = db.insert(IVec::from(user_key.as_bytes()), json);
     if insert_res.is_err() {
         let e = insert_res.expect_err("No error in insert_res");
-        eprintln!("Failed to upsert user into sled DB: {e}");
+        eprintln!("Failed to upsert user into sled DB: {:?}", e);
         return;
     }
     let insert_output = insert_res.expect("Uncaught error in insert_res");
