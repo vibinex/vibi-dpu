@@ -29,8 +29,12 @@ pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> O
     println!("commits url = {}", &commits_url);
     let authinfo: AuthInfo =  auth_info();
     let access_token = authinfo.access_token();
-    let response = get_api(&commits_url, access_token, &None).await;
-    let parse_res = response.expect("No response").json::<serde_json::Value>().await;//.expect("Error in deserializing json");
+    let response_opt = get_api(&commits_url, access_token, &None).await;
+    if response_opt.is_none() {
+        return None;
+    }
+    let response = response_opt.expect("Empty response_opt from commit url");
+    let parse_res = response.json::<serde_json::Value>().await;//.expect("Error in deserializing json");
     if parse_res.is_err() {
         let e = parse_res.expect_err("No error in parse_res");
         eprintln!("Error in deserializing json: {:?}", e);
