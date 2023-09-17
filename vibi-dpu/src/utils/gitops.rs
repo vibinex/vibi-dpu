@@ -37,13 +37,17 @@ pub async fn git_pull(review: &Review) {
 	println!("directory = {}", &directory);
 	let access_token = refresh_git_auth(review.clone_url(), review.clone_dir()).await;
     set_git_url(review.clone_url(), directory, &access_token);
-	let output = Command::new("git")
+	let output_res = Command::new("git")
 		.arg("pull")
 		// .arg("--all") 
 		// .arg(&review.clone_url)
 		.current_dir(directory)
-		.output()
-		.expect("failed to execute git pull");
+		.output();
+	if output_res.is_err() {
+		let e = output_res.expect_err("No error in output_res");
+		eprintln!("failed to execute git pull: {:?}", e);
+	}
+	let output = output_res.expect("Uncaught error in output_res");
 	match str::from_utf8(&output.stderr) {
 		Ok(v) => println!("git pull stderr = {:?}", v),
 		Err(e) => {/* error handling */ println!("{}", e)}, 
