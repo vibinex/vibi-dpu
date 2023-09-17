@@ -25,7 +25,7 @@ pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str
 
 pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> Option<LineItem>{
     let base_url = bitbucket_base_url();
-    let commits_url = format!("{}/repositories/{repo_owner}/{repo_name}/commit/{commit}", &base_url);
+    let commits_url = format!("{}/repositories/{}/{}/commit/{}", &base_url, repo_owner, repo_name, commit);
     println!("commits url = {}", &commits_url);
     let authinfo: AuthInfo =  auth_info();
     let access_token = authinfo.access_token();

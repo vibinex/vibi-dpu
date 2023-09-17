@@ -28,9 +28,9 @@ pub async fn get_access_token_from_bitbucket(code: &str) -> Option<AuthInfo> {
         Ok(res) => {
             if !res.status().is_success() {
                 println!(
-                    "Failed to exchange code for access token. Status code: {}, Response content: {}",
+                    "Failed to exchange code for access token. Status code: {}, Response content: {:?}",
                     res.status(),
-                    res.text().await.expect("No text in response")
+                    res.text().await
                 );
                 return None;
             }
