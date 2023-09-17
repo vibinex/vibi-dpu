@@ -4,12 +4,12 @@ use crate::db::user::{save_user_to_db, user_from_db};
 use crate::utils::auth::AuthInfo;
 use crate::utils::lineitem::LineItem;
 use crate::utils::user::{User, Provider, ProviderEnum};
-use super::config::{bitbucket_base_url, get_api, call_get_api};
+use super::config::{bitbucket_base_url, get_api_values, get_api};
 
 pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str) {
     let base_url = bitbucket_base_url();
     let members_url = format!("{}/workspaces/{}/members", &base_url, workspace_id);
-    let response_json = get_api(&members_url, access_token, None).await;
+    let response_json = get_api_values(&members_url, access_token, None).await;
     for user_json in response_json {
         let provider_id = user_json["user"]["uuid"].to_string().replace('"', "");
         let user = User::new(
@@ -29,7 +29,7 @@ pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> O
     println!("commits url = {}", &commits_url);
     let authinfo: AuthInfo =  auth_info();
     let access_token = authinfo.access_token();
-    let response = call_get_api(&commits_url, access_token, &None).await;
+    let response = get_api(&commits_url, access_token, &None).await;
     let parse_res = response.expect("No response").json::<serde_json::Value>().await;//.expect("Error in deserializing json");
     if parse_res.is_err() {
         let e = parse_res.expect_err("No error in parse_res");

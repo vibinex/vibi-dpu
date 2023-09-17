@@ -3,7 +3,7 @@ use std::env;
 use reqwest::{header::HeaderValue, Response, Error};
 use serde_json::json;
 
-use crate::{db::webhook::save_webhook_to_db, utils::webhook::{Webhook, WebhookResponse}, bitbucket::config::{bitbucket_base_url, get_api}};
+use crate::{db::webhook::save_webhook_to_db, utils::webhook::{Webhook, WebhookResponse}, bitbucket::config::{bitbucket_base_url, get_api_values}};
 
 use super::config::{get_client, prepare_auth_headers};
 
@@ -11,7 +11,7 @@ use super::config::{get_client, prepare_auth_headers};
 pub async fn get_webhooks_in_repo(workspace_slug: &str, repo_slug: &str, access_token: &str) -> Vec<Webhook> {
     let url = format!("{}/repositories/{}/{}/hooks", bitbucket_base_url(), workspace_slug, repo_slug);
     println!("Getting webhooks from {}", url);
-    let response_json = get_api(&url, access_token, None).await;
+    let response_json = get_api_values(&url, access_token, None).await;
     let mut webhooks = Vec::new();
     for webhook_json in response_json {
         let active = matches!(webhook_json["active"].to_string().trim_matches('"'), "true" | "false");
@@ -35,7 +35,11 @@ pub async fn add_webhook(workspace_slug: &str, repo_slug: &str, access_token: &s
         bitbucket_base_url(), workspace_slug, repo_slug
     );
 
-    let mut headers_map = prepare_auth_headers(&access_token);
+    let headers_map_opt = prepare_auth_headers(&access_token);
+    if headers_map_opt.is_none() {
+        return;
+    }
+    let mut headers_map = headers_map_opt.expect("Empty headers_map_opt");
     headers_map.insert("Accept", HeaderValue::from_static("application/vnd.github+json"));
     let callback_url = format!("{}/api/bitbucket/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
@@ -45,7 +49,6 @@ pub async fn add_webhook(workspace_slug: &str, repo_slug: &str, access_token: &s
         "active": true,
         "events": ["pullrequest:created", "pullrequest:updated"] 
     });
-
     let response = get_client()
         .post(&url)
         .headers(headers_map)
