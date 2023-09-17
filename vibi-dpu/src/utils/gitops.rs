@@ -222,9 +222,14 @@ fn process_diff(filepath: &str, diff: &str, linemap: &mut HashMap<String, Vec<St
 	let mut idx: usize = 0;
 	let len = limiterpos.len();
 	while (idx + 1) < len {
-		let line = diff.get(
+		let line_res = diff.get(
 			(limiterpos[idx]+delimitter.len())..limiterpos[idx+1]
-		).expect("Unable to format diff line");
+		);
+		if line_res.is_none() {
+			eprintln!("Unable to format diff line");
+			continue;
+		}
+		let line = line_res.expect("Empty line_res");
 		let sublines: Vec<&str> = line.split(" ").collect();
 		if line.contains("\n") || sublines.len() != 4 {
 			idx += 1;
