@@ -20,13 +20,16 @@ pub struct StatItem {
 }
 
 pub fn commit_exists(commit: &str) -> bool {
-	let output = Command::new("git")
+	let output_res = Command::new("git")
 		.arg("rev-list")
 		.arg(commit)
-		.output()
-		.expect("failed to execute git rev-list");
-
-	output.status.success()
+		.output();
+	if output_res.is_err() {
+		let e = output_res.expect_err("No error in output_res");
+		eprintln!("Failed to execute git rev-list: {:?}", e);
+	}
+	let output = output_res.expect("Uncaught error in output_res");
+	return output.status.success()
 }
 
 pub async fn git_pull(review: &Review) {
