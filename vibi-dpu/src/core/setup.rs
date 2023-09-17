@@ -117,17 +117,45 @@ async fn clone_git_repo(repo: &mut Repository, access_token: &str) {
         .take(10)
         .map(char::from)
         .collect();
-    let mut directory = format!("/tmp/{}/{}/{}", repo.provider(), repo.workspace(), random_string);
+    let mut directory = format!("/tmp/{}/{}/{}", repo.provider(), 
+        repo.workspace(), random_string);
     // Check if directory exists
-    if fs::metadata(&directory).await.is_ok() {
-        fs::remove_dir_all(&directory).await.expect("Unable to remove pre-existing directory components");
+    let exists_res = fs::metadata(&directory).await;
+    if exists_res.is_err() {
+        let e = exists_res.expect_err("No error in exists_res");
+        eprintln!("Unable to execute metadata in {:?}, error: {:?}",
+                &directory, e);
+        return;
     }
-    fs::create_dir_all(&directory).await.expect("Unable to create directory");
+    let exists_output = exists_res.expect("Uncaught error in exists_res");
+    println!("directory exists before cloning: {:?}", &exists_output);
+    let remove_dir_opt = fs::remove_dir_all(&directory).await;
+    if remove_dir_opt.is_err() {
+        let e = remove_dir_opt.expect_err("No error in remove_dir_opt");
+        eprintln!("Unable to execute remove_dir_all in {:?}, error: {:?}",
+            &directory, e);
+        return;
+    }
+    let remove_dir = remove_dir_opt.expect("Uncaught error in remove_dir_opt");
+    println!("The remove_dir output: {:?}", &remove_dir);
+    let create_dir_opt = fs::create_dir_all(&directory).await;
+    if create_dir_opt.is_err() {
+        let e = create_dir_opt.expect_err("No error in create_dir_opt");
+        eprintln!("Error executing in directory: {:?}, create_dir_all: {:?}",
+            &directory, e);
+        return;
+    }
     println!("directory exists? {}", fs::metadata(&directory).await.is_ok());
     let mut cmd = std::process::Command::new("git");
     cmd.arg("clone").arg(clone_url).current_dir(&directory);
-    let output = cmd.output().expect("Failed to clone git repo");
-    println!("Git clone output: {:?}", output);
+    let output_res = cmd.output();
+    if output_res.is_err() {
+        let e = output_res.expect_err("No error in output_res in git clone");
+        eprintln!("Error in git clone: {:?}", e);
+        return;
+    }
+    let output = output_res.expect("Uncaught error in output_res");
+    println!("Git clone output: {:?}", &output);
     directory = format!("{}/{}", &directory, repo.name());
     repo.set_local_dir(directory);
     save_repo_to_db(repo);
