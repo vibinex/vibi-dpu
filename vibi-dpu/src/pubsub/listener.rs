@@ -12,8 +12,7 @@ use tokio::task;
 use std::collections::VecDeque;
 use sha256::digest;
 use tonic::Code;
-use crate::core::setup::handle_install_bitbucket;
-// use crate::core::{setup::handle_install_bitbucket, review::process_review}; // To be added in future PR
+use crate::core::{setup::handle_install_bitbucket, review::process_review}; // To be added in future PR
 
 #[derive(Debug, Deserialize)]
 struct InstallCallback {
@@ -45,8 +44,9 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             });
         },
         "webhook_callback" => {
+            let data_bytes_async = data_bytes.to_owned();
             task::spawn(async move {
-                // process_review(&data_bytes).await;
+                process_review(&data_bytes_async).await;
                 println!("Processed webhook callback message");
             });
         }
