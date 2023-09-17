@@ -67,15 +67,15 @@ pub async fn update_access_token(auth_info: &AuthInfo) -> Option<AuthInfo> {
     let now = SystemTime::now();
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
 
-    if let Some(timestamp) = auth_info.timestamp() {
+    let timestamp_opt = auth_info.timestamp();
+    if timestamp_opt.is_some() {
+        let timestamp = timestamp_opt.expect("Empty timestamp");
         let expires_at = timestamp + auth_info.expires_in();
         println!(" expires_at = {expires_at}, now_secs = {now_secs}");
         if expires_at <= now_secs {  
             // auth info has expired
-            match bitbucket_refresh_token(auth_info.refresh_token()).await {
-                Some(new_auth_info) => return Some(new_auth_info),
-                None => {},
-            };
+            let new_auth_info_opt = bitbucket_refresh_token(auth_info.refresh_token()).await;
+            return new_auth_info_opt;
         }
     }
     return None;
