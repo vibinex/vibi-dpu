@@ -19,32 +19,34 @@ pub async fn get_access_token_from_bitbucket(code: &str) -> Option<AuthInfo> {
     params.insert("grant_type", "authorization_code".to_owned());
     params.insert("redirect_uri", redirect_uri);
     println!("params = {:?}", &params);
-    let response = client
+    let post_res = client
         .post("https://bitbucket.org/site/oauth2/access_token")
         .form(&params)
         .send()
         .await;
-    match response {
-        Ok(res) => {
-            if !res.status().is_success() {
-                println!(
-                    "Failed to exchange code for access token. Status code: {}, Response content: {:?}",
-                    res.status(),
-                    res.text().await
-                );
-                return None;
-            }
-            match res.json::<AuthInfo>().await { Ok(mut response_json) => {
-                save_auth_info_to_db(&mut response_json);
-                return Some(response_json);
-            }, Err(e) => {
-                println!("error deserializing : {:?}", e);
-                return None;} };
-        },
-        Err(e) => {
-            println!("error in calling api : {:?}", e);
-            return None},
+    if post_res.is_err() {
+        let e = post_res.expect_err("No error in post_res");
+        eprintln!("error in calling api : {:?}", e);
+        return None;
     }
+    let res = post_res.expect("Uncaught error in post_res");
+    if !res.status().is_success() {
+        println!(
+            "Failed to exchange code for access token. Status code: {}, Response content: {:?}",
+            res.status(),
+            res.text().await
+        );
+        return None;
+    }
+    let parse_res = res.json::<AuthInfo>().await ;
+    if parse_res.is_err() {
+        let e = parse_res.expect_err("No error in parse_res for AuthInfo");
+        eprintln!("error deserializing AuthInfo: {:?}", e);
+        return None;
+    }
+    let mut response_json = parse_res.expect("Uncaught error in parse_res for AuthInfo");
+    save_auth_info_to_db(&mut response_json);
+    return Some(response_json);
 }
 
 pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> String{
@@ -63,28 +65,25 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> String{
 }
 
 pub async fn update_access_token(auth_info: &AuthInfo) -> Option<AuthInfo> {
-
     let now = SystemTime::now();
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
-
     let timestamp_opt = auth_info.timestamp();
-    if timestamp_opt.is_some() {
-        let timestamp = timestamp_opt.expect("Empty timestamp");
-        let expires_at = timestamp + auth_info.expires_in();
-        println!(" expires_at = {expires_at}, now_secs = {now_secs}");
-        if expires_at <= now_secs {  
-            // auth info has expired
-            let new_auth_info_opt = bitbucket_refresh_token(auth_info.refresh_token()).await;
-            return new_auth_info_opt;
-        }
+    if timestamp_opt.is_none() {
+        eprintln!("No timestamp in authinfo");
+        return None;
+    }
+    let timestamp = timestamp_opt.expect("Empty timestamp");
+    let expires_at = timestamp + auth_info.expires_in();
+    println!(" expires_at = {expires_at}, now_secs = {now_secs}");
+    if expires_at <= now_secs {  
+        // auth info has expired
+        let new_auth_info_opt = bitbucket_refresh_token(auth_info.refresh_token()).await;
+        return new_auth_info_opt;
     }
     return None;
 }
 
-async fn bitbucket_refresh_token(
-    refresh_token: &str, 
-) -> Option<AuthInfo> {
-
+async fn bitbucket_refresh_token(refresh_token: &str) -> Option<AuthInfo> {
     let token_url = "https://bitbucket.org/site/oauth2/access_token";
     let client_id = std::env::var("BITBUCKET_CLIENT_ID")
         .expect("BITBUCKET_CLIENT_ID must be set");
@@ -97,28 +96,31 @@ async fn bitbucket_refresh_token(
         ("grant_type", "refresh_token"),
         ("refresh_token", refresh_token)
     ];
-
     let client = Client::new();
-    match client.post(token_url)
+    let post_res = client.post(token_url)
         .headers(headers)
         .basic_auth(client_id, Some(client_secret))
         .form(payload)
         .send()
-        .await {
-            Ok(response) => {
-                if response.status().is_success() {
-                    match response.json().await {
-                        Ok(resbody) => return Some(resbody),
-                        Err(e) => eprintln!("Unable to deserialize response: {}", e),
-                    }
-                }
-                else {
-                    eprintln!("Failed to get refresh token, status: {}", response.status());
-                }
-            },
-            Err(e) => eprintln!("Unable to get refresh token: {}", e),
-        };
+        .await;
+    if post_res.is_err() {
+        let e = post_res.expect_err("No error in post_err for refres token");
+        eprintln!("Unable to get refresh token: {}", e);
         return None;
+    }
+    let response = post_res.expect("Uncaught error in post_res");
+    if !response.status().is_success() {
+        eprintln!("Failed to get refresh token, status: {}", response.status());
+        return None;
+    }
+    let parse_res =  response.json().await;
+    if parse_res.is_err() {
+        let e = parse_res.expect_err("No error in parse_res refresh_token");
+        eprintln!("Unable to deserialize refresh token response: {}", e);
+        return None;
+    }
+    let refresh_token_resbody = parse_res.expect("Uncaught error in parse_res");
+    return Some(refresh_token_resbody);
 }
 
 fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str) {
@@ -131,13 +133,14 @@ fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str) {
 		.current_dir(directory)
 		.output()
 		.expect("failed to execute git pull");
+    // Only for debug purposes
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("git pull stderr = {:?}", v),
-		Err(e) => {/* error handling */ println!("{}", e)}, 
+		Ok(v) => println!("set_git_url stderr = {:?}", v),
+		Err(e) => eprintln!("set_git_url stderr error: {}", e), 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("git pull stdout = {:?}", v),
-		Err(e) => {/* error handling */ println!("{}", e)}, 
+		Ok(v) => println!("set_git_urll stdout = {:?}", v),
+		Err(e) => eprintln!("set_git_url stdout error: {}", e), 
 	};
 	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
 }
