@@ -14,9 +14,15 @@ pub fn save_user_to_db(user: &User) {
     let json = serde_json::to_vec(user).expect("Failed to serialize user");
   
     // Insert JSON into sled DB
-    db.insert(IVec::from(user_key.as_bytes()), json).expect("Failed to upsert user into sled DB");
+    let insert_res = db.insert(IVec::from(user_key.as_bytes()), json);
+    if insert_res.is_err() {
+        let e = insert_res.expect_err("No error in insert_res");
+        eprintln!("Failed to upsert user into sled DB: {e}");
+        return;
+    }
+    let insert_output = insert_res.expect("Uncaught error in insert_res");
+    println!("User succesfully upserted: {:?}", &insert_output);
 }
-
 pub fn user_from_db(repo_provider: &str, workspace: &str, user_id: &str, ) -> Option<User> {
 	let db = get_db();
 	let user_key = format!("{}/{}/{}", 

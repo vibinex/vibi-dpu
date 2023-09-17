@@ -11,5 +11,12 @@ pub fn save_webhook_to_db(webhook: &Webhook) {
     // Serialize webhook struct to JSON
     let json = serde_json::to_vec(webhook).expect("Failed to serialize webhook");
     // Insert JSON into sled DB
-    db.insert(IVec::from(id), json).expect("Failed to insert webhook into sled DB");
+    let insert_res = db.insert(IVec::from(id), json);
+    if insert_res.is_err() {
+        let e = insert_res.expect_err("No error in insert_res");
+        eprintln!("Failed to upsert webhook into sled DB: {e}");
+        return;
+    }
+    let insert_output = insert_res.expect("Uncaught error in insert_res");
+    println!("Webhook succesfully upserted: {:?}", &insert_output);
 }

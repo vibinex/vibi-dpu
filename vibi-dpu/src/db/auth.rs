@@ -19,7 +19,14 @@ pub fn save_auth_info_to_db(auth_info: &mut AuthInfo) {
     let ivec = IVec::from(bytes);
 
     // Insert into sled DB
-    db.insert("bitbucket_auth_info", ivec).expect("Failed to insert auth info in sled database");
+    let insert_res = db.insert("bitbucket_auth_info", ivec);
+    if insert_res.is_err() {
+        let e = insert_res.expect_err("No error in insert_res");
+        eprintln!("Failed to upsert auth info into sled DB: {e}");
+        return;
+    }
+    let insert_output = insert_res.expect("Uncaught error in insert_res");
+    println!("AuthInfo succesfully upserted: {:?}", &insert_output);
 }
 
 pub fn auth_info() -> AuthInfo {
