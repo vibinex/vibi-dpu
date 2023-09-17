@@ -312,6 +312,11 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 				continue;
 			}
 			let blame_output = blame_res.expect("Uncaught error in blame_res");
+			if !blame_output.status.success() {
+                eprintln!("git blame command failed with exit code {:?} and error: {:?}",
+					blame_output.status.code(), String::from_utf8_lossy(&blame_output.stderr));
+                continue;
+            }
 			let blame = blame_output.stdout;
 			let parse_res = str::from_utf8(&blame);
 			if parse_res.is_err() {
