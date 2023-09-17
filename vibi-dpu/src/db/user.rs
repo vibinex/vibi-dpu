@@ -27,7 +27,13 @@ pub fn user_from_db(repo_provider: &str, workspace: &str, user_id: &str, ) -> Op
 	let db = get_db();
 	let user_key = format!("{}/{}/{}", 
         repo_provider, workspace, user_id);
-	let user_opt = db.get(IVec::from(user_key.as_bytes())).expect("Unable to get repo from db");
+    let get_res = db.get(IVec::from(user_key.as_bytes()));
+    if get_res.is_err() {
+        let e = get_res.expect("No error in get_res user_from_db");
+        eprintln!("Unable to get user_from_db: {:?}", e);
+        return None;
+    }
+	let user_opt = get_res.expect("Uncaught error in get_res user_from_db");
     if user_opt.is_none() {
         return None;
     }
