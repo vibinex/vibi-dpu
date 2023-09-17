@@ -27,7 +27,11 @@ pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> O
     let base_url = bitbucket_base_url();
     let commits_url = format!("{}/repositories/{}/{}/commit/{}", &base_url, repo_owner, repo_name, commit);
     println!("commits url = {}", &commits_url);
-    let authinfo: AuthInfo =  auth_info();
+    let authinfo_opt =  auth_info();
+    if authinfo_opt.is_none() {
+        return None;
+    }
+    let authinfo = authinfo_opt.expect("empty authinfo_opt in get_commit_bb");
     let access_token = authinfo.access_token();
     let response_opt = get_api(&commits_url, access_token, &None).await;
     if response_opt.is_none() {

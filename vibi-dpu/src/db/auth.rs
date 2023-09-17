@@ -29,14 +29,27 @@ pub fn save_auth_info_to_db(auth_info: &mut AuthInfo) {
     println!("AuthInfo succesfully upserted: {:?}", &insert_output);
 }
 
-pub fn auth_info() -> AuthInfo {
+pub fn auth_info() -> Option<AuthInfo> {
     let db = get_db();
 	let authinfo_key = "bitbucket_auth_info";
-	let authinfo_ivec = db.get(IVec::from(authinfo_key.as_bytes()))
-		.expect("Unable to get bb authinfo from db")
-		.expect("Empty bitbucket authinfo in db");
-	let authinfo: AuthInfo =  
-		serde_json::from_slice(&authinfo_ivec)
-        .expect("Unable to deserialize authinfo");
-    return authinfo;
+	let authinfo_res = db.get(IVec::from(authinfo_key.as_bytes()));
+    if authinfo_res.is_err() {
+        let e = authinfo_res.expect_err("No error in authinfo_res");
+        eprintln!("Unable to get bb authinfo from db: {:?}", e);
+        return None;
+    }
+    let authinfo_opt = authinfo_res.expect("Uncaught error in authinfo_res");
+    if authinfo_opt.is_none() {
+        eprintln!("No bitbucket authinfo in db");
+        return None;
+    }
+    let authinfo_ivec = authinfo_opt.expect("Empty authinfo_opt");
+    let authinfo_parse = serde_json::from_slice(&authinfo_ivec);
+    if authinfo_parse.is_err() {
+        let e = authinfo_parse.expect_err("No error in authinfo_parse");
+        eprintln!("Unable to deserialize authinfo_parse: {:?}", e);
+        return None;
+    }
+	let authinfo: AuthInfo =  authinfo_parse.expect("Uncaught error in authinfo_parse");
+    return Some(authinfo);
 }

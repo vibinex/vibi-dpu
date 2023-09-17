@@ -36,7 +36,12 @@ pub fn commit_exists(commit: &str) -> bool {
 pub async fn git_pull(review: &Review) {
 	let directory = review.clone_dir();
 	println!("directory = {}", &directory);
-	let access_token = refresh_git_auth(review.clone_url(), review.clone_dir()).await;
+	let access_token_opt = refresh_git_auth(review.clone_url(), review.clone_dir()).await;
+	if access_token_opt.is_none() {
+		eprintln!("Unable to get access_token from refresh_git_auth");
+		return;
+	}
+	let access_token = access_token_opt.expect("Empty access_token");
     set_git_url(review.clone_url(), directory, &access_token);
 	let output_res = Command::new("git")
 		.arg("pull")

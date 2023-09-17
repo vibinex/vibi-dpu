@@ -46,14 +46,15 @@ fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review) {
 }
 
 fn hunk_already_exists(review: &Review) -> bool {
-	let hunk = get_hunk_from_db(&review);
-	if hunk.is_some() {
-		let hunkval = hunk.expect("hunk is empty");
-		publish_hunkmap(&hunkval);
-		eprintln!("Hunk already in db!");
-		return true;
+	let hunk_opt = get_hunk_from_db(&review);
+	if hunk_opt.is_none() {
+		eprintln!("No hunk from get_hunk_from_db");
+		return false;
 	}
-	return false;
+	let hunkmap = hunk_opt.expect("empty hunk from get_hunk_from_db");
+	publish_hunkmap(&hunkmap);
+	println!("Hunk already in db!");
+	return true;
 }
 async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 	let mut prvec = Vec::<PrHunkItem>::new();

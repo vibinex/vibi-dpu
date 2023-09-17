@@ -50,19 +50,25 @@ pub async fn get_access_token_from_bitbucket(code: &str) -> Option<AuthInfo> {
     return Some(response_json);
 }
 
-pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> String{
-	let authinfo: AuthInfo =  auth_info();
-    let mut access_token = authinfo.access_token().to_string();
-    match update_access_token(&authinfo).await {
-        Some(mut new_auth_info) => {
-            println!("New auth info  = {:?}", &new_auth_info);
-            access_token = new_auth_info.access_token().to_string();
-            set_git_remote_url(clone_url, directory, &access_token);
-            save_auth_info_to_db(&mut new_auth_info);
-        },
-        None => {println!(" No new auth info");},
+pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String>{
+	let authinfo_opt =  auth_info();
+    if authinfo_opt.is_none() {
+        return None;
     }
-    return access_token;
+    let authinfo = authinfo_opt.expect("empty authinfo_opt in refresh_git_auth");
+    let mut access_token = authinfo.access_token().to_string();
+    let authinfo_opt = update_access_token(&authinfo).await;
+    if authinfo_opt.is_none() {
+        eprintln!("Empty authinfo_opt from update_access_token");
+        return None;
+    }
+    let mut new_auth_info = authinfo_opt
+        .expect("empty auhtinfo_opt from update_access_token");
+    println!("New auth info  = {:?}", &new_auth_info);
+    access_token = new_auth_info.access_token().to_string();
+    set_git_remote_url(clone_url, directory, &access_token);
+    save_auth_info_to_db(&mut new_auth_info);
+    return Some(access_token);
 }
 
 pub async fn update_access_token(auth_info: &AuthInfo) -> Option<AuthInfo> {
@@ -111,7 +117,8 @@ async fn bitbucket_refresh_token(refresh_token: &str) -> Option<AuthInfo> {
     }
     let response = post_res.expect("Uncaught error in post_res");
     if !response.status().is_success() {
-        eprintln!("Failed to get refresh token, status: {}", response.status());
+        eprintln!("Failed to get refresh token, status: {} body: {:?}", 
+            response.status(), response.text().await);
         return None;
     }
     let parse_res =  response.json().await;
