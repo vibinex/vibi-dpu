@@ -1,4 +1,4 @@
-#[derive(Debug, Serialize, Default, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HunkMap {
     repo_provider: String,
     repo_owner: String,
@@ -11,7 +11,7 @@ pub struct HunkMap {
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Debug, Serialize, Default, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PrHunkItem {
     pr_number: String,
     author: String,
@@ -19,7 +19,7 @@ pub struct PrHunkItem {
 }
 
 
-#[derive(Debug, Serialize, Default, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlameItem {
     author: String,
     timestamp: String,
