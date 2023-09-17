@@ -86,17 +86,21 @@ async fn deserialize_response(response_opt: Option<Response>) -> (Vec<Value>, Op
 
 async fn get_all_pages(next_url: Option<String>, access_token: &str, params: &Option<HashMap<&str, &str>>) -> Vec<Value>{
     let mut values_vec = Vec::new();
-    let mut next_url = next_url;
-    while next_url.is_some() {
-        let url = next_url.as_ref().expect("next_url is none").trim_matches('"');
-        if url != "null" {
-            let response_opt = get_api(url, access_token, params).await;
-            let (mut response_values, url_opt) = deserialize_response(response_opt).await;
-            next_url = url_opt.clone();
-            values_vec.append(&mut response_values);    
-        } else {
+    let mut next_url_mut = next_url;
+    while next_url_mut.is_some() {
+        let url_opt = next_url_mut.as_ref();
+        if url_opt.is_none() {
+            eprintln!("next_url is none");
             break;
         }
+        let url = url_opt.expect("Empty next url_opt").trim_matches('"');
+        if url == "null" {
+            break;   
+        }
+        let response_opt = get_api(url, access_token, params).await;
+        let (mut response_values, url_opt) = deserialize_response(response_opt).await;
+        next_url_mut = url_opt.clone();
+        values_vec.append(&mut response_values);
     }
     return values_vec;
 }
