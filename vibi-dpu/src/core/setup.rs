@@ -87,14 +87,19 @@ async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
     };
     println!("body = {:?}", &body);
     let client = get_client();
-    let resp = client
-      .post(format!("{base_url}/api/rustApp/setup"))
+    let setup_url = format!("{base_url}/api/rustApp/setup");
+    let post_res = client
+      .post(&setup_url)
       .json(&body)
       .send()
-      .await
-      .unwrap();
-
-    println!("Response: {}", resp.text().await.unwrap());
+      .await;
+    if post_res.is_err() {
+        let e = post_res.expect_err("No error in post_res in send_setup_info");
+        eprintln!("error in send_setup_info post_res: {:?}, url: {:?}", e, &setup_url);
+        return;
+    }
+    let resp = post_res.expect("Uncaught error in post_res");
+    println!("Response: {:?}", resp.text().await);
 }
 
 async fn clone_git_repo(repo: &mut Repository, access_token: &str) {
