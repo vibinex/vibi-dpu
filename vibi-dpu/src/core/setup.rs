@@ -32,7 +32,12 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
     // get access token from installation code by calling relevant repo provider's api
     // out of github, bitbucket, gitlab
 
-    let authinfo = get_access_token_from_bitbucket(installation_code).await.expect("Unable to get access token");
+    let authinfo_opt = get_access_token_from_bitbucket(installation_code).await;
+    if authinfo_opt.is_none() {
+        eprintln!("Unable to get authinfo in get_access_token_from_bitbucket");
+        return;
+    }
+    let authinfo = authinfo_opt.expect("Empty authinfo_opt");
     println!("AuthInfo: {:?}", authinfo);
     // let auth_info = { "access_token": access_token, "expires_in": expires_in_formatted, "refresh_token": auth_info["refresh_token"] }; db.insert("auth_info", serde_json::to_string(&auth_info).unwrap());
     let access_token = authinfo.access_token().clone();
