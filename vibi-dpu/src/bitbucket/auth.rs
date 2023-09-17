@@ -3,11 +3,12 @@ use std::str;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use reqwest::Client;
+use super::config::get_client;
 use crate::db::auth::{save_auth_info_to_db, auth_info};
 use crate::utils::auth::AuthInfo;
 
 pub async fn get_access_token_from_bitbucket(code: &str) -> Option<AuthInfo> {
-    let client = Client::new();
+    let client = get_client();
     let bitbucket_client_id = env::var("BITBUCKET_CLIENT_ID").unwrap();
     let bitbucket_client_secret = env::var("BITBUCKET_CLIENT_SECRET").unwrap();
     let mut params = std::collections::HashMap::new();
@@ -96,7 +97,7 @@ async fn bitbucket_refresh_token(refresh_token: &str) -> Option<AuthInfo> {
         ("grant_type", "refresh_token"),
         ("refresh_token", refresh_token)
     ];
-    let client = Client::new();
+    let client = get_client();
     let post_res = client.post(token_url)
         .headers(headers)
         .basic_auth(client_id, Some(client_secret))

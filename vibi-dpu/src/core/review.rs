@@ -2,7 +2,19 @@ use std::env;
 
 use serde_json::Value;
 
-use crate::{utils::{hunk::{HunkMap, PrHunkItem}, review::Review, gitops::{commit_exists, git_pull, get_excluded_files, generate_diff, process_diffmap, generate_blame}}, db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, repo::get_clone_url_clone_dir, review::{save_review_to_db, self}}};//, core::coverage::process_coverage};
+use crate::{
+	utils::{hunk::{HunkMap, PrHunkItem}, 
+			review::Review, 
+			gitops::{commit_exists, 
+					git_pull, 
+					get_excluded_files, 
+					generate_diff, 
+					process_diffmap, 
+					generate_blame}}, 
+	db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, 
+		repo::get_clone_url_clone_dir, 
+		review::{save_review_to_db}},
+	bitbucket::config::get_client};//, core::coverage::process_coverage};
 
 pub async fn process_review(message_data: &Vec<u8>) {
 	let review_opt = parse_review(message_data);
@@ -108,7 +120,7 @@ fn parse_review(message_data: &Vec<u8>) -> Option<Review>{
 }
 
 fn publish_hunkmap(hunkmap: &HunkMap) {
-	let client = reqwest::Client::new();
+	let client = get_client();
 	let hunkmap_json = serde_json::to_string(&hunkmap).expect("Unable to serialize hunkmap");
 	tokio::spawn(async move {
 		let url = format!("{}/api/hunks",

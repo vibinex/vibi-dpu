@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::{db::webhook::save_webhook_to_db, utils::webhook::{Webhook, WebhookResponse}, bitbucket::config::{bitbucket_base_url, get_api}};
 
-use super::config::prepare_auth_headers;
+use super::config::{get_client, prepare_auth_headers};
 
 
 pub async fn get_webhooks_in_repo(workspace_slug: &str, repo_slug: &str, access_token: &str) -> Vec<Webhook> {
@@ -46,7 +46,7 @@ pub async fn add_webhook(workspace_slug: &str, repo_slug: &str, access_token: &s
         "events": ["pullrequest:created", "pullrequest:updated"] 
     });
 
-    let response = reqwest::Client::new()
+    let response = get_client()
         .post(&url)
         .headers(headers_map)
         .json(&payload)
