@@ -143,7 +143,7 @@ fn generate_statitem(statitems: &Vec<&str>) -> StatItem {
 				0 // default value
 			}
 		},
-		deletions: match statitems[0].to_string().parse() {
+		deletions: match statitems[1].to_string().parse() {
 			Ok(dels) => {dels}
 			Err(e) => {
 				eprintln!("Unable to parse deletions: {:?}", e);
