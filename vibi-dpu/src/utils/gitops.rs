@@ -27,6 +27,7 @@ pub fn commit_exists(commit: &str) -> bool {
 	if output_res.is_err() {
 		let e = output_res.expect_err("No error in output_res");
 		eprintln!("Failed to execute git rev-list: {:?}", e);
+		return false;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
 	return output.status.success()
@@ -39,22 +40,21 @@ pub async fn git_pull(review: &Review) {
     set_git_url(review.clone_url(), directory, &access_token);
 	let output_res = Command::new("git")
 		.arg("pull")
-		// .arg("--all") 
-		// .arg(&review.clone_url)
 		.current_dir(directory)
 		.output();
 	if output_res.is_err() {
 		let e = output_res.expect_err("No error in output_res");
 		eprintln!("failed to execute git pull: {:?}", e);
+		return;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
 	match str::from_utf8(&output.stderr) {
 		Ok(v) => println!("git pull stderr = {:?}", v),
-		Err(e) => {/* error handling */ println!("{}", e)}, 
+		Err(e) => {/* error handling */ println!("git pull stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
 		Ok(v) => println!("git pull stdout = {:?}", v),
-		Err(e) => {/* error handling */ println!("{}", e)}, 
+		Err(e) => {/* error handling */ println!("git pull stdout error {}", e)}, 
 	};
 	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
 }
@@ -63,21 +63,26 @@ fn set_git_url(git_url: &str, directory: &str, access_token: &str) {
     let clone_url = git_url.to_string()
         .replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
         .replace("bitbucket.org:", "bitbucket.org/");
-    let output = Command::new("git")
+    let output_res = Command::new("git")
 		.arg("remote").arg("set-url").arg("origin")
 		.arg(clone_url)
 		.current_dir(directory)
-		.output()
-		.expect("failed to execute git pull");
+		.output();
+	if output_res.is_err() {
+		let e = output_res.expect_err("No error in output_res");
+		eprintln!("failed to execute set_git_url: {:?}", e);
+		return;
+	}
+	let output = output_res.expect("Uncaught error in output_res");
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("git pull stderr = {:?}", v),
-		Err(e) => {/* error handling */ println!("{}", e)}, 
+		Ok(v) => println!("set_git_url stderr = {:?}", v),
+		Err(e) => {/* error handling */ println!("set_git_url stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("git pull stdout = {:?}", v),
-		Err(e) => {/* error handling */ println!("{}", e)}, 
+		Ok(v) => println!("set_git_url stdout = {:?}", v),
+		Err(e) => {/* error handling */ println!("set_git_url stdout error {}", e)}, 
 	};
-	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
+	println!("set_git_url output = {:?}, {:?}", &output.stdout, &output.stderr);
 }
 
 pub fn get_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatItem>)> {

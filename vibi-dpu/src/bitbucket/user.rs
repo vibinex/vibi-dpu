@@ -40,12 +40,13 @@ pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> O
     let timestamp_str = &response_json["date"].to_string().replace('"', "");
     println!("timestamp_str = {}", timestamp_str);
     // Explicitly specify the format
-    let datetime_res: DateTime<FixedOffset> = DateTime::parse_from_rfc3339(&timestamp_str);
+    let datetime_res = DateTime::parse_from_rfc3339(&timestamp_str);
     if datetime_res.is_err() {
         let e = datetime_res.expect_err("No error in dateime_res");
         eprintln!("Failed to parse timestamp: {:?}", e);
+        return None;
     }
-    let datetime = datetime_res.expect("Uncaught error in datetime_res");
+    let datetime: DateTime<FixedOffset> = datetime_res.expect("Uncaught error in datetime_res");
     // Convert to Utc
     let datetime_utc = datetime.with_timezone(&Utc);
 
