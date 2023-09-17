@@ -83,13 +83,17 @@ fn set_git_url(git_url: &str, directory: &str, access_token: &str) {
 		return;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
+	if !output.status.success() {
+		eprintln!("set_git_url failed with exit code: {}", output.status);
+		return;
+	}
 	match str::from_utf8(&output.stderr) {
 		Ok(v) => println!("set_git_url stderr = {:?}", v),
-		Err(e) => {/* error handling */ println!("set_git_url stderr error {}", e)}, 
+		Err(e) => {/* error handling */ eprintln!("set_git_url stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
 		Ok(v) => println!("set_git_url stdout = {:?}", v),
-		Err(e) => {/* error handling */ println!("set_git_url stdout error {}", e)}, 
+		Err(e) => {/* error handling */ eprintln!("set_git_url stdout error {}", e)}, 
 	};
 	println!("set_git_url output = {:?}, {:?}", &output.stdout, &output.stderr);
 }
