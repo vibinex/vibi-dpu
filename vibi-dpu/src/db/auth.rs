@@ -25,8 +25,7 @@ pub fn save_auth_info_to_db(auth_info: &mut AuthInfo) {
         eprintln!("Failed to upsert auth info into sled DB: {e}");
         return;
     }
-    let insert_output = insert_res.expect("Uncaught error in insert_res");
-    println!("AuthInfo succesfully upserted: {:?}", &insert_output);
+    println!("AuthInfo succesfully upserted: {:?}", auth_info);
 }
 
 pub fn auth_info() -> Option<AuthInfo> {

@@ -85,7 +85,8 @@ async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 }
 
 async fn commit_check(review: &Review) {
-	if !commit_exists(&review.base_head_commit()) || !commit_exists(&review.pr_head_commit()) {
+	if !commit_exists(&review.base_head_commit(), &review.clone_dir()) 
+		|| !commit_exists(&review.pr_head_commit(), &review.clone_dir()) {
 		println!("Pulling repository {} for commit history", &review.repo_name());
 		git_pull(review).await;
 	}
@@ -104,7 +105,12 @@ fn parse_review(message_data: &Vec<u8>) -> Option<Review>{
 	let repo_name = data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
 	println!("repo NAME == {}", &repo_name);
 	let workspace_name = data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
-	let (clone_url, clone_dir) = get_clone_url_clone_dir(&repo_provider, &workspace_name, &repo_name);
+	let clone_opt = get_clone_url_clone_dir(&repo_provider, &workspace_name, &repo_name);
+	if clone_opt.is_none() {
+		eprintln!("Unable to get clone url and directory");
+		return None;
+	}
+	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");
 	let pr_id = data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
 	let review = Review::new(
 		data["eventPayload"]["pullrequest"]["destination"]["commit"]["hash"].to_string().replace("\"", ""),

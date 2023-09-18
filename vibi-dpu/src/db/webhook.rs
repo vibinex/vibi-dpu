@@ -23,6 +23,5 @@ pub fn save_webhook_to_db(webhook: &Webhook) {
         eprintln!("Failed to upsert webhook into sled DB: {e}");
         return;
     }
-    let insert_output = insert_res.expect("Uncaught error in insert_res");
-    println!("Webhook succesfully upserted: {:?}", &insert_output);
+    println!("Webhook succesfully upserted: {:?}", webhook);
 }

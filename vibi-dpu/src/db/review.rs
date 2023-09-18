@@ -14,6 +14,5 @@ pub fn save_review_to_db(review: &Review) {
         eprintln!("Failed to upsert review into sled DB: {e}");
         return;
     }
-    let insert_output = insert_res.expect("Uncaught error in insert_res");
-    println!("Review succesfully upserted: {:?}", &insert_output);
+    println!("Review succesfully upserted: {:?}", review);
 }

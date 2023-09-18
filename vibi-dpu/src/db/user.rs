@@ -20,8 +20,7 @@ pub fn save_user_to_db(user: &User) {
         eprintln!("Failed to upsert user into sled DB: {:?}", e);
         return;
     }
-    let insert_output = insert_res.expect("Uncaught error in insert_res");
-    println!("User succesfully upserted: {:?}", &insert_output);
+    println!("User succesfully upserted: {:?}", user);
 }
 pub fn user_from_db(repo_provider: &str, workspace: &str, user_id: &str, ) -> Option<User> {
 	let db = get_db();

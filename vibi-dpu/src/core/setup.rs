@@ -1,4 +1,6 @@
 use std::env;
+use std::str;
+use std::io::ErrorKind;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use reqwest::Client;
@@ -123,27 +125,29 @@ async fn clone_git_repo(repo: &mut Repository, access_token: &str) {
     let exists_res = fs::metadata(&directory).await;
     if exists_res.is_err() {
         let e = exists_res.expect_err("No error in exists_res");
-        eprintln!("Unable to execute metadata in {:?}, error: {:?}",
+        println!("executing metadata in {:?}, output: {:?}",
                 &directory, e);
-        return;
+        if e.kind() != ErrorKind::NotFound {
+            return;
+        }
     }
-    let exists_output = exists_res.expect("Uncaught error in exists_res");
-    println!("directory exists before cloning: {:?}", &exists_output);
     let remove_dir_opt = fs::remove_dir_all(&directory).await;
     if remove_dir_opt.is_err() {
         let e = remove_dir_opt.expect_err("No error in remove_dir_opt");
-        eprintln!("Unable to execute remove_dir_all in {:?}, error: {:?}",
+        println!("Execute in directory: {:?}, remove_dir_all: {:?}",
             &directory, e);
-        return;
+        if e.kind() != ErrorKind::NotFound {
+            return;
+        }
     }
-    let remove_dir = remove_dir_opt.expect("Uncaught error in remove_dir_opt");
-    println!("The remove_dir output: {:?}", &remove_dir);
     let create_dir_opt = fs::create_dir_all(&directory).await;
     if create_dir_opt.is_err() {
         let e = create_dir_opt.expect_err("No error in create_dir_opt");
-        eprintln!("Error executing in directory: {:?}, create_dir_all: {:?}",
+        println!("Executing in directory: {:?}, create_dir_all: {:?}",
             &directory, e);
-        return;
+        if e.kind() != ErrorKind::NotFound {
+            return;
+        }
     }
     println!("directory exists? {}", fs::metadata(&directory).await.is_ok());
     let mut cmd = std::process::Command::new("git");
@@ -151,13 +155,21 @@ async fn clone_git_repo(repo: &mut Repository, access_token: &str) {
     let output_res = cmd.output();
     if output_res.is_err() {
         let e = output_res.expect_err("No error in output_res in git clone");
-        eprintln!("Error in git clone: {:?}", e);
+        eprintln!("Executing in directory: {:?}, git clone: {:?}",
+            &directory, e);
         return;
     }
     let output = output_res.expect("Uncaught error in output_res");
-    println!("Git clone output: {:?}", &output);
+	match str::from_utf8(&output.stderr) {
+		Ok(v) => println!("git pull stderr = {:?}", v),
+		Err(e) => {/* error handling */ println!("git clone stderr error {}", e)}, 
+	};
+	match str::from_utf8(&output.stdout) {
+		Ok(v) => println!("git pull stdout = {:?}", v),
+		Err(e) => {/* error handling */ println!("git clone stdout error {}", e)}, 
+	};
     directory = format!("{}/{}", &directory, repo.name());
-    repo.set_local_dir(directory);
+    repo.set_local_dir(&directory);
     save_repo_to_db(repo);
 }
 
@@ -167,6 +179,7 @@ async fn process_webhooks(workspace_slug: String, repo_name: String, access_toke
     let webhook_callback_url = format!("{}/api/bitbucket/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
     if webhooks_data.is_empty() {
+        println!("Adding new webhook...");
         let repo_name_async = repo_name.clone();
         let workspace_slug_async = workspace_slug.clone();
         let access_token_async = access_token.clone();
@@ -176,25 +189,24 @@ async fn process_webhooks(workspace_slug: String, repo_name: String, access_toke
                 &repo_name_async, 
                 &access_token_async).await;
         });
+        return;
     }
-    else {
-        let matching_webhook = webhooks_data.into_iter()
-            .find(|w| w.url().to_string() == webhook_callback_url);
-        if matching_webhook.is_some() {
-            let webhook = matching_webhook.expect("no matching webhook");
-            println!("Webhook already exists: {:?}", &webhook);
-            save_webhook_to_db(&webhook);
-        } else {
-            println!("Adding new webhook...");
-            let repo_name_async = repo_name.clone();
-            let workspace_slug_async = workspace_slug.clone();
-            let access_token_async = access_token.clone();
-            task::spawn(async move {
-                add_webhook(
-                    &workspace_slug_async, 
-                    &repo_name_async, 
-                    &access_token_async).await;
-            });
-        }
+    let matching_webhook = webhooks_data.into_iter()
+        .find(|w| w.url().to_string() == webhook_callback_url);
+    if matching_webhook.is_none() {
+        println!("Adding new webhook...");
+        let repo_name_async = repo_name.clone();
+        let workspace_slug_async = workspace_slug.clone();
+        let access_token_async = access_token.clone();
+        task::spawn(async move {
+            add_webhook(
+                &workspace_slug_async, 
+                &repo_name_async, 
+                &access_token_async).await;
+        });
+        return;
     }
+    let webhook = matching_webhook.expect("no matching webhook");
+    println!("Webhook already exists: {:?}", &webhook);
+    save_webhook_to_db(&webhook);
 }

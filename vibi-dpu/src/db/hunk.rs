@@ -42,6 +42,5 @@ pub fn store_hunkmap_to_db(hunkmap: &HunkMap, review: &Review) {
         eprintln!("Failed to upsert hunkmap into sled DB: {e}");
         return;
     }
-    let insert_output = insert_res.expect("Uncaught error in insert_res");
-    println!("Hunkmap succesfully upserted: {:?}", &insert_output);
+    println!("Hunkmap succesfully upserted: {:?}", hunkmap);
 }

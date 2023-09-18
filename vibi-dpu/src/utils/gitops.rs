@@ -19,10 +19,11 @@ pub struct StatItem {
 	deletions: i32,
 }
 
-pub fn commit_exists(commit: &str) -> bool {
+pub fn commit_exists(commit: &str, directory: &str) -> bool {
 	let output_res = Command::new("git")
 		.arg("rev-list")
 		.arg(commit)
+		.current_dir(directory)
 		.output();
 	if output_res.is_err() {
 		let e = output_res.expect_err("No error in output_res");
@@ -30,10 +31,15 @@ pub fn commit_exists(commit: &str) -> bool {
 		return false;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
-	if !output.status.success() {
-		eprintln!("Failed to execute git rev-list, exit code: {:?}", output.status.code());
-		return false;
-	}
+	println!("Execute git rev-list, exit code: {:?}", output.status.code());
+	match str::from_utf8(&output.stderr) {
+		Ok(v) => println!("git rev-list stderr = {:?}", v),
+		Err(e) => {/* error handling */ println!("git rev-list stderr error {}", e)}, 
+	};
+	match str::from_utf8(&output.stdout) {
+		Ok(v) => println!("git rev-list stdout = {:?}", v),
+		Err(e) => {/* error handling */ println!("git rev-list stdout error {}", e)}, 
+	};
 	return true;
 }
 
@@ -65,7 +71,6 @@ pub async fn git_pull(review: &Review) {
 		Ok(v) => println!("git pull stdout = {:?}", v),
 		Err(e) => {/* error handling */ println!("git pull stdout error {}", e)}, 
 	};
-	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
 }
 
 fn set_git_url(git_url: &str, directory: &str, access_token: &str) {

@@ -24,6 +24,5 @@ pub fn save_workspace_to_db(workspace: &Workspace) {
         eprintln!("Failed to upsert workspace into sled DB: {e}");
         return;
     }
-    let insert_output = insert_res.expect("Uncaught error in insert_res");
-    println!("Workspace succesfully upserted: {:?}", &insert_output);  
+    println!("Workspace succesfully upserted: {:?}", workspace);  
 }
