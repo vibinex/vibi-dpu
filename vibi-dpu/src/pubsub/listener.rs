@@ -86,7 +86,11 @@ async fn setup_subscription(keypath: &str, topicname: &str) -> Subscription{
         ..Default::default()
     };
     let subscription_name = format!("{topicname}-sub");
-    let subscription = client.subscription(&subscriptionname);
+    let subscription = client.subscription(&subscription_name);
+    let subconfig = SubscriptionConfig {
+        enable_message_ordering: true,
+        ..Default::default()
+    };
     if !subscription.exists(None).await.expect("Unable to get subscription information") {
         subscription.create(
             topic.fully_qualified_name(), subconfig, None)
