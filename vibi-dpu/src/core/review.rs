@@ -14,7 +14,8 @@ use crate::{
 	db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, 
 		repo::get_clone_url_clone_dir, 
 		review::{save_review_to_db}},
-	bitbucket::config::get_client};//, core::coverage::process_coverage};
+	bitbucket::config::get_client,
+	core::coverage::process_coverage};
 
 pub async fn process_review(message_data: &Vec<u8>) {
 	let review_opt = parse_review(message_data);
@@ -29,10 +30,10 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	println!("Processing PR : {}", &review.id());
 	commit_check(&review).await;
 	let hunkmap_opt = process_review_changes(&review).await;
-	send_hunkmap(&hunkmap_opt, &review);
+	send_hunkmap(&hunkmap_opt, &review).await;
 }
 
-fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review) {
+async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review) {
 	if hunkmap_opt.is_none() {
 		eprintln!("Empty hunkmap in send_hunkmap");
 		return;
@@ -41,8 +42,9 @@ fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review) {
 	println!("HunkMap = {:?}", &hunkmap);
 	store_hunkmap_to_db(&hunkmap, review);
 	publish_hunkmap(&hunkmap);
-	// let hunkmap_async = hunkmap.clone();
-	// process_coverage(&hunkmap_async).await; TODO - include in future PR
+	let hunkmap_async = hunkmap.clone();
+	let review_async = review.clone();
+	process_coverage(&hunkmap_async, &review_async).await;
 }
 
 fn hunk_already_exists(review: &Review) -> bool {
