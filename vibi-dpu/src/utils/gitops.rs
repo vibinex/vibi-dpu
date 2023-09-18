@@ -31,14 +31,33 @@ pub fn commit_exists(commit: &str, directory: &str) -> bool {
 		return false;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
+	if !output.status.success() {
+		eprintln!("git rev-list, exit code: {:?}",
+			output.status.code());
+		// for debugging
+		match str::from_utf8(&output.stderr) {
+			Ok(v) => println!("git rev-list stderr = {:?}", v),
+			Err(e) => {/* error handling */ println!("git rev-list stderr error {}", e)}, 
+		};
+		return false;
+	}
 	println!("Execute git rev-list, exit code: {:?}", output.status.code());
+	if output.status.code() == Some(128) {
+		// for debugging
+		match str::from_utf8(&output.stderr) {
+			Ok(v) => eprintln!("git rev-list stderr = {:?}", v),
+			Err(e) => {/* error handling */ eprintln!("git rev-list stderr error {}", e)}, 
+		};
+		return false;
+	}
+	// for debugging
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("git rev-list stderr = {:?}", v),
-		Err(e) => {/* error handling */ println!("git rev-list stderr error {}", e)}, 
+		Ok(v) => eprintln!("git rev-list stderr = {:?}", v),
+		Err(e) => {/* error handling */ eprintln!("git rev-list stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
 		Ok(v) => println!("git rev-list stdout = {:?}", v),
-		Err(e) => {/* error handling */ println!("git rev-list stdout error {}", e)}, 
+		Err(e) => {/* error handling */ eprintln!("git rev-list stdout error {}", e)}, 
 	};
 	return true;
 }
@@ -48,8 +67,7 @@ pub async fn git_pull(review: &Review) {
 	println!("directory = {}", &directory);
 	let access_token_opt = refresh_git_auth(review.clone_url(), review.clone_dir()).await;
 	if access_token_opt.is_none() {
-		eprintln!("Unable to get access_token from refresh_git_auth");
-		return;
+		eprintln!("no refresh token acquired");
 	}
 	let access_token = access_token_opt.expect("Empty access_token");
     set_git_url(review.clone_url(), directory, &access_token);

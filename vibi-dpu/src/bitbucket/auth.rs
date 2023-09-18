@@ -57,21 +57,17 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
     }
     let authinfo = authinfo_opt.expect("empty authinfo_opt in refresh_git_auth");
     let mut access_token = authinfo.access_token().to_string();
-    let authinfo_opt = update_access_token(&authinfo).await;
+    let authinfo_opt = update_access_token(&authinfo, clone_url, directory).await;
     if authinfo_opt.is_none() {
         eprintln!("Empty authinfo_opt from update_access_token");
         return None;
     }
-    let mut new_auth_info = authinfo_opt
-        .expect("empty auhtinfo_opt from update_access_token");
-    println!("New auth info  = {:?}", &new_auth_info);
-    access_token = new_auth_info.access_token().to_string();
-    set_git_remote_url(clone_url, directory, &access_token);
-    save_auth_info_to_db(&mut new_auth_info);
+    
     return Some(access_token);
 }
 
-pub async fn update_access_token(auth_info: &AuthInfo) -> Option<AuthInfo> {
+pub async fn update_access_token(auth_info: &AuthInfo,
+        clone_url: &str, directory: &str) -> Option<AuthInfo> {
     let now = SystemTime::now();
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
     let timestamp_opt = auth_info.timestamp();
@@ -81,13 +77,20 @@ pub async fn update_access_token(auth_info: &AuthInfo) -> Option<AuthInfo> {
     }
     let timestamp = timestamp_opt.expect("Empty timestamp");
     let expires_at = timestamp + auth_info.expires_in();
-    println!(" expires_at = {expires_at}, now_secs = {now_secs}");
-    if expires_at <= now_secs {  
-        // auth info has expired
-        let new_auth_info_opt = bitbucket_refresh_token(auth_info.refresh_token()).await;
-        return new_auth_info_opt;
+    if expires_at > now_secs {  
+        eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
+        return Some(auth_info.to_owned());
     }
-    return None;
+    // auth info has expired
+    println!("auth info expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
+    let new_auth_info_opt = bitbucket_refresh_token(auth_info.refresh_token()).await;
+    let mut new_auth_info = new_auth_info_opt.clone()
+        .expect("empty auhtinfo_opt from update_access_token");
+    println!("New auth info  = {:?}", &new_auth_info);
+    let access_token = new_auth_info.access_token().to_string();
+    set_git_remote_url(clone_url, directory, &access_token);
+    save_auth_info_to_db(&mut new_auth_info);
+    return new_auth_info_opt;
 }
 
 async fn bitbucket_refresh_token(refresh_token: &str) -> Option<AuthInfo> {
