@@ -124,7 +124,7 @@ fn parse_review(message_data: &Vec<u8>) -> Option<Review>{
 		format!("bitbucket/{}/{}/{}", &workspace_name, &repo_name, &pr_id),
 		clone_dir,
 		clone_url,
-		data["eventPayload"]["pullrequest"]["author"]["account_id"].to_string().replace("\"", ""),
+		data["eventPayload"]["pullrequest"]["author"]["uuid"].to_string().replace("\"", ""),
 	);
 	println!("review = {:?}", &review);
 	save_review_to_db(&review);
