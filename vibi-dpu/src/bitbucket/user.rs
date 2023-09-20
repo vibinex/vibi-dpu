@@ -69,7 +69,7 @@ pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> O
     let user_opt = get_workspace_user_from_db(&user_key);
     if user_opt.is_none() {
         eprintln!("No user found in db for key: {}", &user_key);
-        return None;
+        return Some(LineItem::new(bitbucket_user.display_name().to_owned(), unix_timestamp_str));
     }
     let user = user_opt.expect("empty user_opt");
     user_key = user.display_name().to_owned();

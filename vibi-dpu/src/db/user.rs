@@ -4,41 +4,6 @@ use sled::IVec;
 use crate::db::config::get_db;
 use crate::utils::user::{BitbucketUser, WorkspaceUser};
 
-pub fn save_bitbucket_user_to_db(user: &BitbucketUser) {
-    let db = get_db();
-    let user_key = format!("bitbucket/{}", user.uuid());
-    println!("user_key = {}", &user_key);
-  
-    // Serialize repo struct to JSON 
-    let json = serde_json::to_vec(user).expect("Failed to serialize user");
-  
-    // Insert JSON into sled DB
-    let insert_res = db.insert(IVec::from(user_key.as_bytes()), json);
-    if insert_res.is_err() {
-        let e = insert_res.expect_err("No error in insert_res");
-        eprintln!("Failed to upsert user into sled DB: {:?}", e);
-        return;
-    }
-    println!("User succesfully upserted: {:?}", user);
-}
-pub fn bitbucket_user_from_db(user_id: &str) -> Option<BitbucketUser> {
-	let db = get_db();
-	let user_key = format!("bitbucket/{}", user_id);
-    let get_res = db.get(IVec::from(user_key.as_bytes()));
-    if get_res.is_err() {
-        let e = get_res.expect("No error in get_res bitbucket_user_from_db");
-        eprintln!("Unable to get bitbucket_user_from_db: {:?}", e);
-        return None;
-    }
-	let user_opt = get_res.expect("Uncaught error in get_res bitbucket_user_from_db");
-    if user_opt.is_none() {
-        return None;
-    }
-	let user_ivec = user_opt.expect("Empty value");
-	let user: BitbucketUser = serde_json::from_slice::<BitbucketUser>(&user_ivec).unwrap();
-	println!("user from db = {:?}", &user);
-	return Some(user);
-}
 
 pub fn set_workspace_user_in_db(user: &WorkspaceUser) {
     let db = get_db();
@@ -63,7 +28,7 @@ pub fn get_workspace_user_from_db(user_key: &str) -> Option<WorkspaceUser> {
     let db = get_db();
     let get_res = db.get(IVec::from(user_key.to_string().as_bytes()));
     if get_res.is_err() {
-        let e = get_res.expect("No error in get_res bitbucket_user_from_db");
+        let e = get_res.expect("No error in get_res get_workspace_user_from_db");
         eprintln!("Unable to get workspace_user_from_db: {:?}", e);
         return None;
     }

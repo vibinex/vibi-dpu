@@ -277,12 +277,25 @@ fn process_diff(filepath: &str, diff: &str, linemap: &mut HashMap<String, Vec<St
 			deletionstr = deletionstr.replace("-", "");
 			if deletionstr.contains(",") {
 				let delsplit: Vec<&str> = deletionstr.split(",").collect();
-				let delidx = delsplit[0].parse::<i32>().unwrap();
-				let deldiff = delsplit[1].parse::<i32>().unwrap();
+				let delidx_res = delsplit[0].parse::<i32>();
+				let deldiff_res = delsplit[1].parse::<i32>();
+				if delidx_res.is_err() || deldiff_res.is_err() {
+					eprintln!("Unable to parse delidx_res or deldiff_res: {:?} {:?}",
+						delidx_res, deldiff_res);
+					continue;
+				}
+				let delidx = delidx_res.expect("Uncaught error in delidx_res");
+				let deldiff = deldiff_res.expect("Uncaught error in deldiff_res");
 				deletionstr = format!("{delidx},{}", delidx+deldiff);
 			}
 			else {
-				let delidx = deletionstr.parse::<i32>().unwrap();
+				let delidx_res = deletionstr.parse::<i32>();
+				if delidx_res.is_err() {
+					eprintln!("Unable to parse delidx_res {:?}",
+						delidx_res);
+					continue;
+				}
+				let delidx = delidx_res.expect("Uncaught error in delidx_res");
 				deletionstr.push_str(format!(",{}", delidx).as_str());
 			}
 		}
@@ -291,7 +304,13 @@ fn process_diff(filepath: &str, diff: &str, linemap: &mut HashMap<String, Vec<St
 			continue;
 		}
 		if linemap.contains_key(filepath) {
-			linemap.get_mut(filepath).unwrap().push(deletionstr);
+			let linemap_mut_res = linemap.get_mut(filepath);//.unwrap().push(deletionstr);
+			if linemap_mut_res.is_none() {
+				eprintln!("Unable to get mutable ref for linemap: {:?}", linemap);
+				continue;
+			}
+			let linemap_mut = linemap_mut_res.expect("Empty linemap_mut_res");
+			linemap_mut.push(deletionstr);
 		}
 		else {
 			linemap.insert(filepath.to_string(), vec!(deletionstr));
