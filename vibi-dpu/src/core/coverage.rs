@@ -2,9 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{utils::hunk::{HunkMap, PrHunkItem}, db::user::get_workspace_user_from_db, bitbucket::{comment::add_comment, reviewer::add_reviewers}};
 use crate::utils::review::Review;
+use crate::utils::repo_config::RepoConfig;
 use crate::bitbucket::auth::get_access_token_review;
 
-pub async fn process_coverage(hunkmap: &HunkMap, review: &Review) {
+pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &RepoConfig) {
     let access_token_opt = get_access_token_review(review).await;
     if access_token_opt.is_none() {
         eprintln!("Unable to acquire access_token in process_coverage");
@@ -15,23 +16,25 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review) {
         // calculate number of hunks for each userid
         let coverage_map = calculate_coverage(&hunkmap.repo_owner(), prhunk);
         if !coverage_map.is_empty() {
-            // get user for each user id
-            // add reviewers
-            let mut author_set: HashSet<String> = HashSet::new();
-            author_set.insert(prhunk.author().to_string());
-            for blame in prhunk.blamevec() {
-                if author_set.contains(blame.author()) {
-                    continue;
-                }
-                author_set.insert(blame.author().to_string());
-                let author_id = blame.author();
-                add_reviewers(blame.author(), review, &access_token).await;
+            if repo_config.comment() {
+                // create comment text
+                let comment = comment_text(coverage_map, repo_config.auto_assign());
+                // add comment
+                add_comment(&comment, review, &access_token).await; 
             }
-             // create comment text
-            let comment = comment_text(coverage_map);
-            // add comment
-            add_comment(&comment, review, &access_token).await; 
-            // TODO - implement settings
+            if repo_config.auto_assign() {
+                // add reviewers
+                let mut author_set: HashSet<String> = HashSet::new();
+                author_set.insert(prhunk.author().to_string());
+                for blame in prhunk.blamevec() {
+                    if author_set.contains(blame.author()) {
+                        continue;
+                    }
+                    author_set.insert(blame.author().to_string());
+                    let author_id = blame.author();
+                    add_reviewers(blame.author(), review, &access_token).await;
+                }
+            }
         }    
     }
 }
@@ -74,13 +77,17 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem) -> HashMap<String, 
     return coverage_map;
 }
 
-fn comment_text(coverage_map: HashMap<String, String>) -> String {
+fn comment_text(coverage_map: HashMap<String, String>, auto_assign: bool) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
     comment += "| Contributor Name/Alias  | Code Coverage |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
 
     for (key, value) in coverage_map.iter() {
         comment += &format!("| {} | {}% |\n", key, value);  // Added a newline at the end
+    }
+    if auto_assign {
+        comment += "\n\n";
+        comment += "Auto assigning to all relevant reviewers";
     }
     comment += "\n\n";
     comment += "Code coverage is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines

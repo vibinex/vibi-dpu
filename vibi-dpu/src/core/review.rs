@@ -26,16 +26,17 @@ pub async fn process_review(message_data: &Vec<u8>) {
 		return;
 	}
 	let (review, repo_config) = parse_opt.expect("parse_opt is empty");
+	println!("deserialized repo_config, review = {:?}, {:?}", &repo_config, &review);
 	if hunk_already_exists(&review) {
 		return;
 	}
 	println!("Processing PR : {}", &review.id());
 	commit_check(&review).await;
 	let hunkmap_opt = process_review_changes(&review).await;
-	send_hunkmap(&hunkmap_opt, &review).await;
+	send_hunkmap(&hunkmap_opt, &review, &repo_config).await;
 }
 
-async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review) {
+async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review, repo_config: &RepoConfig) {
 	if hunkmap_opt.is_none() {
 		eprintln!("Empty hunkmap in send_hunkmap");
 		return;
@@ -46,7 +47,8 @@ async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review) {
 	publish_hunkmap(&hunkmap);
 	let hunkmap_async = hunkmap.clone();
 	let review_async = review.clone();
-	process_coverage(&hunkmap_async, &review_async).await;
+	let repo_config_clone = repo_config.clone();
+	process_coverage(&hunkmap_async, &review_async, &repo_config_clone).await;
 }
 
 fn hunk_already_exists(review: &Review) -> bool {
