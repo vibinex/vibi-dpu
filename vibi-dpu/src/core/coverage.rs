@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{utils::hunk::{HunkMap, PrHunkItem}, db::user::get_workspace_user_from_db, bitbucket::comment::{add_comment, add_reviewers}};
+use crate::{utils::hunk::{HunkMap, PrHunkItem}, db::user::get_workspace_user_from_db, bitbucket::{comment::add_comment, reviewer::add_reviewers}};
 use crate::utils::review::Review;
 use crate::bitbucket::auth::get_access_token_review;
 

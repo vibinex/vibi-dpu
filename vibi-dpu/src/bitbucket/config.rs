@@ -1,4 +1,5 @@
 use std::{env, collections::HashMap};
+use std::error::Error;
 
 use reqwest::{Response, header::{HeaderMap, HeaderValue}};
 use serde_json::Value;
@@ -19,9 +20,9 @@ pub fn bitbucket_base_url() -> String {
 }
 
 pub async fn get_api_values(url: &str, access_token: &str, params: Option<HashMap<&str, &str>> ) -> Vec<Value> {
-    let response_opt = get_api(url, access_token, &params).await;
+    let response_opt = get_api_response(url, None, access_token, &params).await;
     println!("response of get_api = {:?}", &response_opt);
-    let (mut response_values, next_url) = deserialize_response(response_opt).await;
+    let (mut response_values, next_url) = deserialize_paginated_response(response_opt).await;
     if next_url.is_some() {
         let mut page_values = get_all_pages(next_url, access_token, &params).await;
         response_values.append(&mut page_values);
@@ -29,19 +30,18 @@ pub async fn get_api_values(url: &str, access_token: &str, params: Option<HashMa
     return response_values;
 }
 
-pub async fn get_api(url: &str, access_token: &str, params: &Option<HashMap<&str, &str>> ) -> Option<Response>{
-    println!("GET api url = {}", url);
-    let client = get_client();
-    let mut headers = reqwest::header::HeaderMap::new(); 
-    headers.insert( reqwest::header::AUTHORIZATION, 
-    format!("Bearer {}", access_token).parse().expect("Invalid auth header"), );
-    headers.insert("Accept",
-     "application/json".parse().expect("Invalid Accept header"));
-    let res_opt = get_api_response(url, headers, access_token, params).await;
-    return res_opt;
-}
-
-async fn get_api_response(url: &str, headers: reqwest::header::HeaderMap, access_token: &str, params: &Option<HashMap<&str, &str>>) -> Option<Response>{
+pub async fn get_api_response(url: &str, headers_opt: Option<reqwest::header::HeaderMap>, access_token: &str, params: &Option<HashMap<&str, &str>>) -> Option<Response>{
+    let mut headers;
+    if headers_opt.is_none() {
+        let headers_opt_new = prepare_headers(&access_token);
+        if headers_opt_new.is_none() {
+            eprintln!("Unable to prepare_headers, empty headers_opt");
+            return None;
+        }
+        headers = headers_opt_new.expect("Empty headers_opt");
+    } else {
+        headers = headers_opt.expect("Empty headers_opt");
+    }
     let client = get_client();
     let get_res = client.get(url).headers(headers).send().await;
     if get_res.is_err() {
@@ -57,7 +57,7 @@ async fn get_api_response(url: &str, headers: reqwest::header::HeaderMap, access
     return Some(response);
 }
 
-async fn deserialize_response(response_opt: Option<Response>) -> (Vec<Value>, Option<String>) {
+async fn deserialize_paginated_response(response_opt: Option<Response>) -> (Vec<Value>, Option<String>) {
     let mut values_vec = Vec::new();
     if response_opt.is_none() {
         eprintln!("Response is None, can't deserialize");
@@ -97,8 +97,8 @@ async fn get_all_pages(next_url: Option<String>, access_token: &str, params: &Op
         if url == "null" {
             break;   
         }
-        let response_opt = get_api(url, access_token, params).await;
-        let (mut response_values, url_opt) = deserialize_response(response_opt).await;
+        let response_opt = get_api_response(url, None, access_token, params).await;
+        let (mut response_values, url_opt) = deserialize_paginated_response(response_opt).await;
         next_url_mut = url_opt.clone();
         values_vec.append(&mut response_values);
     }
@@ -117,4 +117,29 @@ pub fn prepare_auth_headers(access_token: &str) -> Option<HeaderMap>{
     let headerval = headervalres.expect("Empty headervalres");
     headers_map.insert("Authorization", headerval);
     return Some(headers_map);
+}
+
+pub fn prepare_headers(access_token: &str) -> Option<HeaderMap> {
+    let mut headers = reqwest::header::HeaderMap::new(); 
+    let auth_header_res = format!("Bearer {}", access_token).parse();
+    if auth_header_res.is_err() {
+        let e = auth_header_res
+            .expect_err("Empty error in auth_header_res");
+        eprintln!("Invalid auth header: {:?}", e);
+        return None;
+    }
+    let header_authval = auth_header_res
+        .expect("Uncaught error in auth_header_res");
+    headers.insert( reqwest::header::AUTHORIZATION, header_authval);
+    let header_accept_res =  "application/json".parse();
+    if header_accept_res.is_err() {
+        let e = header_accept_res
+            .expect_err("No error in header_accept_res");
+        eprintln!("Invalide accept header val, error: {:?}", e);
+        return None;
+    }
+    let header_acceptval = header_accept_res
+        .expect("Uncaught error in header_accept_res");
+    headers.insert("Accept", header_acceptval);
+    return Some(headers);
 }

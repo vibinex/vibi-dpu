@@ -4,7 +4,7 @@ use crate::db::user::{add_bitbucket_user_to_workspace_user, get_workspace_user_f
 use crate::utils::auth::AuthInfo;
 use crate::utils::lineitem::LineItem;
 use crate::utils::user::BitbucketUser;
-use super::config::{bitbucket_base_url, get_api_values, get_api};
+use super::config::{bitbucket_base_url, get_api_values, get_api_response};
 
 pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str) {
     let base_url = bitbucket_base_url();
@@ -28,7 +28,7 @@ pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> O
     }
     let authinfo = authinfo_opt.expect("empty authinfo_opt in get_commit_bb");
     let access_token = authinfo.access_token();
-    let response_opt = get_api(&commits_url, access_token, &None).await;
+    let response_opt = get_api_response(&commits_url, None, access_token, &None).await;
     if response_opt.is_none() {
         return None;
     }
