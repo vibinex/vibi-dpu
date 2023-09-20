@@ -13,12 +13,15 @@ For more information, visit our website at https://vibinex.com/.
 To run Vibi-DPU locally:
 
 1. Generate public url using ngrok - `ngrok http 3000`
-2. Fire up cloud sql proxy - `./cloud-sql-proxy --port 5432 vibi-test-394606:asia-south1:test-db`
-3. Change url in team-monitor-website in .env.local - `NEXTAUTH_URL=https://example.ngrok-free.app`
-4. Start team-monitor-website - `npm run dev`
-5. Build vibi-dpu, go to vibi-dpu/vibi-dpu and run - `cargo build`
-6. Go up to the root directory of vibi-dpu - `cd ../`
-7. **Build the Docker image**: In the root directory of the project, run the following command to build a Docker image with the name "dpu".
+2. Paste this in OAuth consumers in callback_url field.
+3. Clone [team-monitor-webiste](https://github.com/Alokit-Innovations/team-monitor-website/) locally.
+4. Paste the client id and secret in team-monitor-wesite in .env.local in root directory. Also use them in the docker command below.
+5. Fire up cloud sql proxy - `./cloud-sql-proxy --port 5432 vibi-test-394606:asia-south1:test-db`
+6. Change url in team-monitor-website in .env.local - `NEXTAUTH_URL=https://example.ngrok-free.app`
+7. Start team-monitor-website - `npm run dev`
+8. Build vibi-dpu, go to vibi-dpu/vibi-dpu and run - `cargo build`
+9. Go up to the root directory of vibi-dpu - `cd ../`
+10. **Build the Docker image**: In the root directory of the project, run the following command to build a Docker image with the name "dpu".
 
     ```bash
     docker build \
@@ -32,11 +35,14 @@ To run Vibi-DPU locally:
       --build-arg SERVER_URL=your-server-url \
       -t dpu .
     ```
-8. **Run the Docker container**: After building the image, you can run it using the following command.
+11. **Run the Docker container**: After building the image, you can run it using the following command.
 
     ```bash
     docker run dpu
     ```
+12. For bitbucket, replace your url in this url and paste it on your browser and visit it. If you are using ngrok, you might get a "visit site" ngrok welcome page. Click and visit site. Grant any permissions asked from your user to bitbucket. Example URL - `https://bitbucket.org/site/oauth2/authorize?response_type=code&client_id=raFykYJRvEBHPttQAm&redirect_uri=https%3A%2F%2F5bef-171-76-86-89.ngrok-free.app%2Fapi%2Fbitbucket%2Fcallbacks%2Finstall&scope=repository%20pullrequest%20pullrequest:write%20webhook%20account%20repository:write`. You only need to replace the `5bef-171-76-86-89.ngrok-free.app` part with your own ngrok url instead of generating a new formatted url.
+13. This would start the "setting up" part of dpu, where it calls bitbucket apis and collects repo info, user info, workspace info and pr info.
+14. Next begin your testing. For instance, if you push to a PR, you should be able to see logs in next server, in dpu and see the required actions being performed on the PR.
 
 ## Contributing
 
