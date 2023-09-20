@@ -12,7 +12,7 @@ For more information, visit our website at https://vibinex.com/.
 
 To run Vibi-DPU locally:
 
-1. Generate public url using ngrok - `ngrok http 3000`
+1. Generate public url using ngrok - `ngrok http 3000`. We will run our next server locally on port 3000 in later steps.
 2. Paste this in OAuth consumers in callback_url field.
 3. Clone [team-monitor-webiste](https://github.com/Alokit-Innovations/team-monitor-website/) locally.
 4. Paste the client id and secret in team-monitor-wesite in .env.local in root directory. Also use them in the docker command below.
