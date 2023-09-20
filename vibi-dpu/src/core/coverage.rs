@@ -15,8 +15,13 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
     for prhunk in hunkmap.prhunkvec() {
         // calculate number of hunks for each userid
         let coverage_map = calculate_coverage(&hunkmap.repo_owner(), prhunk);
+        let coverage_cond = !coverage_map.is_empty();
+        println!("!coverage_map.is_empty() = {:?}", &coverage_cond);
+        println!("repo_config.comment() = {:?}", repo_config.comment());
+        println!("repo_config.auto_assign() = {:?}", repo_config.auto_assign());
         if !coverage_map.is_empty() {
             if repo_config.comment() {
+                println!("Inserting comment...");
                 // create comment text
                 let comment = comment_text(coverage_map, repo_config.auto_assign());
                 // add comment
@@ -24,6 +29,7 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
             }
             if repo_config.auto_assign() {
                 // add reviewers
+                println!("Adding reviewers...");
                 let mut author_set: HashSet<String> = HashSet::new();
                 author_set.insert(prhunk.author().to_string());
                 for blame in prhunk.blamevec() {
