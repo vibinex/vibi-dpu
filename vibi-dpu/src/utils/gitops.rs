@@ -341,6 +341,7 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 				commit,
 				"-L",
 				line.as_str(),
+				"-w",
 				"-e",
 				"--date=unix",
 				path.as_str(),
