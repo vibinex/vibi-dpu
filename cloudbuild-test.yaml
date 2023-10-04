@@ -1,0 +1,38 @@
+steps:
+  # Fetch the credentials from the GCP bucket
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['cp', 'gs://vibi-test-secrets/pubsub-sa-test.json', '/workspace/pubsub-sa.json']
+
+  # Build the Docker image with the build arguments
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'GCP_CREDENTIALS=/workspace/pubsub-sa.json'
+      - '--build-arg'
+      - 'SERVER_URL=$_SERVER_URL'
+      - '--build-arg'
+      - 'INSTALL_ID=$_INSTALL_ID'
+      - '--build-arg'
+      - 'BITBUCKET_CLIENT_ID=$_BITBUCKET_CLIENT_ID'
+      - '--build-arg'
+      - 'BITBUCKET_CLIENT_SECRET=$_BITBUCKET_CLIENT_SECRET'
+      - '--build-arg'
+      - 'BITBUCKET_BASE_URL=$_BITBUCKET_BASE_URL'
+      - '-t'
+      - 'asia-docker.pkg.dev/$PROJECT_ID/dpu-test:$SHORT_SHA'
+      - '.'
+
+  # Push the Docker image to Google Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia-docker.pkg.dev/$PROJECT_ID/dpu-test:$SHORT_SHA']
+
+  # Deploy the Docker image to a Docker-optimized VM
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['compute', 'instances', 'create-with-container', 'dpu-instance', '--container-image=asia-docker.pkg.dev/$PROJECT_ID/dpu-test:$SHORT_SHA', '--zone=asia-south1-c', '--machine-type=e2-small']
+
+# Only trigger the build when there's a push to the main branch
+trigger:
+  branch:
+    only:
+      - tr/test
