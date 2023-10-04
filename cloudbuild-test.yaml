@@ -30,9 +30,3 @@ steps:
   # Deploy the Docker image to a Docker-optimized VM
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['compute', 'instances', 'create-with-container', 'dpu-instance', '--container-image=asia-docker.pkg.dev/$PROJECT_ID/dpu-test:$SHORT_SHA', '--zone=asia-south1-c', '--machine-type=e2-small']
-
-# Only trigger the build when there's a push to the main branch
-trigger:
-  branch:
-    only:
-      - tr/test
