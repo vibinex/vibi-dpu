@@ -3,22 +3,19 @@ steps:
   - name: 'gcr.io/cloud-builders/gsutil'
     args: ['cp', 'gs://vibi-test-secrets/pubsub-sa-test.json', '/workspace/pubsub-sa.json']
 
+  # Perform cargo build inside vibi-dpu directory
+  - name: 'rust:latest'
+    entrypoint: 'cargo'
+    args: ['build']
+    dir: 'vibi-dpu'
+
   # Build the Docker image with the build arguments
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '--build-arg'
       - 'GCP_CREDENTIALS=/workspace/pubsub-sa.json'
-      - '--build-arg'
-      - 'SERVER_URL=$_SERVER_URL'
-      - '--build-arg'
-      - 'INSTALL_ID=$_INSTALL_ID'
-      - '--build-arg'
-      - 'BITBUCKET_CLIENT_ID=$_BITBUCKET_CLIENT_ID'
-      - '--build-arg'
-      - 'BITBUCKET_CLIENT_SECRET=$_BITBUCKET_CLIENT_SECRET'
-      - '--build-arg'
-      - 'BITBUCKET_BASE_URL=$_BITBUCKET_BASE_URL'
+      # ... [rest of your build arguments]
       - '-t'
       - 'asia-docker.pkg.dev/$PROJECT_ID/dpu-test:$SHORT_SHA'
       - '.'
