@@ -1,7 +1,7 @@
 steps:
   # Fetch the credentials from the GCP bucket
   - name: 'gcr.io/cloud-builders/gsutil'
-    args: ['cp', 'gs://vibi-test-secrets/pubsub-sa-test.json', '/workspace/pubsub-sa.json']
+    args: ['cp', 'gs://vibi-test-secrets/pubsub-sa-test.json', 'pubsub-sa.json']
 
   # Perform cargo build inside vibi-dpu directory
   - name: 'rust:latest'
@@ -14,7 +14,7 @@ steps:
     args:
       - 'build'
       - '--build-arg'
-      - 'GCP_CREDENTIALS=/workspace/pubsub-sa.json'
+      - 'GCP_CREDENTIALS=$_GCP_CREDENTIALS'
       - '--build-arg'
       - 'SERVER_URL=$_SERVER_URL'
       - '--build-arg'
