@@ -1,9 +1,9 @@
 use std::env;
 mod pubsub;
-// mod db;
-// mod core;
-// mod bitbucket;
-// mod utils;
+mod db;
+mod core;
+mod bitbucket;
+mod utils;
 
 #[tokio::main]
 async fn main() {

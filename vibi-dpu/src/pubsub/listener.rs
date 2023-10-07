@@ -12,6 +12,7 @@ use tokio::task;
 use std::collections::VecDeque;
 use sha256::digest;
 use tonic::Code;
+use crate::core::setup::handle_install_bitbucket;
 // use crate::core::{setup::handle_install_bitbucket, review::process_review}; // To be added in future PR
 
 #[derive(Debug, Deserialize)]
@@ -39,7 +40,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             let data = msg_data_res.expect("msg_data not found");
             let code_async = data.installation_code.clone();
             task::spawn(async move {
-                // handle_install_bitbucket(&code_async).await;
+                handle_install_bitbucket(&code_async).await;
                 println!("Processed install callback message");
             });
         },
@@ -85,7 +86,11 @@ async fn setup_subscription(keypath: &str, topicname: &str) -> Subscription{
         ..Default::default()
     };
     let subscription_name = format!("{topicname}-sub");
-    let subscription = client.subscription(&subscriptionname);
+    let subscription = client.subscription(&subscription_name);
+    let subconfig = SubscriptionConfig {
+        enable_message_ordering: true,
+        ..Default::default()
+    };
     if !subscription.exists(None).await.expect("Unable to get subscription information") {
         subscription.create(
             topic.fully_qualified_name(), subconfig, None)
