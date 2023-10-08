@@ -3,12 +3,11 @@ use std::str;
 use std::io::ErrorKind;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::{task, fs};
 
 use crate::bitbucket::auth::get_access_token_from_bitbucket;
-use crate::bitbucket::config::get_client;
+use crate::client::config::get_client;
 use crate::bitbucket::repo::get_workspace_repos;
 use crate::bitbucket::workspace::get_bitbucket_workspaces;
 use crate::bitbucket::webhook::{get_webhooks_in_repo, add_webhook};

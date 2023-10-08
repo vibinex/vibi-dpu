@@ -31,7 +31,7 @@ ENV INSTALL_ID=$INSTALL_ID
 ENV SERVER_URL=$SERVER_URL
 
 COPY ./vibi-dpu/target/debug/vibi-dpu /app/vibi-dpu
-COPY ./pubsub-sa.json /app/pubsub-sa.json
+COPY ./pubsub-sa-test.json /app/pubsub-sa.json
 
 # Start the Rust application
 CMD ["/app/vibi-dpu"]
