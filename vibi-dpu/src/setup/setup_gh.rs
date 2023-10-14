@@ -24,7 +24,7 @@ pub async fn handle_install_github(installation_code: &str) {
     // For example:
     // 1. Get access token from GitHub using the installation code
     let auth_info = fetch_access_token(installation_code).await;
-    println!("[handle_install_github] auth_info = {:?}", &auth_info);
+    println!("[handle_install_github] auth_info = {:?}", auth_info);
     // 2. Fetch user repositories and other necessary data
     // 3. Process webhooks or other setup tasks
     // 4. Send setup info or any other post-processing

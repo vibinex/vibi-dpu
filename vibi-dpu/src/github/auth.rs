@@ -20,9 +20,8 @@ struct Claims {
 }
 
 fn generate_jwt(github_app_id: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let pem_file_path = "/tmp/repoprofiler_private.pem";
+    let pem_file_path = "/app/repoprofiler_private.pem";
     let pem_data = fs::read(pem_file_path)?;
-
     let my_claims = Claims {
         iat: Utc::now().timestamp(),
         exp: (Utc::now() + Duration::minutes(5)).timestamp(),
@@ -31,7 +30,6 @@ fn generate_jwt(github_app_id: &str) -> Result<String, Box<dyn std::error::Error
 
     let encoding_key = EncodingKey::from_rsa_pem(&pem_data)?;
     let token = encode(&Header::new(Algorithm::RS256), &my_claims, &encoding_key)?;
-
     Ok(token)
 }
 
@@ -43,6 +41,7 @@ pub async fn fetch_access_token(installation_id: &str) -> Result<Value, Box<dyn 
     let response: Value = client.post(&format!("https://api.github.com/app/installations/{}/access_tokens", installation_id))
         .header("Accept", "application/vnd.github+json")
         .header("Authorization", format!("Bearer {}", jwt_token))
+        .header("User-Agent", "Vibinex code review Test App")
         .send()
         .await?
         .json()
