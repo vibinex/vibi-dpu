@@ -18,18 +18,35 @@ struct Claims {
     iss: String,
 }
 
-fn generate_jwt(github_app_id: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn generate_jwt(github_app_id: &str) -> Option<String> {
     let pem_file_path = "/app/repoprofiler_private.pem";
-    let pem_data = fs::read(pem_file_path)?;
+    let pem_data = match fs::read(pem_file_path) {
+        Ok(data) => data,
+        Err(e) => {
+            println!("Error reading pem file: {}", e);
+            return None;
+        },
+    };
     let my_claims = Claims {
         iat: Utc::now().timestamp(),
         exp: (Utc::now() + Duration::minutes(5)).timestamp(),
         iss: github_app_id.to_string(),
     };
 
-    let encoding_key = EncodingKey::from_rsa_pem(&pem_data)?;
-    let token = encode(&Header::new(Algorithm::RS256), &my_claims, &encoding_key)?;
-    Ok(token)
+    let encoding_key = match EncodingKey::from_rsa_pem(&pem_data) {
+        Ok(key) => key,
+        Err(e) => {
+            println!("Error creating encoding key: {}", e);
+            return None;
+        },
+    };
+    match encode(&Header::new(Algorithm::RS256), &my_claims, &encoding_key) {
+        Ok(token) => Some(token),
+        Err(e) => {
+            println!("Error encoding JWT: {}", e);
+            None
+        },
+    }
 }
 
 pub async fn fetch_access_token(installation_id: &str) -> Option<AuthInfo> {
