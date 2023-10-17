@@ -9,6 +9,7 @@ use std::time::SystemTime;
 use crate::client::config::get_client;
 use crate::utils::auth::AuthInfo;
 use crate::utils::review::Review;
+use crate::utils::prInfo::PrInfo;
 
 pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token: &str, state: &str) -> Vec<u32> {
     let mut pr_list = Vec::new();
@@ -55,3 +56,34 @@ pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token:
     }
     pr_list
 }
+
+pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Result<PrInfo, Box<dyn std::error::Error>> {
+    let url = format!("{}/repositories/{}/{}/pullrequests/{}", env::var("SERVER_URL").expect("SERVER_URL must be set"), workspace_slug, repo_slug, pr_number);
+
+    let client = get_client();
+    let response = client.get(&url)
+        .header("Authorization", format!("Bearer {}", access_token))
+        .header("Accept", "application/json")
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        let pr_data: serde_json::Value = response.json().await?;
+
+        // create a PrInfo object from it
+        let pr_info = PrInfo {
+            base_head_commit: pr_data["destination"]["commit"]["hash"].as_str().unwrap().to_string(),
+            pr_head_commit: pr_data["source"]["commit"]["hash"].as_str().unwrap().to_string(),
+            state: pr_data["state"].as_str().unwrap().to_string(),
+            pr_branch: pr_data["source"]["branch"]["name"].as_str().unwrap().to_string(),
+        };
+
+        Ok(pr_info)
+    } else {
+        Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other, 
+            format!("Failed to get PR info, status: {}", response.status()),
+        )))
+    }
+}
+
