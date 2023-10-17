@@ -49,7 +49,7 @@ fn generate_jwt(github_app_id: &str) -> Option<String> {
     }
 }
 
-pub async fn fetch_access_token(installation_id: &str) -> Option<AuthInfo> {
+pub async fn fetch_access_token(installation_id: &str) -> Option<String> {
     let github_app_id = env::var("GITHUB_APP_ID").unwrap();
     let jwt_token = generate_jwt(&github_app_id).unwrap();
 
@@ -74,7 +74,7 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<AuthInfo> {
             );
             return None;
         }
-        let parse_res = res.json().await ;
+        let parse_res = res.text().await ;
         if parse_res.is_err() {
             let e = parse_res.expect_err("No error in parse_res for AuthInfo");
             eprintln!("error deserializing AuthInfo: {:?}", e);
