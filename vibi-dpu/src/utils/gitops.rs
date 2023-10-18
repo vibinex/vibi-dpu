@@ -4,10 +4,8 @@ use std::str;
 use serde::Deserialize;
 use serde::Serialize;
 use sha256::digest;
-use uuid::timestamp;
 
 use crate::bitbucket::auth::refresh_git_auth;
-use crate::bitbucket::user::get_commit_bb;
 
 use super::hunk::BlameItem;
 use super::review::Review;
