@@ -1,0 +1,81 @@
+
+name: Auto-version
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  build:
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'update-cargo-toml'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Run Build Script
+        run: |
+           git config user.name "GitHub Actions Bot"
+           git config user.email "<>"
+           
+      - name: run script
+        run: |
+           python scripts/update.py
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Updated code"
+          title: "Update Cargo.toml"
+          body: "This pull request updates the Cargo.toml file."
+          branch: update-cargo-toml
+          reviewers: tapishr
+
+      - name: Build Rust CLI
+        run: |
+          cd vibi-dpu
+          cargo build --release
+          
+      - name: Get version from Cargo.toml
+        id: get_version
+        run: |
+          cd vibi-dpu
+          echo "::set-output name=version::$(grep -Po '(?<=version = ")[\d.]+(?=")' Cargo.toml)"
+          
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: Release ${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+          
+      - name: cargo deb
+        run: |
+          cargo install  cargo-deb
+          
+      - name: build binary
+        run: |
+          cd vibi-dpu
+          cargo deb
+          
+      - name: Rename Debian Package
+        run: mv ./vibi-dpu/target/debian/*.deb ./vibi-dpu/target/debian/vibi-dpu.deb
+        
+      - name: Upload .deb Package
+        id: upload_deb
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./vibi-dpu/target/debian/vibi-dpu.deb
+          asset_name: vibi-dpu.deb
+          asset_content_type: application/octet-stream
+
