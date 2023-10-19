@@ -80,7 +80,7 @@ pub async fn update_access_token(auth_info: &AuthInfo,
     }
     let timestamp = timestamp_opt.expect("Empty timestamp");
     let expires_at = timestamp + auth_info.expires_in();
-    if expires_at > now_secs {  
+    if expires_at < now_secs {  
         eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
         return Some(auth_info.to_owned());
     }
