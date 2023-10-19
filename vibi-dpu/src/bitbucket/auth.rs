@@ -57,14 +57,12 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
         return None;
     }
     let authinfo = authinfo_opt.expect("empty authinfo_opt in refresh_git_auth");
-    println!("[refresh_git_auth] Authinfo before update_access_token : {:?}", authinfo.access_token());
     let authinfo_opt = update_access_token(&authinfo, clone_url, directory).await;
     if authinfo_opt.is_none() {
         eprintln!("Empty authinfo_opt from update_access_token");
         return None;
     }
     let latest_authinfo = authinfo_opt.expect("Empty authinfo_opt");
-    println!("[refresh_git_auth] Authinfo before update_access_token : {:?}", latest_authinfo.access_token());
     let access_token = latest_authinfo.access_token().to_string();
     return Some(access_token);
 }
@@ -80,7 +78,7 @@ pub async fn update_access_token(auth_info: &AuthInfo,
     }
     let timestamp = timestamp_opt.expect("Empty timestamp");
     let expires_at = timestamp + auth_info.expires_in();
-    if expires_at < now_secs {  
+    if expires_at > now_secs {  
         eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
         return Some(auth_info.to_owned());
     }
