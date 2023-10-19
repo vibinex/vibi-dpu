@@ -57,13 +57,15 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
         return None;
     }
     let authinfo = authinfo_opt.expect("empty authinfo_opt in refresh_git_auth");
-    let mut access_token = authinfo.access_token().to_string();
+    println!("[refresh_git_auth] Authinfo before update_access_token : {:?}", authinfo.access_token());
     let authinfo_opt = update_access_token(&authinfo, clone_url, directory).await;
     if authinfo_opt.is_none() {
         eprintln!("Empty authinfo_opt from update_access_token");
         return None;
     }
-    
+    let latest_authinfo = authinfo_opt.expect("Empty authinfo_opt");
+    println!("[refresh_git_auth] Authinfo before update_access_token : {:?}", latest_authinfo.access_token());
+    let access_token = latest_authinfo.access_token().to_string();
     return Some(access_token);
 }
 
