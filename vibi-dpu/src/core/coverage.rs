@@ -2,9 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{utils::{hunk::{HunkMap, PrHunkItem}, user::BitbucketUser}, db::user::{get_workspace_user_from_db}, bitbucket::{user::author_from_commit, comment::add_comment, reviewer::add_reviewers}};
 use crate::utils::review::Review;
+use crate::utils::repo_config::RepoConfig;
 use crate::bitbucket::auth::get_access_token_review;
 
-pub async fn process_coverage(hunkmap: &HunkMap, review: &Review) {
+pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &RepoConfig) {
     let access_token_opt = get_access_token_review(review).await;
     if access_token_opt.is_none() {
         eprintln!("Unable to acquire access_token in process_coverage");
@@ -14,6 +15,10 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review) {
     for prhunk in hunkmap.prhunkvec() {
         // calculate number of hunks for each userid
         let coverage_map = calculate_coverage(&hunkmap.repo_owner(), prhunk);
+        let coverage_cond = !coverage_map.is_empty();
+        println!("!coverage_map.is_empty() = {:?}", &coverage_cond);
+        println!("repo_config.comment() = {:?}", repo_config.comment());
+        println!("repo_config.auto_assign() = {:?}", repo_config.auto_assign());
         if !coverage_map.is_empty() {
             // get user for each user id
             // add reviewers
@@ -43,11 +48,6 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review) {
                 author_set.insert(author_uuid.to_string());
                 add_reviewers(&blame_user, review, &access_token).await;
             }
-             // create comment text
-            let comment = comment_text(coverage_map);
-            // add comment
-            add_comment(&comment, review, &access_token).await; 
-            // TODO - implement settings
         }    
     }
 }
@@ -90,13 +90,17 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem) -> HashMap<String, 
     return coverage_map;
 }
 
-fn comment_text(coverage_map: HashMap<String, String>) -> String {
+fn comment_text(coverage_map: HashMap<String, String>, auto_assign: bool) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
     comment += "| Contributor Name/Alias  | Code Coverage |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
 
     for (key, value) in coverage_map.iter() {
         comment += &format!("| {} | {}% |\n", key, value);  // Added a newline at the end
+    }
+    if auto_assign {
+        comment += "\n\n";
+        comment += "Auto assigning to all relevant reviewers";
     }
     comment += "\n\n";
     comment += "Code coverage is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
