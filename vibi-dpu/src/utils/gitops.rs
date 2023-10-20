@@ -6,7 +6,6 @@ use serde::Serialize;
 use sha256::digest;
 
 use crate::bitbucket::auth::refresh_git_auth;
-use crate::bitbucket::user::get_commit_bb;
 
 use super::hunk::BlameItem;
 use super::review::Review;
@@ -371,7 +370,7 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 			if blamelines.len() == 0 {
 				continue;
 			}
-			let blamitems_opt = process_blameitem(path, commit, linenum, blamelines, review).await;
+			let blamitems_opt = process_blameitem(path, linenum, blamelines).await;
 			if blamitems_opt.is_some() {
 				let blameitems = blamitems_opt.expect("blameitem not found in blameitem_opt");
 				blamevec.extend(blameitems);
@@ -381,7 +380,7 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 	return blamevec;
 }
 
-async fn process_blameitem(path: &str, commit: &str, linenum: &str, blamelines: Vec<&str>, review: &Review) -> Option<Vec<BlameItem>> {
+async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> Option<Vec<BlameItem>> {
 	let linenumint_res = linenum.parse::<usize>();
 	let mut blamevec = Vec::<BlameItem>::new();
 	if linenumint_res.is_err() {
@@ -390,8 +389,7 @@ async fn process_blameitem(path: &str, commit: &str, linenum: &str, blamelines: 
 		return None;
 	}
 	let linenumint = linenumint_res.expect("Uncaught error in linenumint_res");
-	let lineauthormap = process_blamelines(&blamelines, linenumint,
-		&review.repo_name(), &review.repo_owner()).await;
+	let lineauthormap = process_blamelines(&blamelines, linenumint).await;
 	let mut linebreak = linenumint;
 	for lidx in linenumint..(linenumint + blamelines.len()-1) {
 		if lineauthormap.contains_key(&lidx) && lineauthormap.contains_key(&(lidx+1)) {
@@ -406,7 +404,9 @@ async fn process_blameitem(path: &str, commit: &str, linenum: &str, blamelines: 
 					lineitem.timestamp().to_string(),
 					linebreak.to_string(),
 					lidx.to_string(),
-					digest(path) ));
+					digest(path),
+					lineitem.commit().to_string())
+				);
 				linebreak = lidx + 1;
 			}
 		}
@@ -419,26 +419,61 @@ async fn process_blameitem(path: &str, commit: &str, linenum: &str, blamelines: 
 			lineitem.timestamp().to_string(),
 			linebreak.to_string(),
 			lastidx.to_string(),
-			digest(path)));
+			digest(path),
+			lineitem.commit().to_string()));
 	}
 	return Some(blamevec);
 }
 
-async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize,
-    repo_name: &str, repo_owner: &str) -> HashMap<usize, LineItem> {
+async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, LineItem> {
 	let mut linemap = HashMap::<usize, LineItem>::new();
 	for lnum  in 0..blamelines.len() {
 		let ln = blamelines[lnum];
 		let wordvec: Vec<&str> = ln.split(" ").collect();
-        let commit = wordvec[0];
-        let lineitem_opt = get_commit_bb(commit, repo_name, repo_owner).await;
-		if lineitem_opt.is_some() {
-			let lineitem = lineitem_opt.expect("Empty linemap_opt");
-			linemap.insert(
-				linenum + lnum,
-				lineitem
-			);
-		}
+		let commit = wordvec[0].to_string();
+		let (author, idx) = extract_author(&wordvec);
+		let timestamp = extract_timestamp(&wordvec, idx);
+		let lineitem = LineItem::new(author, timestamp, commit);
+		linemap.insert(
+			linenum + lnum,
+			lineitem
+		);
 	}
 	return linemap;
+}
+
+fn extract_author(wordvec: &Vec<&str>) -> (String, usize) {
+	let mut author = wordvec[1];
+	let mut idx = 1;
+	// Check if the second value is an email address (enclosed in angle brackets)
+	if !author.starts_with('(') && !author.ends_with('>') {
+		// Shift the index to the next non-empty value
+		while idx < wordvec.len() && (wordvec[idx] == "" || !wordvec[idx].starts_with('(')){
+			idx += 1;
+		}
+		if idx < wordvec.len() {
+			author = wordvec[idx];
+		}
+	} else {
+		// Remove the angle brackets from the email address
+		author = author.trim_start_matches('<').trim_end_matches('>');
+	}
+	let authorstr = author.replace("(", "")
+		.replace("<", "")
+		.replace(">", "");
+	return (authorstr, idx)
+}
+
+fn extract_timestamp(wordvec: &Vec<&str>, mut idx: usize) -> String {
+	let mut timestamp = wordvec[2];
+	if timestamp == "" || timestamp.starts_with('(') {
+		idx = idx + 1;
+		while idx < wordvec.len() && (wordvec[idx] == "" || wordvec[idx].starts_with('(')) {
+			idx = idx + 1;
+		}
+		if idx < wordvec.len() {
+			timestamp = wordvec[idx];
+		}
+	}
+	return timestamp.to_string();
 }

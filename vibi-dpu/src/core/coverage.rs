@@ -20,6 +20,7 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review) {
             let mut author_set: HashSet<String> = HashSet::new();
             author_set.insert(prhunk.author().to_string());
             for blame in prhunk.blamevec() {
+                let blame_author_id = author_uuid_from_commit(blame.commit(), hunkmap.repo_name(), hunkmap.repo_owner());
                 if author_set.contains(blame.author()) {
                     continue;
                 }
