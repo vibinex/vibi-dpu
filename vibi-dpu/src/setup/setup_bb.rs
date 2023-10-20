@@ -12,6 +12,7 @@ use crate::bitbucket::repo::get_workspace_repos;
 use crate::bitbucket::workspace::get_bitbucket_workspaces;
 use crate::bitbucket::webhook::{get_webhooks_in_repo, add_webhook};
 use crate::bitbucket::user::get_and_save_workspace_users;
+use crate::bitbucket::prs::{list_prs_bitbucket, get_and_store_pr_info};
 use crate::db::repo::save_repo_to_db;
 use crate::db::webhook::save_webhook_to_db;
 use crate::utils::repo::Repository;
@@ -66,12 +67,32 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             let repo_name_async = repo_name.clone();
             let workspace_slug_async = workspace_slug.clone();
             let access_token_async = access_token.clone();
-            // task::spawn(async move {
-            //     get_prs(&workspace_slug_async,
-            //         &repo_name_async,
-            //         &access_token_async,
-            //         "OPEN").await;
-            // });
+            task::spawn(async move {
+                let prs = list_prs_bitbucket(&workspace_slug_async, &repo_name_async, &access_token_async, "OPEN").await;
+                let prs = prs.unwrap();
+                if prs.is_err() {
+                    let err = prs.expect_err("No error in getting Prs list");
+                    eprintln!("An error occurred while retrieving pull requests: {:?}", err);
+                    return;
+                }
+                if prs.is_empty() {
+                    println!("No open pull requests found for processing.");
+                    return;
+                }
+                // We can concurrently process each PR with tokio::spawn.
+                let handles: Vec<_> = prs.into_iter().map(|pr| {
+                    tokio::spawn(async move {
+                        get_and_store_pr_info(&workspace_slug_async, &repo_name_async, &access_token_async, &pr.to_string()).await;
+                    })
+                }).collect();
+        
+                // Wait for all async tasks to complete.
+                for handle in handles {
+                    if let Err(e) = handle.await {
+                        eprintln!("Error in processing PR: {:?}", e);
+                    }
+                }                
+            });
         }
         pubreqs.push(SetupInfo {
             provider: "bitbucket".to_owned(),
