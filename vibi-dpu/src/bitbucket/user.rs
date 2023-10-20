@@ -3,7 +3,7 @@ use crate::db::auth::auth_info;
 use crate::db::user::{add_bitbucket_user_to_workspace_user, get_workspace_user_from_db};
 use crate::utils::auth::AuthInfo;
 use crate::utils::lineitem::LineItem;
-use crate::utils::user::BitbucketUser;
+use crate::utils::user::{BitbucketUser, User, Provider, ProviderEnum};
 use super::config::{bitbucket_base_url, get_api_values, get_api_response};
 
 pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str) {
@@ -18,7 +18,7 @@ pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str
     }
 }
 
-pub async fn author_uuid_from_commit(commit: &str, repo_name: &str, repo_owner: &str) -> Option<String>{
+pub async fn author_from_commit(commit: &str, repo_name: &str, repo_owner: &str) -> Option<BitbucketUser>{
     let base_url = bitbucket_base_url();
     let commits_url = format!("{}/repositories/{}/{}/commit/{}", &base_url, repo_owner, repo_name, commit);
     println!("commits url = {}", &commits_url);
@@ -40,7 +40,13 @@ pub async fn author_uuid_from_commit(commit: &str, repo_name: &str, repo_owner: 
         return None;
     }
     let response_json = parse_res.expect("Uncaught error in parse_res");
-
-    let author_id = response_json["author"]["user"]["uuid"].to_string().replace('"', "");
-    return Some(author_id);
+    let author_val = response_json["author"]["user"].to_owned();
+    let author_res = serde_json::from_value(author_val);
+    if author_res.is_err() {
+        let err = author_res.expect_err("Empty error in author_res");
+        eprintln!("[author_from_commit] Unable to deserialize author: {:?}", err);
+        return None;
+    }
+    let author: BitbucketUser = author_res.expect("Uncaught error in author_res");
+    return Some(author);
 }

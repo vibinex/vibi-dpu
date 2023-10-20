@@ -4,20 +4,20 @@ use serde_json::Value;
 use reqwest::Error;
 use std::io;
 
-use crate::db::user::get_workspace_user_from_db;
+use crate::{db::user::get_workspace_user_from_db, utils::user::WorkspaceUser};
 use crate::utils::review::Review;
 use crate::utils::user::BitbucketUser;
 
 use super::{config::{bitbucket_base_url, get_client, prepare_headers}};
 
-pub async fn add_reviewers(user_key: &str, review: &Review, access_token: &str) {
+pub async fn add_reviewers(user: &WorkspaceUser, review: &Review, access_token: &str) {
     let url = prepare_add_reviewers_url(review.repo_owner(), review.repo_name(), review.id());
     let get_response = get_pr_info(&url, access_token).await;
-    let put_request_body_opt = add_user_to_reviewers(get_response, user_key).await;
+    let put_request_body_opt = add_user_to_reviewers(get_response, user).await;
     put_reviewers(&url, access_token, &put_request_body_opt).await;
 }
 
-async fn add_user_to_reviewers(response_res: Option<Response>, user_key: &str) -> Option<Value> {
+async fn add_user_to_reviewers(response_res: Option<Response>, user_from_db: &WorkspaceUser) -> Option<Value> {
     let reviewers_opt = parse_reviewers_from_prinfo(response_res).await;
     if reviewers_opt.is_none() {
         eprintln!("Unable to parse and add reviewers");
@@ -25,13 +25,6 @@ async fn add_user_to_reviewers(response_res: Option<Response>, user_key: &str) -
     }
     let (mut reviewers, get_response_json) = reviewers_opt.expect("Empty reviewers_opt");
     println!("reviewers = {:?}", reviewers);
-    // Get user from db who needs to be added to reviewers
-    let user_from_db_opt = get_workspace_user_from_db(&user_key);
-    if user_from_db_opt.is_none() {
-        eprintln!("Empty user_from_db_opt");
-        return None;
-    }
-    let user_from_db = user_from_db_opt.expect("empty user_from_db_opt");
     println!("user_from_db = {:?}", &user_from_db);
     // For each user in user_from_db.users()...
     for user in user_from_db.users().iter() {
