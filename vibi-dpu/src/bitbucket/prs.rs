@@ -28,13 +28,13 @@ pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token:
         .send()
         .await;
 
-    if response_result.is_err() {
-        let e = response_result.expect_err("No error in sending request");
+    if response.is_err() {
+        let e = response.expect_err("No error in sending request");
         eprintln!("Failed to send the request {:?}", e);
         return pr_list;
     }
 
-    let mut response = response_result.unwrap();
+    let mut response = response.unwrap();
 
     if response.status() != StatusCode::OK {
         eprintln!("Request failed with status: {:?}", response.status());
