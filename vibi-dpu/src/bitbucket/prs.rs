@@ -28,36 +28,39 @@ pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token:
         .send()
         .await;
 
-    match response {
-        Ok(resp) => {
-            if resp.status() != StatusCode::OK {
-                eprintln!("Request failed with status: {}", resp.status());
-                return pr_list;
-            }
-            let data: Value = match resp.json().await {
-                Ok(json) => json,
-                Err(err) => {
-                    eprintln!("Failed to parse JSON: {:?}", err);
-                    return pr_list;
-                },
-            };
+    if response_result.is_err() {
+        let e = response_result.expect_err("No error in sending request");
+        eprintln!("Failed to send the request {:?}", e);
+        return pr_list;
+    }
 
-            if let Value::Array(pull_requests) = data["values"].clone() {
-                for pr in pull_requests.iter() {
-                    if let Some(id) = pr["id"].as_u64() {
-                        pr_list.push(id as u32);
-                    }
-                }
+    let mut response = response_result.unwrap();
+
+    if response.status() != StatusCode::OK {
+        eprintln!("Request failed with status: {:?}", response.status());
+        return pr_list;
+    }
+
+    let parse_result = response.json::<Value>().await;
+    if parse_result.is_err() {
+        err = parse_result.expect_err("No error in parsing");
+        eprintln!("Failed to parse JSON: {:?}", err);
+        return pr_list;
+    }
+
+    let data = parse_result.unwrap();
+
+    if let Value::Array(pull_requests) = data["values"].clone() {
+        for pr in pull_requests.iter() {
+            if let Some(id) = pr["id"].as_u64() {
+                pr_list.push(id as u32);
             }
-        },
-        Err(error) => {
-            eprintln!("Failed to make a request: {:?}", error);
         }
     }
     pr_list
 }
 
-pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Result<PrInfo, Box<dyn std::error::Error>> {
+pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Option<PrInfo> {
     let url = format!("{}/repositories/{}/{}/pullrequests/{}", env::var("SERVER_URL").expect("SERVER_URL must be set"), workspace_slug, repo_slug, pr_number);
 
     let client = get_client();
@@ -65,25 +68,26 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
         .header("Authorization", format!("Bearer {}", access_token))
         .header("Accept", "application/json")
         .send()
-        .await?;
-
-    if response.status().is_success() {
-        let pr_data: serde_json::Value = response.json().await?;
-
-        // create a PrInfo object from it
-        let pr_info = PrInfo {
-            base_head_commit: pr_data["destination"]["commit"]["hash"].as_str().unwrap().to_string(),
-            pr_head_commit: pr_data["source"]["commit"]["hash"].as_str().unwrap().to_string(),
-            state: pr_data["state"].as_str().unwrap().to_string(),
-            pr_branch: pr_data["source"]["branch"]["name"].as_str().unwrap().to_string(),
-        };
-
-        Ok(pr_info)
-    } else {
-        Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other, 
-            format!("Failed to get PR info, status: {}", response.status()),
-        )))
+        .await;
+  
+    if response.is_err() {
+        res_err = response.expect_err("No error in getting Pr response");
+        println!("Error getting PR info: {:?}", res_err);
+        return None;
     }
+
+    if !response.status().is_success() {
+        println!("Failed to get PR info, status: {:?}", response.status());
+        return None;
+    }
+    let response = response.unwrap();
+    let pr_data: Value = response.json().await.unwrap_or_default();
+
+    Some(PrInfo {
+        base_head_commit: pr_data["destination"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
+        pr_head_commit: pr_data["source"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
+        state: pr_data["state"].as_str().unwrap_or_default().to_string(),
+        pr_branch: pr_data["source"]["branch"]["name"].as_str().unwrap_or_default().to_string(),
+    })
 }
 
