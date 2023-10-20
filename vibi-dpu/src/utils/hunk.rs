@@ -26,6 +26,8 @@ pub struct BlameItem {
     line_start: String,
     line_end: String,
     filepath: String,
+    #[serde(skip_serializing)]
+    commit: String, // This variable will be ignored during serialization
 }
 
 impl BlameItem {
@@ -36,6 +38,7 @@ impl BlameItem {
         line_start: String,
         line_end: String,
         filepath: String,
+        commit: String,
     ) -> Self {
         Self {
             author,
@@ -43,6 +46,7 @@ impl BlameItem {
             line_start,
             line_end,
             filepath,
+            commit
         }
     }
 
@@ -65,6 +69,10 @@ impl BlameItem {
 
     pub fn filepath(&self) -> &String {
         &self.filepath
+    }
+
+    pub fn commit(&self) -> &String {
+        &self.commit
     }
 
     // Public setter methods
