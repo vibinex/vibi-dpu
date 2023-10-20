@@ -20,33 +20,34 @@ struct Claims {
 
 fn generate_jwt(github_app_id: &str) -> Option<String> {
     let pem_file_path = "/app/repoprofiler_private.pem";
-    let pem_data = match fs::read(pem_file_path) {
-        Ok(data) => data,
-        Err(e) => {
-            println!("Error reading pem file: {}", e);
-            return None;
-        },
-    };
+    let pem_data = fs::read(pem_file_path);
+    
+    if pem_data.is_err() {
+        let pem_data_err = pem_data.expect_err("No error in reading pem file");
+        println!("Error reading pem file: {:?}", pem_data_err);
+        return None;
+    }
+    let pem_data = pem_data.unwrap();
+
     let my_claims = Claims {
         iat: Utc::now().timestamp(),
         exp: (Utc::now() + Duration::minutes(5)).timestamp(),
         iss: github_app_id.to_string(),
     };
 
-    let encoding_key = match EncodingKey::from_rsa_pem(&pem_data) {
-        Ok(key) => key,
-        Err(e) => {
-            println!("Error creating encoding key: {}", e);
-            return None;
-        },
-    };
-    match encode(&Header::new(Algorithm::RS256), &my_claims, &encoding_key) {
-        Ok(token) => Some(token),
-        Err(e) => {
-            println!("Error encoding JWT: {}", e);
-            None
-        },
+    let encoding_key = EncodingKey::from_rsa_pem(&pem_data);
+    if let Err(e) = encoding_key {
+        println!("Error creating encoding key: {:?}", e); // Changed to avoid Debug requirement
+        return None;
     }
+
+    let token = encode(&Header::new(Algorithm::RS256), &my_claims, &encoding_key.unwrap());
+    if token.is_err() {
+        let token_err = token.expect_err("No error in fetching token");
+        println!("Error encoding JWT: {:?}", token_err);
+        return None;
+    }
+    Some(token.unwrap())
 }
 
 pub async fn fetch_access_token(installation_id: &str) -> Option<String> {
