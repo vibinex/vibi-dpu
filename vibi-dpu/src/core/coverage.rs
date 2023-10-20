@@ -20,33 +20,42 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
         println!("repo_config.comment() = {:?}", repo_config.comment());
         println!("repo_config.auto_assign() = {:?}", repo_config.auto_assign());
         if !coverage_map.is_empty() {
-            // get user for each user id
-            // add reviewers
-            let mut author_set: HashSet<String> = HashSet::new();
-            author_set.insert(prhunk.author().to_string());
-            for blame in prhunk.blamevec() {
-                let blame_author_opt = author_from_commit(blame.commit(),
-                    hunkmap.repo_name(), hunkmap.repo_owner()).await;
-                if blame_author_opt.is_none() {
-                    eprintln!("[process_coverage] Unable to get blame author for commit: {}", &blame.commit());
-                    continue;
+            if repo_config.comment() {
+                println!("Inserting comment...");
+                // create comment text
+                let comment = comment_text(coverage_map, repo_config.auto_assign());
+                // add comment
+                add_comment(&comment, review, &access_token).await; 
+            }
+            if repo_config.auto_assign() {
+                // add reviewers
+                println!("Adding reviewers...");
+                let mut author_set: HashSet<String> = HashSet::new();
+                author_set.insert(prhunk.author().to_string());
+                for blame in prhunk.blamevec() {
+                    let blame_author_opt = author_from_commit(blame.commit(),
+                        hunkmap.repo_name(), hunkmap.repo_owner()).await;
+                    if blame_author_opt.is_none() {
+                        eprintln!("[process_coverage] Unable to get blame author for commit: {}", &blame.commit());
+                        continue;
+                    }
+                    let blame_author = blame_author_opt.expect("Empty blame_author_opt");
+                    let user_key = blame_author.uuid().to_string();
+                    let blame_user_opt = get_workspace_user_from_db(&user_key);
+                    if blame_user_opt.is_none() {
+                        eprintln!("[process_coverage] no user found in db for blame author: {:?}", blame_author);
+                        continue;
+                    }
+                    let blame_user = blame_user_opt.expect("Empty blame user");
+                    let blame_users: Vec<BitbucketUser> = blame_user.users().iter().cloned().collect();
+                    let actual_blame_user = blame_users[0].to_owned();
+                    let author_uuid = actual_blame_user.uuid();
+                    if author_set.contains(author_uuid) {
+                        continue;
+                    }
+                    author_set.insert(author_uuid.to_string());
+                    add_reviewers(&blame_user, review, &access_token).await;
                 }
-                let blame_author = blame_author_opt.expect("Empty blame_author_opt");
-                let user_key = blame_author.uuid().to_string();
-                let blame_user_opt = get_workspace_user_from_db(&user_key);
-                if blame_user_opt.is_none() {
-                    eprintln!("[process_coverage] no user found in db for blame author: {:?}", blame_author);
-                    continue;
-                }
-                let blame_user = blame_user_opt.expect("Empty blame user");
-                let blame_users: Vec<BitbucketUser> = blame_user.users().iter().cloned().collect();
-                let actual_blame_user = blame_users[0].to_owned();
-                let author_uuid = actual_blame_user.uuid();
-                if author_set.contains(author_uuid) {
-                    continue;
-                }
-                author_set.insert(author_uuid.to_string());
-                add_reviewers(&blame_user, review, &access_token).await;
             }
         }    
     }
