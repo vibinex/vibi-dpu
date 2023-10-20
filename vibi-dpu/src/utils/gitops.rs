@@ -406,7 +406,9 @@ async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> 
 					lineitem.timestamp().to_string(),
 					linebreak.to_string(),
 					lidx.to_string(),
-					digest(path) ));
+					digest(path),
+					lineitem.commit().to_string())
+				);
 				linebreak = lidx + 1;
 			}
 		}
@@ -419,7 +421,8 @@ async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> 
 			lineitem.timestamp().to_string(),
 			linebreak.to_string(),
 			lastidx.to_string(),
-			digest(path)));
+			digest(path),
+			lineitem.commit().to_string()));
 	}
 	return Some(blamevec);
 }
@@ -429,9 +432,10 @@ async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<u
 	for lnum  in 0..blamelines.len() {
 		let ln = blamelines[lnum];
 		let wordvec: Vec<&str> = ln.split(" ").collect();
+		let commit = wordvec[0].to_string();
 		let (author, idx) = extract_author(&wordvec);
 		let timestamp = extract_timestamp(&wordvec, idx);
-		let lineitem = LineItem::new(author, timestamp);
+		let lineitem = LineItem::new(author, timestamp, commit);
 		linemap.insert(
 			linenum + lnum,
 			lineitem

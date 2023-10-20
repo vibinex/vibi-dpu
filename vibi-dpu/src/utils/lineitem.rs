@@ -2,13 +2,15 @@
 pub struct LineItem {
     author_id: String,
     timestamp: String,
+    commit: String,
 }
 
 impl LineItem {
-    pub fn new(author_id: String, timestamp: String) -> Self {
+    pub fn new(author_id: String, timestamp: String, commit: String) -> Self {
         Self {
             author_id,
-            timestamp
+            timestamp,
+            commit
         }
     }
 
@@ -18,5 +20,9 @@ impl LineItem {
 
     pub fn timestamp(&self) -> &String {
         &self.timestamp
+    }
+
+    pub fn commit(&self) -> &String {
+        &self.commit
     }
 }
