@@ -40,7 +40,7 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
                         continue;
                     }
                     let blame_author = blame_author_opt.expect("Empty blame_author_opt");
-                    let user_key = blame_author.uuid().to_string();
+                    let user_key = blame_author.display_name().to_string();
                     let blame_user_opt = get_workspace_user_from_db(&user_key);
                     if blame_user_opt.is_none() {
                         eprintln!("[process_coverage] no user found in db for blame author: {:?}", blame_author);
