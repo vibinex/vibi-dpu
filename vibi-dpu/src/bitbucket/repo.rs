@@ -2,11 +2,11 @@ use serde_json::Value;
 
 use crate::db::repo::save_repo_to_db;
 use crate::utils::repo::Repository;
-use super::config::{bitbucket_base_url, get_api};
+use super::config::{bitbucket_base_url, get_api_values};
 
 pub async fn get_workspace_repos(workspace: &str, access_token: &str) -> Option<Vec<Repository>> {
     let repos_url = format!("{}/repositories/{}", bitbucket_base_url(), workspace);
-    let response_json = get_api(&repos_url, access_token, None).await;
+    let response_json = get_api_values(&repos_url, access_token, None).await;
     let mut repos_data = Vec::new();
     for repo_json in response_json {
         let val = Repository::new(

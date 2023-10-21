@@ -3,15 +3,15 @@ use std::env;
 use reqwest::{header::HeaderValue, Response, Error};
 use serde_json::json;
 
-use crate::{db::webhook::save_webhook_to_db, utils::webhook::{Webhook, WebhookResponse}, bitbucket::config::{bitbucket_base_url, get_api}};
+use crate::{db::webhook::save_webhook_to_db, utils::webhook::{Webhook, WebhookResponse}, bitbucket::config::{bitbucket_base_url, get_api_values}};
 
-use super::config::prepare_auth_headers;
+use super::config::{get_client, prepare_auth_headers};
 
 
 pub async fn get_webhooks_in_repo(workspace_slug: &str, repo_slug: &str, access_token: &str) -> Vec<Webhook> {
     let url = format!("{}/repositories/{}/{}/hooks", bitbucket_base_url(), workspace_slug, repo_slug);
     println!("Getting webhooks from {}", url);
-    let response_json = get_api(&url, access_token, None).await;
+    let response_json = get_api_values(&url, access_token, None).await;
     let mut webhooks = Vec::new();
     for webhook_json in response_json {
         let active = matches!(webhook_json["active"].to_string().trim_matches('"'), "true" | "false");
@@ -35,7 +35,11 @@ pub async fn add_webhook(workspace_slug: &str, repo_slug: &str, access_token: &s
         bitbucket_base_url(), workspace_slug, repo_slug
     );
 
-    let mut headers_map = prepare_auth_headers(&access_token);
+    let headers_map_opt = prepare_auth_headers(&access_token);
+    if headers_map_opt.is_none() {
+        return;
+    }
+    let mut headers_map = headers_map_opt.expect("Empty headers_map_opt");
     headers_map.insert("Accept", HeaderValue::from_static("application/vnd.github+json"));
     let callback_url = format!("{}/api/bitbucket/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
@@ -45,8 +49,7 @@ pub async fn add_webhook(workspace_slug: &str, repo_slug: &str, access_token: &s
         "active": true,
         "events": ["pullrequest:created", "pullrequest:updated"] 
     });
-
-    let response = reqwest::Client::new()
+    let response = get_client()
         .post(&url)
         .headers(headers_map)
         .json(&payload)
@@ -63,16 +66,16 @@ async fn process_add_webhook_response(response: Result<Response, Error>){
     }
     let res = response.expect("Uncaught error in response");
     if !res.status().is_success() {
-        println!("Failed to add webhook. Status code: {}, Text: {:?}",
+        eprintln!("Failed to add webhook. Status code: {}, Text: {:?}",
             res.status(), res.text().await);
         return;
     }
     let webhook_res = res.json::<WebhookResponse>().await;
     if webhook_res.is_err() {
         let err = webhook_res.expect_err("No error in webhook response");
+        eprintln!("Failed to parse webhook_res: {:?}", err);
         return;
     }
-    
     let webhook = webhook_res.expect("Uncaught error in webhook response");
     let webhook_data = Webhook::new(
         webhook.uuid().to_string(),

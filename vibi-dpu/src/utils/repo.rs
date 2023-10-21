@@ -78,7 +78,7 @@ impl Repository {
     }
 
     //Public Setters
-    pub fn set_local_dir(&mut self, local_dir: String) {
-        self.local_dir = Some(local_dir);
+    pub fn set_local_dir(&mut self, local_dir: &String) {
+        self.local_dir = Some(local_dir.to_owned());
     }
 }

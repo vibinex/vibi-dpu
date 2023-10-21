@@ -6,10 +6,23 @@ use crate::utils::owner::Workspace;
 pub fn save_workspace_to_db(workspace: &Workspace) {
     let uuid = workspace.uuid().clone();
     let db = get_db();
-    let json = serde_json::to_string(&workspace).expect("Failed to serialize workspace");
+    let parse_json = serde_json::to_string(&workspace);
+    if parse_json.is_err() {
+        let e = parse_json
+            .expect_err("No error in parse_json for workspace");
+        eprintln!("Failed to serialize workspace: {:?}", e);
+        return;
+    }
+    let json = parse_json.expect("Uncaught error in parse_json workspace");
     // Convert JSON string to bytes
     let bytes = json.as_bytes(); 
     // Create IVec from bytes
     let ivec = IVec::from(bytes);
-    db.insert(format!("owners:{}", uuid), ivec).expect("Unable to save workspace in db");  
+    let insert_res = db.insert(format!("owners:{}", uuid), ivec);
+    if insert_res.is_err() {
+        let e = insert_res.expect_err("No error in insert_res");
+        eprintln!("Failed to upsert workspace into sled DB: {e}");
+        return;
+    }
+    println!("Workspace succesfully upserted: {:?}", workspace);  
 }
