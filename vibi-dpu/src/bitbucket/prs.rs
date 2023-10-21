@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::str;
 use std::env;
 use crate::client::config::get_client;
-use crate::utils::prInfo::PrInfo;
+use crate::utils::prInfo::prInfo;
 use crate::db::prs::save_pr_info_to_db;
 
 pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token: &str, state: &str) -> Vec<u32> {
@@ -59,7 +59,7 @@ pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token:
 
 
 
-pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Option<PrInfo> {
+pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Option<prInfo> {
     let url = format!("{}/repositories/{}/{}/pullrequests/{}", env::var("SERVER_URL").expect("SERVER_URL must be set"), workspace_slug, repo_slug, pr_number);
 
     let client = get_client();
@@ -81,7 +81,7 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
     }
     let pr_data: Value = response.json().await.unwrap_or_default();
 
-    Some(PrInfo {
+    Some(prInfo {
         base_head_commit: pr_data["destination"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
         pr_head_commit: pr_data["source"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
         state: pr_data["state"].as_str().unwrap_or_default().to_string(),

@@ -1,9 +1,10 @@
 use sled::IVec;
 use std::error::Error;
 use crate::db::config::get_db;
+use crate::utils::prInfo::prInfo;
 
 
-pub async fn save_pr_info_to_db(workspace_slug: &str,repo_slug: &str,pr_info: PrInfo,pr_number: &str) {
+pub async fn save_pr_info_to_db(workspace_slug: &str,repo_slug: &str, pr_info: prInfo, pr_number: &str) {
     let db = get_db();
     let key = format!("{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
 
@@ -15,18 +16,18 @@ pub async fn save_pr_info_to_db(workspace_slug: &str,repo_slug: &str,pr_info: Pr
     }
     let pr_info_json = pr_info_bytes.expect("Uncaught error in parse_res repo");
 
-    let insert_result = db.insert(key.as_bytes(), IVec::from(pr_info_json.unwrap())); 
+    let insert_result = db.insert(key.as_bytes(), IVec::from(pr_info_json)); 
     if insert_result.is_err() {
         let e = insert_result.expect_err("No error in inserting pr_info");
         eprintln!("Failed to insert PR info into the database. {:?}", e);
         return;
     }
 
-    println!("PR succesfully upserted: {:?} {:?}", key, PrInfo);
+    println!("PR succesfully upserted: {:?} {:?}", key, pr_info);
 }
 
 
-pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info: PrInfo, pr_number: &str) {
+pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info: prInfo, pr_number: &str) {
     let key = format!("{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
     let db = get_db();
 
@@ -49,6 +50,6 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
         return;
     }
 
-    println!("PR info updated successfully in the database. {:?} {:?}", key, PrInfo);
+    println!("PR info updated successfully in the database. {:?} {:?}", key, pr_info);
 }
 

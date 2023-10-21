@@ -35,6 +35,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
         },
         "webhook_callback" => {
             let data_bytes_async = data_bytes.to_owned();
+            println!("data {:?}", data_bytes_async);
             task::spawn(async move {
                 process_review(&data_bytes_async).await;
                 println!("Processed webhook callback message");
