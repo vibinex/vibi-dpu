@@ -8,3 +8,4 @@ pub mod gitops;
 pub mod user;
 pub mod lineitem;
 pub mod repo_config;
+pub mod prInfo;

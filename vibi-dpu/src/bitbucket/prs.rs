@@ -1,22 +1,18 @@
-use reqwest::{Client, StatusCode};
+use reqwest::StatusCode;
+use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::time::Duration;
 use std::str;
 use std::env;
-use std::process::Command;
-use std::time::SystemTime;
 use crate::client::config::get_client;
-use crate::utils::auth::AuthInfo;
-use crate::utils::review::Review;
 use crate::utils::prInfo::PrInfo;
 
 pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token: &str, state: &str) -> Vec<u32> {
     let mut pr_list = Vec::new();
     let client = get_client();
 
-    let mut headers = HashMap::new();
-    headers.insert("Authorization".to_string(), format!("Bearer {}", access_token));
+    let mut headers = HeaderMap::new();
+    headers.insert("Authorization", HeaderValue::from_str(&format!("Bearer {}", access_token)).unwrap());
     
     let mut params = HashMap::new();
     params.insert("state".to_string(), state.to_string());
@@ -59,6 +55,8 @@ pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token:
     }
     pr_list
 }
+
+
 
 pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Option<PrInfo> {
     let url = format!("{}/repositories/{}/{}/pullrequests/{}", env::var("SERVER_URL").expect("SERVER_URL must be set"), workspace_slug, repo_slug, pr_number);

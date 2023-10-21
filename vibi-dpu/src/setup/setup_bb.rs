@@ -69,12 +69,6 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             let access_token_async = access_token.clone();
             task::spawn(async move {
                 let prs = list_prs_bitbucket(&workspace_slug_async, &repo_name_async, &access_token_async, "OPEN").await;
-                let prs = prs.unwrap();
-                if prs.is_err() {
-                    let err = prs.expect_err("No error in getting Prs list");
-                    eprintln!("An error occurred while retrieving pull requests: {:?}", err);
-                    return;
-                }
                 if prs.is_empty() {
                     println!("No open pull requests found for processing.");
                     return;
