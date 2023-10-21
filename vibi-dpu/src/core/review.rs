@@ -135,6 +135,7 @@ fn publish_hunkmap(hunkmap: &HunkMap) {
 	tokio::spawn(async move {
 		let url = format!("{}/api/hunks",
 			env::var("SERVER_URL").expect("SERVER_URL must be set"));
+		let url_clone = url.clone();
 		println!("url for hunkmap publishing  {}", &url);
 		match client
 		.post(url)
@@ -142,10 +143,10 @@ fn publish_hunkmap(hunkmap: &HunkMap) {
 		.send()
 		.await {
 			Ok(_) => {
-				println!("Hunkmap published successfully!");
+				println!("[publish_hunkmap] Hunkmap published successfully for: {} !", &url_clone);
 			},
 			Err(e) => {
-				eprintln!("Failed to publish hunkmap: {}", e);
+				eprintln!("[publish_hunkmap] Failed to publish hunkmap: {} for: {}", e, &url_clone);
 			}
 		};
 	});
