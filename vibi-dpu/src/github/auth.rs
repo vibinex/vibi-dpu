@@ -1,9 +1,10 @@
 use jsonwebtoken::{encode, Header, EncodingKey, Algorithm};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::env;
 use chrono::{Utc, Duration};
 use std::fs;
-use crate::{client::config::get_client, utils::auth::AuthInfo, };
+use crate::{client::config::get_client, utils::auth::AuthInfo};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AccessTokenResponse {
@@ -27,7 +28,7 @@ fn generate_jwt(github_app_id: &str) -> Option<String> {
         println!("Error reading pem file: {:?}", pem_data_err);
         return None;
     }
-    let pem_data = pem_data.unwrap();
+    let pem_data_res = pem_data.expect("Error reading pem file");
 
     let my_claims = Claims {
         iat: Utc::now().timestamp(),
@@ -35,9 +36,9 @@ fn generate_jwt(github_app_id: &str) -> Option<String> {
         iss: github_app_id.to_string(),
     };
 
-    let encoding_key = EncodingKey::from_rsa_pem(&pem_data);
-    if let Err(e) = encoding_key {
-        println!("Error creating encoding key: {:?}", e); // Changed to avoid Debug requirement
+    let encoding_key = EncodingKey::from_rsa_pem(&pem_data_res);
+    if encoding_key.is_err() {
+        println!("Error creating encoding key");
         return None;
     }
 
@@ -46,13 +47,15 @@ fn generate_jwt(github_app_id: &str) -> Option<String> {
         let token_err = token.expect_err("No error in fetching token");
         println!("Error encoding JWT: {:?}", token_err);
         return None;
-    }
-    Some(token.unwrap())
+    };
+    let token_result = token.expect("Error encoding JWT");
+    Some(token_result)
 }
 
-pub async fn fetch_access_token(installation_id: &str) -> Option<String> {
-    let github_app_id = env::var("GITHUB_APP_ID").unwrap();
-    let jwt_token = generate_jwt(&github_app_id).unwrap();
+pub async fn fetch_access_token(installation_id: &str) -> Option<Value> {
+    let github_app_id = env::var("GITHUB_APP_ID");
+    let github_app_id_str = github_app_id.expect("GITHUB_APP_ID must be set");
+    let jwt_token = generate_jwt(&github_app_id_str).expect("Error generating JWT");
 
     let client = get_client();
     let response = client.post(&format!("https://api.github.com/app/installations/{}/access_tokens", installation_id))
@@ -66,21 +69,21 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<String> {
             eprintln!("error in calling github api : {:?}", e);
             return None;
         }
-        let res = response.expect("Uncaught error in reponse");
-        if !res.status().is_success() {
+        let response_access_token = response.expect("Uncaught error in reponse");
+        if !response_access_token.status().is_success() {
             println!(
                 "Failed to exchange code for access token. Status code: {}, Response content: {:?}",
-                res.status(),
-                res.text().await
+                response_access_token.status(),
+                response_access_token.text().await
             );
             return None;
         }
-        let parse_res = res.text().await ;
+        let parse_res = response_access_token.json().await ;
         if parse_res.is_err() {
             let e = parse_res.expect_err("No error in parse_res for AuthInfo");
             eprintln!("error deserializing AuthInfo: {:?}", e);
             return None;
         }
-        let response_json = parse_res.expect("Uncaught error in parse_res for AuthInfo");
+        let response_json: Value = parse_res.expect("Uncaught error in parse_res for AuthInfo");
         return Some(response_json);
 }
