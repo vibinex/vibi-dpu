@@ -7,3 +7,4 @@ pub mod user;
 pub mod hunk;
 pub mod review;
 pub mod repo_config;
+pub mod prs;

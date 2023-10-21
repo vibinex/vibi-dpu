@@ -75,6 +75,9 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
                 }
                 // We can concurrently process each PR with tokio::spawn.
                 let handles: Vec<_> = prs.into_iter().map(|pr| {
+                    let workspace_slug_async = workspace_slug_async.clone(); //Instead of cloning each time, I could have used ARC but not sure what is the best way.
+                    let repo_name_async = repo_name_async.clone();
+                    let access_token_async = access_token_async.clone();
                     tokio::spawn(async move {
                         get_and_store_pr_info(&workspace_slug_async, &repo_name_async, &access_token_async, &pr.to_string()).await;
                     })
@@ -95,6 +98,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
     } 
     send_setup_info(&pubreqs).await;
 }
+
 
 async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
     let installation_id = env::var("INSTALL_ID")
