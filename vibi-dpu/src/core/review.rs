@@ -132,10 +132,10 @@ fn parse_review(message_data: &Vec<u8>) -> Option<Review>{
 fn publish_hunkmap(hunkmap: &HunkMap) {
 	let client = get_client();
 	let hunkmap_json = serde_json::to_string(&hunkmap).expect("Unable to serialize hunkmap");
+	let key_clone = hunkmap.db_key().to_string();
 	tokio::spawn(async move {
 		let url = format!("{}/api/hunks",
 			env::var("SERVER_URL").expect("SERVER_URL must be set"));
-		let url_clone = url.clone();
 		println!("url for hunkmap publishing  {}", &url);
 		match client
 		.post(url)
@@ -143,10 +143,10 @@ fn publish_hunkmap(hunkmap: &HunkMap) {
 		.send()
 		.await {
 			Ok(_) => {
-				println!("[publish_hunkmap] Hunkmap published successfully for: {} !", &url_clone);
+				println!("[publish_hunkmap] Hunkmap published successfully for: {} !", &key_clone);
 			},
 			Err(e) => {
-				eprintln!("[publish_hunkmap] Failed to publish hunkmap: {} for: {}", e, &url_clone);
+				eprintln!("[publish_hunkmap] Failed to publish hunkmap: {} for: {}", e, &key_clone);
 			}
 		};
 	});
