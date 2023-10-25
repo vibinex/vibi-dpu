@@ -50,7 +50,7 @@ async fn add_user_to_reviewers(response_res: Option<Response>, user_key: &str) -
     return Some((reviewers, get_response_json));
 }
 
-fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, get_response_json: &Value) -> Option<Value> {
+fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, pr_info_json: &Value) -> Option<Value> {
     // Serialize and add updated reviewers to response json
     let reviewers_obj_res = serde_json::to_value(updated_reviewers);
     if reviewers_obj_res.is_err() {
@@ -59,7 +59,7 @@ fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, get_response_json: &
         return None;
     }
     let reviewers_obj = reviewers_obj_res.expect("Uncaught error in reviewers_obj_res");
-    let mut response_json = get_response_json.to_owned();
+    let mut response_json = pr_info_json.to_owned();
     let obj_opt = response_json.as_object_mut();
     if obj_opt.is_none() {
         eprintln!("Unable to get mutable reviewer response obj");
