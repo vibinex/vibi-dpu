@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use base64ct::Error;
 use futures_util::StreamExt;
 use google_cloud_auth::credentials::CredentialsFile;
 use google_cloud_default::WithAuthExt;
@@ -8,6 +9,7 @@ use google_cloud_pubsub::{
     subscription::{SubscriptionConfig, Subscription},
 };
 use serde::Deserialize;
+use serde_json::Value;
 use tokio::task;
 use std::collections::VecDeque;
 use sha256::digest;
@@ -35,7 +37,6 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
         },
         "webhook_callback" => {
             let data_bytes_async = data_bytes.to_owned();
-            println!("data {:?}", data_bytes_async);
             task::spawn(async move {
                 process_review(&data_bytes_async).await;
                 println!("Processed webhook callback message");
@@ -138,4 +139,16 @@ pub async fn listen_messages(keypath: &str, topicname: &str) {
         // Ack or Nack message.
         let _ = message.ack().await;
     }
+}
+
+pub fn deserialized_data(message_data: &Vec<u8>) -> Option<Value> {
+    let msg_data_res = serde_json::from_slice::<Value>(message_data);
+    if msg_data_res.is_err() {
+		let e = msg_data_res.expect_err("No error in data_res");
+		eprintln!("Incoming message does not contain valid reviews: {:?}", e);
+		return None;
+	}
+	let deserialized_data = msg_data_res.expect("Uncaught error in deserializing message_data");
+	println!("deserialized_data == {:?}", &deserialized_data["eventPayload"]["repository"]);
+    Some(deserialized_data)
 }
