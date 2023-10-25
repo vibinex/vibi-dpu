@@ -11,13 +11,18 @@ use crate::utils::user::BitbucketUser;
 use super::{config::{bitbucket_base_url, get_client, prepare_headers}};
 
 pub async fn add_reviewers(user_key: &str, review: &Review, access_token: &str) {
-    let url = prepare_add_reviewers_url(review.repo_owner(), review.repo_name(), review.id());
+    let url = prepare_get_prinfo_url(review.repo_owner(), review.repo_name(), review.id());
     let get_response = get_pr_info(&url, access_token).await;
-    let put_request_body_opt = add_user_to_reviewers(get_response, user_key).await;
-    put_reviewers(&url, access_token, &put_request_body_opt).await;
+    let reviewers_opt = add_user_to_reviewers(get_response, user_key).await;
+    if reviewers_opt.is_none() {
+        eprintln!("[add_reviewers] Unable to add reviewers for review: {}", review.id());
+    }
+    let (reviewers, pr_info_json)  = reviewers_opt.expect("Empty reviewers_opt");
+    let put_payload = prepare_put_body(&reviewers, &pr_info_json);
+    put_reviewers(&url, access_token, &put_payload).await;
 }
 
-async fn add_user_to_reviewers(response_res: Option<Response>, user_key: &str) -> Option<Value> {
+async fn add_user_to_reviewers(response_res: Option<Response>, user_key: &str) -> Option<(Vec<BitbucketUser>, Value)> {
     let reviewers_opt = parse_reviewers_from_prinfo(response_res).await;
     if reviewers_opt.is_none() {
         eprintln!("Unable to parse and add reviewers");
@@ -42,9 +47,7 @@ async fn add_user_to_reviewers(response_res: Option<Response>, user_key: &str) -
         }
     }
     println!("Updated reviewers = {:?}", reviewers);
-    let payload_opt = prepare_put_body(&reviewers, &get_response_json);
-    println!("put reviewers payload = {:?}", &payload_opt);
-    return payload_opt;
+    return Some((reviewers, get_response_json));
 }
 
 fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, get_response_json: &Value) -> Option<Value> {
@@ -142,7 +145,7 @@ async fn get_pr_info(url: &str, access_token: &str) -> Option<Response> {
     return Some(get_response);
 }
 
-fn prepare_add_reviewers_url(repo_owner: &str, 
+fn prepare_get_prinfo_url(repo_owner: &str, 
     repo_name: &str, review_id: &str) -> String {
     let url = format!(
         "{}/repositories/{}/{}/pullrequests/{}",
