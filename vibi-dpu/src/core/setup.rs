@@ -94,7 +94,7 @@ async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
     };
     println!("body = {:?}", &body);
     let client = get_client();
-    let setup_url = format!("{base_url}/api/rustApp/setup");
+    let setup_url = format!("{base_url}/api/dpu/setup");
     let post_res = client
       .post(&setup_url)
       .json(&body)

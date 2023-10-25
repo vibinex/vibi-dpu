@@ -6,6 +6,7 @@ use reqwest::Client;
 use super::config::get_client;
 use crate::db::auth::{save_auth_info_to_db, auth_info};
 use crate::utils::auth::AuthInfo;
+use crate::utils::review::Review;
 
 pub async fn get_access_token_from_bitbucket(code: &str) -> Option<AuthInfo> {
     let client = get_client();
@@ -154,4 +155,22 @@ fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str) {
 		Err(e) => eprintln!("set_git_url stdout error: {}", e), 
 	};
 	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
+}
+
+pub async fn get_access_token_review(review: &Review) -> Option<String> {
+    let authinfo_opt = auth_info();
+    if authinfo_opt.is_none() {
+        return None;
+    }
+    let auth_info = authinfo_opt.expect("Uncaught error in authinfo_opt");
+    let mut access_token = auth_info.access_token().clone();
+    let clone_url = review.clone_url();
+    let directory = review.clone_dir();
+    let new_auth_opt = update_access_token(&auth_info, &clone_url, &directory).await;
+    if new_auth_opt.is_none() {
+        return None;
+    }
+    let new_auth = new_auth_opt.expect("empty new_auth_opt");
+    access_token = new_auth.access_token().to_string();
+    return Some(access_token);
 }
