@@ -3,7 +3,6 @@ use std::str;
 use std::io::ErrorKind;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::{task, fs};
 
@@ -13,6 +12,7 @@ use crate::bitbucket::repo::get_workspace_repos;
 use crate::bitbucket::workspace::get_bitbucket_workspaces;
 use crate::bitbucket::webhook::{get_webhooks_in_repo, add_webhook};
 use crate::bitbucket::user::get_and_save_workspace_users;
+use crate::bitbucket::prs::{list_prs_bitbucket, get_and_store_pr_info};
 use crate::db::repo::save_repo_to_db;
 use crate::db::webhook::save_webhook_to_db;
 use crate::utils::repo::Repository;
@@ -67,12 +67,24 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             let repo_name_async = repo_name.clone();
             let workspace_slug_async = workspace_slug.clone();
             let access_token_async = access_token.clone();
-            // task::spawn(async move {
-            //     get_prs(&workspace_slug_async,
-            //         &repo_name_async,
-            //         &access_token_async,
-            //         "OPEN").await;
-            // });
+            task::spawn(async move {
+                let pr_list_opt = list_prs_bitbucket(&workspace_slug_async, &repo_name_async, &access_token_async, "OPEN").await;
+                if pr_list_opt.is_none() {
+                    println!("No open pull requests found for processing.");
+                    return;
+                }
+                let pr_list = pr_list_opt.expect("Empty pr_list_opt");
+                // We can concurrently process each PR with tokio::spawn.
+                for pr_id in pr_list.iter() {
+                    let workspace_slug_async = workspace_slug_async.clone(); //Instead of cloning each time, I could have used ARC but not sure what is the best way.
+                    let repo_name_async = repo_name_async.clone();
+                    let access_token_async = access_token_async.clone();
+                    let pr_id_async = pr_id.clone();
+                    task::spawn(async move {
+                        get_and_store_pr_info(&workspace_slug_async, &repo_name_async, &access_token_async, &pr_id_async).await;
+                    });
+                }          
+            });
         }
         pubreqs.push(SetupInfo {
             provider: "bitbucket".to_owned(),
@@ -81,6 +93,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
     } 
     send_setup_info(&pubreqs).await;
 }
+
 
 async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
     let installation_id = env::var("INSTALL_ID")
