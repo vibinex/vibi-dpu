@@ -60,22 +60,22 @@ pub async fn process_and_update_pr_if_different(webhook_data: Value, workspace_s
         .and_then(|pr| pr.get("head"))
         .and_then(|head| head.get("sha"))
         .and_then(|sha| sha.as_str())
+        .ok_or("Missing pr_head_commit")?
         .to_string();
     
-    if pr_head_commit.is_none() {
-        return Err("pr_head_commit not found in webhook data".to_string());
-    }
     let base_head_commit = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("base"))
         .and_then(|base| base.get("sha"))
         .and_then(|sha| sha.as_str())
+        .ok_or("Missing base_head commit")?
         .to_string();
 
     let pr_state = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("state"))
         .and_then(|state| state.as_str())
+        .ok_or("Missing pr_state")?
         .to_string();
 
     let pr_branch = webhook_data
@@ -83,6 +83,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: Value, workspace_s
         .and_then(|pr| pr.get("head"))
         .and_then(|head| head.get("ref"))
         .and_then(|ref_val| ref_val.as_str())
+        .ok_or("Missing pr_branch")?
         .to_string();
 
     // Retrieve the existing pr_head_commit from the database
@@ -110,9 +111,9 @@ pub async fn process_and_update_pr_if_different(webhook_data: Value, workspace_s
         return Err("Failed to deserialize PR info".to_string());
     }
     let pr_info: prInfo = pr_info_parse.expect("Failed to deserialize PR info");
-    let stored_pr_head_commit_str = &pr_info.pr_head_commit;
+    let stored_pr_head_commit_str = pr_info.pr_head_commit;
     // Compare with the one in webhook data
-    if pr_head_commit == Some(stored_pr_head_commit_str){
+    if pr_head_commit == stored_pr_head_commit_str{
         Ok(false) // commits are the same
     } else {
         let updated_pr_info = prInfo { base_head_commit: base_head_commit,
