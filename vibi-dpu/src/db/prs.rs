@@ -28,7 +28,7 @@ pub async fn save_pr_info_to_db(workspace_slug: &str,repo_slug: &str,pr_info: Pr
 }
 
 
-pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info: PrInfo, pr_number: &str) {
+pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info: &PrInfo, pr_number: &str) {
     let key = format!("{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
     let db = get_db();
 
@@ -54,45 +54,79 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
     println!("PR info updated successfully in the database. {:?} {:?}", key, pr_info);
 }
 
-pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: String, repo_slug: String, pr_number: String, repo_provider: String) -> Result<bool, String> {
-    let pr_head_commit = webhook_data
+pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str) -> bool {
+    let pr_info_parsed_opt = parse_webhook_data(webhook_data);
+    if pr_info_parsed_opt.is_none() {
+        eprintln!("[process_and_update_pr_if_different] Unable to parse webhook data");
+        return false;
+    }
+    let pr_info_parsed = pr_info_parsed_opt.expect("Empty pr_info_parsed_opt");
+    // Retrieve the existing pr_head_commit from the database
+    let pr_info_db_opt = get_pr_info(workspace_slug, repo_slug, pr_number, repo_provider, &pr_info_parsed).await;
+    if pr_info_db_opt.is_none() {
+        eprintln!("[process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
+        return false;
+    }
+    let pr_info_db = pr_info_db_opt.expect("Empty pr_info_db_opt");
+    if pr_info_db.pr_head_commit().to_string().eq_ignore_ascii_case(pr_info_parsed.pr_head_commit()){
+        return false; // commits are the same
+    } else {
+        update_pr_info_in_db(&workspace_slug, &repo_slug, &pr_info_parsed, &pr_number).await;
+        return true; // commits are different, and PR info should be updated
+    }
+}
+
+fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
+    let pr_head_commit_opt = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("head"))
         .and_then(|head| head.get("sha"))
-        .and_then(|sha| sha.as_str())
-        .ok_or("Missing pr_head_commit")?
-        .to_string();
+        .and_then(|sha| sha.as_str());
+    if pr_head_commit_opt.is_none() {
+        eprintln!("[parse_webhook_data] pr_head_commit_opt not found: {:?}", webhook_data);
+        return None;
+    }
+    let pr_head_commit = pr_head_commit_opt.expect("Empty pr_head_commit_opt");
 
-    let base_head_commit = webhook_data
+    let base_head_commit_opt = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("base"))
         .and_then(|base| base.get("sha"))
-        .and_then(|sha| sha.as_str())
-        .ok_or("Missing base_head commit")?
-        .to_string();
+        .and_then(|sha| sha.as_str());
+    if base_head_commit_opt.is_none() {
+        eprintln!("[parse_webhook_data] base_head_commit_opt not found: {:?}", webhook_data);
+        return None;
+    }
+    let base_head_commit = base_head_commit_opt.expect("Empty base_head_commit_opt");
 
-    let pr_state = webhook_data
+    let pr_state_opt = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("state"))
-        .and_then(|state| state.as_str())
-        .ok_or("Missing pr_state")?
-        .to_string();
-
-    let pr_branch = webhook_data
+        .and_then(|state| state.as_str());
+    if pr_state_opt.is_none() {
+        eprintln!("[parse_webhook_data] pr_state_opt not found: {:?}", webhook_data);
+        return None;
+    }
+    let pr_state = pr_state_opt.expect("Empty pr_state_opt");
+    let pr_branch_opt = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("head"))
         .and_then(|head| head.get("ref"))
-        .and_then(|ref_val| ref_val.as_str())
-        .ok_or("Missing pr_branch")?
-        .to_string();
-
-    let updated_pr_info = PrInfo { base_head_commit: base_head_commit,
-        pr_head_commit: pr_head_commit.clone(),
-        state: pr_state,
-        pr_branch: pr_branch 
+        .and_then(|ref_val| ref_val.as_str());
+    if pr_branch_opt.is_none() {
+        eprintln!("[parse_webhook_data] pr_branch_opt not found: {:?}", webhook_data);
+        return None;
+    }
+    let pr_branch = pr_branch_opt.expect("Empty pr_branch_opt");
+    let pr_info = PrInfo { base_head_commit: base_head_commit.to_string(),
+        pr_head_commit: pr_head_commit.to_string(),
+        state: pr_state.to_string(),
+        pr_branch: pr_branch.to_string()
     };
+    return Some(pr_info);
+}
 
-    // Retrieve the existing pr_head_commit from the database
+pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str, pr_info_parsed: &PrInfo) -> Option<PrInfo> {
     let db = get_db();
     let db_pr_key = format!("{}/{}/{}/{}", repo_provider, workspace_slug, repo_slug, pr_number);
     let pr_info_res = db.get(IVec::from(db_pr_key.as_bytes()));
@@ -100,14 +134,14 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     if pr_info_res.is_err() {
         let e = pr_info_res.expect_err("No error in pr_info_res");
         eprintln!("Unable to get bb pr info from db: {:?}", e);
-        return Err("Database retrieval failed".to_string());
+        return None;
     };
 
     let pr_info_opt = pr_info_res.expect("Uncaught error in pr_info res");
     if pr_info_opt.is_none() {
         eprintln!("No bitbucket pr info in db");
-        update_pr_info_in_db(&workspace_slug, &repo_slug, updated_pr_info, &pr_number).await;
-        return Ok(true); //If no info in db then it will be considered as new commit
+        update_pr_info_in_db(&workspace_slug, &repo_slug, pr_info_parsed, &pr_number).await;
+        return None; //If no info in db then it will be considered as new commit
     }
 
     let pr_info_ivec = pr_info_opt.expect("Empty pr_info_opt");
@@ -115,15 +149,8 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     if pr_info_parse.is_err() {
         let e = pr_info_parse.expect_err("No error in pr_info_parse");
         eprintln!("Unable to deserialize pr_Info: {:?}", e);
-        return Err("Failed to deserialize PR info".to_string());
+        return None;
     }
     let pr_info: PrInfo = pr_info_parse.expect("Failed to deserialize PR info");
-    let stored_pr_head_commit_str = pr_info.pr_head_commit;
-    // Compare with the one in webhook data
-    if pr_head_commit == stored_pr_head_commit_str{
-        Ok(false) // commits are the same
-    } else {
-        update_pr_info_in_db(&workspace_slug, &repo_slug, updated_pr_info, &pr_number).await;
-        Ok(true) // commits are different, and PR info should be updated
-    }
+    return Some(pr_info);
 }

@@ -55,8 +55,8 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             let repo_slug = deserialised_msg_data["eventPayload"]["repository"]["slug"].to_string().trim_matches('"').to_string();
             let pr_number = deserialised_msg_data["eventPayload"]["pullRequest"]["number"].to_string().trim_matches('"').to_string();
             
-            let process_result = process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], workspace_slug, repo_slug, pr_number, repo_provider).await;
-            if let Ok(true) = process_result {
+            let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &workspace_slug, &repo_slug, &pr_number, &repo_provider).await;
+            if is_reviewable {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;
                     println!("Processed webhook callback message");
