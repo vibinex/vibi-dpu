@@ -430,11 +430,11 @@ async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> 
 async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<usize, LineItem> {
 	let mut linemap = HashMap::<usize, LineItem>::new();
 	for lnum  in 0..blamelines.len() {
-		let ln = blamelines[lnum];
-		let wordvec: Vec<&str> = ln.split(" ").collect();
-		let commit = wordvec[0].to_string();
-		let (author, idx) = extract_author(&wordvec);
-		let timestamp = extract_timestamp(&wordvec, idx);
+		let blame_line = blamelines[lnum];
+		let blame_line_words: Vec<&str> = blame_line.split(" ").collect();
+		let commit = blame_line_words[0].to_string();
+		let (author, idx) = extract_author(&blame_line_words);
+		let timestamp = extract_timestamp(&blame_line_words, idx);
 		let lineitem = LineItem::new(author, timestamp, commit);
 		linemap.insert(
 			linenum + lnum,
@@ -444,17 +444,17 @@ async fn process_blamelines(blamelines: &Vec<&str>, linenum: usize) -> HashMap<u
 	return linemap;
 }
 
-fn extract_author(wordvec: &Vec<&str>) -> (String, usize) {
-	let mut author = wordvec[1];
+fn extract_author(blame_line_words: &Vec<&str>) -> (String, usize) {
+	let mut author = blame_line_words[1];
 	let mut idx = 1;
 	// Check if the second value is an email address (enclosed in angle brackets)
 	if !author.starts_with('(') && !author.ends_with('>') {
 		// Shift the index to the next non-empty value
-		while idx < wordvec.len() && (wordvec[idx] == "" || !wordvec[idx].starts_with('(')){
+		while idx < blame_line_words.len() && (blame_line_words[idx] == "" || !blame_line_words[idx].starts_with('(')){
 			idx += 1;
 		}
-		if idx < wordvec.len() {
-			author = wordvec[idx];
+		if idx < blame_line_words.len() {
+			author = blame_line_words[idx];
 		}
 	} else {
 		// Remove the angle brackets from the email address
