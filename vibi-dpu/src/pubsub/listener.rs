@@ -16,6 +16,7 @@ use sha256::digest;
 use tonic::Code;
 use crate::{setup::{setup_bb::handle_install_bitbucket, setup_gh::handle_install_github}, utils::user::{Provider, ProviderEnum}};
 use crate::core::review::process_review; // To be added in future PR
+use crate::db::prs::process_and_update_pr_if_different;
 
 #[derive(Debug, Deserialize)]
 struct InstallCallback {
@@ -37,10 +38,16 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
         },
         "webhook_callback" => {
             let data_bytes_async = data_bytes.to_owned();
-            task::spawn(async move {
-                process_review(&data_bytes_async).await;
-                println!("Processed webhook callback message");
-            });
+            let deserialized_data = deserialized_data(&data_bytes_async);
+            let workspace_slug = deserialized_data.get("workspace").and_then(|workspace| workspace.get("slug")).and_then(|slug| slug.as_str());
+            let repo_slug = deserialized_data.get("repository").and_then(|repository| repository.get("slug")).and_then(|slug| slug.as_str());
+            let pr_number = deserialized_data.get("pullrequest").and_then(|pullrequest| pullrequest.get("number")).and_then(|number| number.as_str());
+            if process_and_update_pr_if_different(deserialized_data, workspace_slug, repo_slug, pr_number) == true {
+                task::spawn(async move {
+                    process_review(&data_bytes_async).await;
+                    println!("Processed webhook callback message");
+                });
+            };
         }
         _ => {
             eprintln!("Message type not found for message : {:?}", attributes);
