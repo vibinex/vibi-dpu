@@ -16,7 +16,7 @@ use crate::{
 		repo::get_clone_url_clone_dir, 
 		review::save_review_to_db,
 		repo_config::save_repo_config_to_db},
-	client::config::get_client,
+	bitbucket::config::get_client,
 	core::coverage::process_coverage};
 
 pub async fn process_review(message_data: &Vec<u8>) {
