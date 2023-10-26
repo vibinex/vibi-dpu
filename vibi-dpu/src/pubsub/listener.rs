@@ -14,9 +14,8 @@ use tokio::task;
 use std::collections::VecDeque;
 use sha256::digest;
 use tonic::Code;
-use crate::{setup::{setup_bb::handle_install_bitbucket, setup_gh::handle_install_github}, utils::user::{Provider, ProviderEnum}};
-use crate::core::review::process_review; // To be added in future PR
-use crate::db::prs::process_and_update_pr_if_different;
+use crate::{db::prs::process_and_update_pr_if_different, utils::user::ProviderEnum};
+use crate::core::{setup::handle_install_bitbucket, review::process_review};
 
 #[derive(Debug, Deserialize)]
 struct InstallCallback {
@@ -34,7 +33,18 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
     let msgtype = msgtype_opt.expect("Empty msgtype");
     match msgtype.as_str() {
         "install_callback" => {
-            prcoess_install_callback(&data_bytes).await;    
+            println!("Processing install callback message");
+            let msg_data_res =  serde_json::from_slice::<InstallCallback>(data_bytes);
+            if msg_data_res.is_err() {
+                eprintln!("Error deserializing install callback: {:?}", msg_data_res);
+                return;
+            }
+            let data = msg_data_res.expect("msg_data not found");
+            let code_async = data.installation_code.clone();
+            task::spawn(async move {
+                handle_install_bitbucket(&code_async).await;
+                println!("Processed install callback message");
+            });
         },
         "webhook_callback" => {
             let data_bytes_async = data_bytes.to_owned();
@@ -69,11 +79,12 @@ async fn prcoess_install_callback(data_bytes: &[u8]) {
     }
     let data = msg_data_res.expect("msg_data not found");
     if data.repository_provider == ProviderEnum::Github.to_string().to_lowercase() {
-        let code_async = data.installation_code.clone();
-        task::spawn(async move {
-            handle_install_github(&code_async).await;
-            println!("Processed install callback message");
-        });
+        println!("To be Implemented");
+        // let code_async = data.installation_code.clone();
+        // task::spawn(async move {
+        //     handle_install_github(&code_async).await;
+        //     println!("Processed install callback message");
+        // });
     }
     if data.repository_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
         let code_async = data.installation_code.clone();

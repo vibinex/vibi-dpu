@@ -5,8 +5,8 @@ use serde_json::json;
 
 use crate::{db::webhook::save_webhook_to_db, utils::webhook::{Webhook, WebhookResponse}, bitbucket::config::{bitbucket_base_url, get_api_values}};
 
-use super::config::prepare_auth_headers;
-use crate::client::config::get_client;
+use super::config::{get_client, prepare_auth_headers};
+
 
 pub async fn get_webhooks_in_repo(workspace_slug: &str, repo_slug: &str, access_token: &str) -> Vec<Webhook> {
     let url = format!("{}/repositories/{}/{}/hooks", bitbucket_base_url(), workspace_slug, repo_slug);

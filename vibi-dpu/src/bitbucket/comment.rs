@@ -9,8 +9,7 @@ use crate::db::user::get_workspace_user_from_db;
 use crate::utils::review::Review;
 use crate::utils::user::BitbucketUser;
 
-use super::{config::{bitbucket_base_url, prepare_headers}};
-use crate::client::config::get_client;
+use super::{config::{bitbucket_base_url, get_client, prepare_headers}};
 
 #[derive(Serialize)]
 struct Comment {

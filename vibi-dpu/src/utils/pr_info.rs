@@ -1,15 +1,14 @@
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct prInfo {
+pub struct PrInfo {
     pub base_head_commit: String,
     pub pr_head_commit: String,
     pub state: String,
     pub pr_branch: String,
 }
 
-impl prInfo {
+impl PrInfo {
     // Constructor
     pub fn new(base_head_commit: String, pr_head_commit: String, state: String, pr_branch: String) -> Self {
         Self {

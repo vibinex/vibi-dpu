@@ -16,16 +16,16 @@ use crate::{
 		repo::get_clone_url_clone_dir, 
 		review::save_review_to_db,
 		repo_config::save_repo_config_to_db},
-	client::config::get_client,
+	bitbucket::config::get_client,
 	core::coverage::process_coverage};
 
 pub async fn process_review(message_data: &Vec<u8>) {
-	let parse_opt = parse_review(message_data);
-	if parse_opt.is_none() {
+	let review_opt = parse_review(message_data);
+	if review_opt.is_none() {
 		eprintln!("Unable to deserialize review message and repo config");
 		return;
 	}
-	let (review, repo_config) = parse_opt.expect("parse_opt is empty");
+	let (review, repo_config) = review_opt.expect("parse_opt is empty");
 	println!("deserialized repo_config, review = {:?}, {:?}", &repo_config, &review);
 	if hunk_already_exists(&review) {
 		return;
@@ -148,6 +148,7 @@ fn parse_review(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)>{
 fn publish_hunkmap(hunkmap: &HunkMap) {
 	let client = get_client();
 	let hunkmap_json = serde_json::to_string(&hunkmap).expect("Unable to serialize hunkmap");
+	let key_clone = hunkmap.db_key().to_string();
 	tokio::spawn(async move {
 		let url = format!("{}/api/hunks",
 			env::var("SERVER_URL").expect("SERVER_URL must be set"));
@@ -158,10 +159,10 @@ fn publish_hunkmap(hunkmap: &HunkMap) {
 		.send()
 		.await {
 			Ok(_) => {
-				println!("Hunkmap published successfully!");
+				println!("[publish_hunkmap] Hunkmap published successfully for: {} !", &key_clone);
 			},
 			Err(e) => {
-				eprintln!("Failed to publish hunkmap: {}", e);
+				eprintln!("[publish_hunkmap] Failed to publish hunkmap: {} for: {}", e, &key_clone);
 			}
 		};
 	});
