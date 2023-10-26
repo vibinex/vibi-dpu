@@ -40,6 +40,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             let data_bytes_async = data_bytes.to_owned();
             let deserialized_data_opt = deserialized_data(&data_bytes_async);
             let deserialised_msg_data = deserialized_data_opt.expect("Failed to deserialize data");
+            let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
             let workspace_slug = deserialised_msg_data.get("workspace").and_then(|workspace| workspace.get("slug")).and_then(|slug| slug.as_str()).expect("missing workspace slug");
             let repo_slug = deserialised_msg_data.get("repository").and_then(|repository| repository.get("slug")).and_then(|slug| slug.as_str()).expect("missing repo slug");
             let pr_number = deserialised_msg_data.get("pullrequest").and_then(|pullrequest| pullrequest.get("number")).and_then(|number| number.as_str()).expect("missing pr number");

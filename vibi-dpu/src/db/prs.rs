@@ -54,7 +54,7 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
     println!("PR info updated successfully in the database. {:?} {:?}", key, pr_info);
 }
 
-pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str) -> Result<bool, String> {
+pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str) -> Result<bool, String> {
     let pr_head_commit = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("head"))
@@ -94,7 +94,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
 
     // Retrieve the existing pr_head_commit from the database
     let db = get_db();
-    let db_pr_key = format!("{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
+    let db_pr_key = format!("{}/{}/{}/{}", repo_provider, workspace_slug, repo_slug, pr_number);
     let pr_info_res = db.get(IVec::from(db_pr_key.as_bytes()));
     
     if pr_info_res.is_err() {
