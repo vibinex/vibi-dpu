@@ -19,8 +19,8 @@ impl RepoConfig {
     // Function to create a default RepoConfig
     pub fn default() -> Self {
         RepoConfig {
-            comment: false,
-            auto_assign: false
+            comment: true,
+            auto_assign: true
         }
     }
 }

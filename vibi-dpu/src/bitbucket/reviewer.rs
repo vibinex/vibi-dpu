@@ -11,13 +11,19 @@ use crate::utils::user::BitbucketUser;
 use super::{config::{bitbucket_base_url, get_client, prepare_headers}};
 
 pub async fn add_reviewers(user: &WorkspaceUser, review: &Review, access_token: &str) {
-    let url = prepare_add_reviewers_url(review.repo_owner(), review.repo_name(), review.id());
+    let url = prepare_get_prinfo_url(review.repo_owner(), review.repo_name(), review.id());
     let get_response = get_pr_info(&url, access_token).await;
-    let put_request_body_opt = add_user_to_reviewers(get_response, user).await;
-    put_reviewers(&url, access_token, &put_request_body_opt).await;
+    let reviewers_opt = add_user_to_reviewers(get_response, user).await;
+    if reviewers_opt.is_none() {
+        eprintln!("[add_reviewers] Unable to add reviewers for review: {}", review.id());
+        return;
+    }
+    let (reviewers, pr_info_json)  = reviewers_opt.expect("Empty reviewers_opt");
+    let put_payload = prepare_put_body(&reviewers, &pr_info_json);
+    put_reviewers(&url, access_token, &put_payload).await;
 }
 
-async fn add_user_to_reviewers(response_res: Option<Response>, user_from_db: &WorkspaceUser) -> Option<Value> {
+async fn add_user_to_reviewers(response_res: Option<Response>, user_from_db: &WorkspaceUser) -> Option<(Vec<BitbucketUser>, Value)> {
     let reviewers_opt = parse_reviewers_from_prinfo(response_res).await;
     if reviewers_opt.is_none() {
         eprintln!("Unable to parse and add reviewers");
@@ -35,12 +41,10 @@ async fn add_user_to_reviewers(response_res: Option<Response>, user_from_db: &Wo
         }
     }
     println!("Updated reviewers = {:?}", reviewers);
-    let payload_opt = prepare_put_body(&reviewers, &get_response_json);
-    println!("put reviewers payload = {:?}", &payload_opt);
-    return payload_opt;
+    return Some((reviewers, get_response_json));
 }
 
-fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, get_response_json: &Value) -> Option<Value> {
+fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, pr_info_json: &Value) -> Option<Value> {
     // Serialize and add updated reviewers to response json
     let reviewers_obj_res = serde_json::to_value(updated_reviewers);
     if reviewers_obj_res.is_err() {
@@ -49,7 +53,7 @@ fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, get_response_json: &
         return None;
     }
     let reviewers_obj = reviewers_obj_res.expect("Uncaught error in reviewers_obj_res");
-    let mut response_json = get_response_json.to_owned();
+    let mut response_json = pr_info_json.to_owned();
     let obj_opt = response_json.as_object_mut();
     if obj_opt.is_none() {
         eprintln!("Unable to get mutable reviewer response obj");
@@ -135,7 +139,7 @@ async fn get_pr_info(url: &str, access_token: &str) -> Option<Response> {
     return Some(get_response);
 }
 
-fn prepare_add_reviewers_url(repo_owner: &str, 
+fn prepare_get_prinfo_url(repo_owner: &str, 
     repo_name: &str, review_id: &str) -> String {
     let url = format!(
         "{}/repositories/{}/{}/pullrequests/{}",
