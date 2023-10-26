@@ -3,7 +3,7 @@ use crate::db::auth::auth_info;
 use crate::db::user::{add_bitbucket_user_to_workspace_user, get_workspace_user_from_db};
 use crate::utils::auth::AuthInfo;
 use crate::utils::lineitem::LineItem;
-use crate::utils::user::BitbucketUser;
+use crate::utils::user::{BitbucketUser, User, Provider, ProviderEnum};
 use super::config::{bitbucket_base_url, get_api_values, get_api_response};
 
 pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str) {
@@ -18,7 +18,7 @@ pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str
     }
 }
 
-pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> Option<LineItem>{
+pub async fn author_from_commit(commit: &str, repo_name: &str, repo_owner: &str) -> Option<BitbucketUser>{
     let base_url = bitbucket_base_url();
     let commits_url = format!("{}/repositories/{}/{}/commit/{}", &base_url, repo_owner, repo_name, commit);
     println!("commits url = {}", &commits_url);
@@ -40,38 +40,13 @@ pub async fn get_commit_bb(commit: &str, repo_name: &str, repo_owner: &str) -> O
         return None;
     }
     let response_json = parse_res.expect("Uncaught error in parse_res");
-    let timestamp_str = &response_json["date"].to_string().replace('"', "");
-    println!("timestamp_str = {}", timestamp_str);
-    // Explicitly specify the format
-    let datetime_res = DateTime::parse_from_rfc3339(&timestamp_str);
-    if datetime_res.is_err() {
-        let e = datetime_res.expect_err("No error in dateime_res");
-        eprintln!("Failed to parse timestamp: {:?}", e);
+    let author_val = response_json["author"]["user"].to_owned();
+    let author_res = serde_json::from_value(author_val);
+    if author_res.is_err() {
+        let err = author_res.expect_err("Empty error in author_res");
+        eprintln!("[author_from_commit] Unable to deserialize author: {:?}", err);
         return None;
     }
-    let datetime: DateTime<FixedOffset> = datetime_res.expect("Uncaught error in datetime_res");
-    // Convert to Utc
-    let datetime_utc = datetime.with_timezone(&Utc);
-
-    let unix_timestamp = datetime_utc.timestamp();
-    let unix_timestamp_str = unix_timestamp.to_string();
-    let author_id = response_json["author"]["user"]["uuid"].to_string().replace('"', "");
-    let author_display_name = response_json["author"]["user"]["display_name"].to_string().replace('"', "");
-    let user_res = response_json["author"].get("user");
-    if user_res.is_none() {
-        eprintln!("no user in response_json: {:?}", &response_json);
-        return None;
-    }
-    let bitbucket_user_json = user_res.expect("empty user_res").to_owned();
-    let bitbucket_user = serde_json::from_value::<BitbucketUser>(bitbucket_user_json)
-        .expect("error in deserializing BitbucketUser from bitbucket_user_json");
-    let mut user_key = author_display_name.clone();
-    let user_opt = get_workspace_user_from_db(&user_key);
-    if user_opt.is_none() {
-        eprintln!("No user found in db for key: {}", &user_key);
-        return Some(LineItem::new(bitbucket_user.display_name().to_owned(), unix_timestamp_str));
-    }
-    let user = user_opt.expect("empty user_opt");
-    user_key = user.display_name().to_owned();
-    return Some(LineItem::new(user_key, unix_timestamp_str));
+    let author: BitbucketUser = author_res.expect("Uncaught error in author_res");
+    return Some(author);
 }
