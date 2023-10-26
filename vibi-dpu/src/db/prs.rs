@@ -28,7 +28,7 @@ pub async fn save_pr_info_to_db(workspace_slug: &str,repo_slug: &str, pr_info: p
 }
 
 
-pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info: prInfo, pr_number: &str) {
+pub async fn update_pr_info_in_db(workspace_slug: String, repo_slug: String, pr_info: prInfo, pr_number: String) {
     let key = format!("{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
     let db = get_db();
 
@@ -54,7 +54,7 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
     println!("PR info updated successfully in the database. {:?} {:?}", key, pr_info);
 }
 
-pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str) -> Result<bool, String> {
+pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: String, repo_slug: String, pr_number: String, repo_provider: String) -> Result<bool, String> {
     let pr_head_commit = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("head"))
