@@ -67,28 +67,23 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             let repo_name_async = repo_name.clone();
             let workspace_slug_async = workspace_slug.clone();
             let access_token_async = access_token.clone();
-            task::spawn(async move {
-                let prs = list_prs_bitbucket(&workspace_slug_async, &repo_name_async, &access_token_async, "OPEN").await;
-                if prs.is_empty() {
+            tokio::spawn(async move {
+                let pr_list_opt = list_prs_bitbucket(&workspace_slug_async, &repo_name_async, &access_token_async, "OPEN").await;
+                if pr_list_opt.is_none() {
                     println!("No open pull requests found for processing.");
                     return;
                 }
+                let pr_list = pr_list_opt.expect("Empty pr_list_opt");
                 // We can concurrently process each PR with tokio::spawn.
-                let handles: Vec<_> = prs.into_iter().map(|pr| {
+                for pr_id in pr_list.iter() {
                     let workspace_slug_async = workspace_slug_async.clone(); //Instead of cloning each time, I could have used ARC but not sure what is the best way.
                     let repo_name_async = repo_name_async.clone();
                     let access_token_async = access_token_async.clone();
+                    let pr_id_async = pr_id.clone();
                     tokio::spawn(async move {
-                        get_and_store_pr_info(&workspace_slug_async, &repo_name_async, &access_token_async, &pr.to_string()).await;
-                    })
-                }).collect();
-        
-                // Wait for all async tasks to complete.
-                for handle in handles {
-                    if let Err(e) = handle.await {
-                        eprintln!("Error in processing PR: {:?}", e);
-                    }
-                }                
+                        get_and_store_pr_info(&workspace_slug_async, &repo_name_async, &access_token_async, &pr_id_async).await;
+                    });
+                }          
             });
         }
         pubreqs.push(SetupInfo {

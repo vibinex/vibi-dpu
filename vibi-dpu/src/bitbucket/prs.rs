@@ -32,7 +32,7 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
         .await;
     if response_result.is_err() {
         let e = response_result.expect_err("No error in sending request");
-        eprintln!("Failed to send the request {:?}", e);
+        eprintln!("[get_list_prs] Failed to send the request {:?}", e);
         return None;
     }
 
