@@ -62,7 +62,6 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
 }
 
 fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem) -> HashMap<String, String>{
-    let mut coverage_map = HashMap::<String, String>::new();
     let mut coverage_floatmap = HashMap::<String, f32>::new();
     let mut total = 0.0;
     for blame in prhunk.blamevec() {
@@ -80,16 +79,17 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem) -> HashMap<String, 
             coverage_floatmap.insert(author_id, num_lines);
         }
     }
+    let mut coverage_map = HashMap::<String, String>::new();
     if total <= 0.0 {
         return coverage_map;
     } 
-    for (key, value) in coverage_floatmap.iter_mut() {
-        *value = *value / total * 100.0;
-        let formatted_value = format!("{:.2}", *value);
-        let user = get_workspace_user_from_db(key);
+    for (blame_author, coverage) in coverage_floatmap.iter_mut() {
+        *coverage = *coverage / total * 100.0;
+        let formatted_value = format!("{:.2}", *coverage);
+        let user = get_workspace_user_from_db(blame_author);
         if user.is_none() {
-            eprintln!("No user name found for {}", key);
-            coverage_map.insert(key.to_string(), formatted_value);
+            eprintln!("No user name found for {}", blame_author);
+            coverage_map.insert(blame_author.to_string(), formatted_value);
             continue;
         }
         let user_val = user.expect("user is empty");

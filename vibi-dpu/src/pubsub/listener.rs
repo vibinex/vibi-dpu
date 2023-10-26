@@ -12,7 +12,7 @@ use tokio::task;
 use std::collections::VecDeque;
 use sha256::digest;
 use tonic::Code;
-use crate::core::{setup::handle_install_bitbucket, review::process_review}; // To be added in future PR
+use crate::core::{setup::handle_install_bitbucket, review::process_review};
 
 #[derive(Debug, Deserialize)]
 struct InstallCallback {
