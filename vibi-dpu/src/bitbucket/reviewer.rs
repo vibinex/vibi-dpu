@@ -11,10 +11,7 @@ pub async fn add_reviewers(user: &BitbucketUser, review: &Review, access_token: 
     let pr_info = get_pr_info(&url, access_token).await;
     let reviewers_opt = get_updated_reviewers_vec(pr_info, user).await;
     if reviewers_opt.is_none() {
-        eprintln!(
-            "[add_reviewers] Unable to add reviewers for review: {}",
-            review.id()
-        );
+        eprintln!("[add_reviewers] Unable to add reviewers for review: {}", review.id());
         return;
     }
     let (reviewers, pr_info_json) = reviewers_opt.expect("Empty reviewers_opt");
@@ -22,10 +19,7 @@ pub async fn add_reviewers(user: &BitbucketUser, review: &Review, access_token: 
     put_reviewers(&url, access_token, &put_payload).await;
 }
 
-async fn get_updated_reviewers_vec(
-    pr_opt: Option<Response>,
-    user_from_db: &BitbucketUser,
-) -> Option<(Vec<BitbucketUser>, Value)> {
+async fn get_updated_reviewers_vec(pr_opt: Option<Response>, user_from_db: &BitbucketUser) -> Option<(Vec<BitbucketUser>, Value)> {
     let reviewers_opt = parse_reviewers_from_prinfo(pr_opt).await;
     if reviewers_opt.is_none() {
         eprintln!("Unable to parse and add reviewers");
@@ -64,9 +58,7 @@ fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, pr_info_json: &Value
     return Some(response_json);
 }
 
-async fn parse_reviewers_from_prinfo(
-    pr_opt: Option<Response>,
-) -> Option<(Vec<BitbucketUser>, Value)> {
+async fn parse_reviewers_from_prinfo(pr_opt: Option<Response>) -> Option<(Vec<BitbucketUser>, Value)> {
     if pr_opt.is_none() {
         eprintln!("Empty get response for pr_info");
         return None;
@@ -110,8 +102,7 @@ async fn put_reviewers(url: &str, access_token: &str, put_body_opt: &Option<Valu
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .json(&put_body)
-        .send()
-        .await;
+        .send().await;
 
     // Handle the response_res as necessary
     println!("response_res = {:?}", &response_res);
