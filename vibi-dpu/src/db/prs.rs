@@ -39,7 +39,7 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
         return;
     }
 
-    let pr_info_bytes = pr_info_json_result.unwrap();
+    let pr_info_bytes = pr_info_json_result.expect("empty pr_info_json_result");
 
     // Update the entry in the database. It will create a new entry if the key does not exist.
     let update_result = db.insert(IVec::from(key.as_bytes()), IVec::from(pr_info_bytes));
