@@ -10,19 +10,20 @@ use crate::utils::user::BitbucketUser;
 
 use super::{config::{bitbucket_base_url, get_client, prepare_headers}};
 
-pub async fn add_reviewers(user_key: &str, review: &Review, access_token: &str) {
+pub async fn add_reviewers(user: &WorkspaceUser, review: &Review, access_token: &str) {
     let url = prepare_get_prinfo_url(review.repo_owner(), review.repo_name(), review.id());
     let get_response = get_pr_info(&url, access_token).await;
-    let reviewers_opt = add_user_to_reviewers(get_response, user_key).await;
+    let reviewers_opt = add_user_to_reviewers(get_response, user).await;
     if reviewers_opt.is_none() {
         eprintln!("[add_reviewers] Unable to add reviewers for review: {}", review.id());
+        return;
     }
     let (reviewers, pr_info_json)  = reviewers_opt.expect("Empty reviewers_opt");
     let put_payload = prepare_put_body(&reviewers, &pr_info_json);
     put_reviewers(&url, access_token, &put_payload).await;
 }
 
-async fn add_user_to_reviewers(response_res: Option<Response>, user_key: &str) -> Option<(Vec<BitbucketUser>, Value)> {
+async fn add_user_to_reviewers(response_res: Option<Response>, user_from_db: &WorkspaceUser) -> Option<(Vec<BitbucketUser>, Value)> {
     let reviewers_opt = parse_reviewers_from_prinfo(response_res).await;
     if reviewers_opt.is_none() {
         eprintln!("Unable to parse and add reviewers");

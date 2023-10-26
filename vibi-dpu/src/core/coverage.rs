@@ -25,11 +25,9 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
                 // create comment text
                 let comment = comment_text(coverage_map, repo_config.auto_assign());
                 // add comment
-                add_comment(&comment, review, &access_token).await; 
+                add_comment(&comment, review, &access_token).await;
             }
             if repo_config.auto_assign() {
-                // add reviewers
-                println!("Adding reviewers...");
                 let mut author_set: HashSet<String> = HashSet::new();
                 author_set.insert(prhunk.author().to_string());
                 for blame in prhunk.blamevec() {
@@ -40,7 +38,7 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
                         continue;
                     }
                     let blame_author = blame_author_opt.expect("Empty blame_author_opt");
-                    let user_key = blame_author.display_name().to_string();
+                    let user_key = blame_author.uuid().to_string();
                     let blame_user_opt = get_workspace_user_from_db(&user_key);
                     if blame_user_opt.is_none() {
                         eprintln!("[process_coverage] no user found in db for blame author: {:?}", blame_author);
