@@ -67,7 +67,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             let repo_name_async = repo_name.clone();
             let workspace_slug_async = workspace_slug.clone();
             let access_token_async = access_token.clone();
-            tokio::spawn(async move {
+            task::spawn(async move {
                 let pr_list_opt = list_prs_bitbucket(&workspace_slug_async, &repo_name_async, &access_token_async, "OPEN").await;
                 if pr_list_opt.is_none() {
                     println!("No open pull requests found for processing.");
@@ -80,7 +80,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
                     let repo_name_async = repo_name_async.clone();
                     let access_token_async = access_token_async.clone();
                     let pr_id_async = pr_id.clone();
-                    tokio::spawn(async move {
+                    task::spawn(async move {
                         get_and_store_pr_info(&workspace_slug_async, &repo_name_async, &access_token_async, &pr_id_async).await;
                     });
                 }          
