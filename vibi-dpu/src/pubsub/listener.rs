@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-
-use base64ct::Error;
 use futures_util::StreamExt;
 use google_cloud_auth::credentials::CredentialsFile;
 use google_cloud_default::WithAuthExt;
