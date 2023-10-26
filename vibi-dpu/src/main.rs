@@ -4,9 +4,6 @@ mod db;
 mod core;
 mod bitbucket;
 mod utils;
-mod setup;
-mod github;
-mod client;
 
 #[tokio::main]
 async fn main() {

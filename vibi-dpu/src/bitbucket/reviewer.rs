@@ -8,8 +8,7 @@ use crate::db::user::get_workspace_user_from_db;
 use crate::utils::review::Review;
 use crate::utils::user::BitbucketUser;
 
-use super::{config::{bitbucket_base_url, prepare_headers}};
-use crate::client::config::get_client;
+use super::config::{bitbucket_base_url, prepare_headers, get_client};
 
 pub async fn add_reviewers(user_key: &str, review: &Review, access_token: &str) {
     let url = prepare_get_prinfo_url(review.repo_owner(), review.repo_name(), review.id());

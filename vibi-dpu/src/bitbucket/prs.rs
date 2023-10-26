@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::str;
 use std::env;
-use crate::client::config::get_client;
+use crate::bitbucket::config::get_client;
 use crate::utils::prInfo::PrInfo;
 use crate::db::prs::save_pr_info_to_db;
 
