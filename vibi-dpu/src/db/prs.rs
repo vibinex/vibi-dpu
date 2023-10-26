@@ -1,7 +1,7 @@
 use sled::IVec;
 use std::error::Error;
 use crate::db::config::get_db;
-use crate::utils::prInfo::PrInfo;
+use crate::utils::pr_info::PrInfo;
 
 
 pub async fn save_pr_info_to_db(workspace_slug: &str,repo_slug: &str,pr_info: PrInfo, pr_number: &str) {

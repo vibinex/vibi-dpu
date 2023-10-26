@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::str;
 use std::env;
 use crate::bitbucket::config::get_client;
-use crate::utils::prInfo::PrInfo;
+use crate::utils::pr_info::PrInfo;
 use crate::db::prs::save_pr_info_to_db;
 
 pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token: &str, state: &str) -> Vec<u32> {
