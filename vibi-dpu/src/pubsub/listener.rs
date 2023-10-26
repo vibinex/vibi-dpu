@@ -12,7 +12,8 @@ use tokio::task;
 use std::collections::VecDeque;
 use sha256::digest;
 use tonic::Code;
-use crate::{setup::{setup_bb::handle_install_bitbucket, setup_gh::handle_install_github}, utils::user::{Provider, ProviderEnum}};
+use crate::setup::{setup_bb::handle_install_bitbucket, setup_gh::handle_install_github};
+use crate::utils::user::ProviderEnum;
 use crate::core::review::process_review; // To be added in future PR
 
 #[derive(Debug, Deserialize)]

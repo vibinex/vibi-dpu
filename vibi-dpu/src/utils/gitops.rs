@@ -126,8 +126,9 @@ pub fn get_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatIte
 	let next_commit = review.pr_head_commit();
 	let clone_dir = review.clone_dir();
 	println!("prev_commit = {}, next commit = {}, clone_dir = {}", prev_commit, next_commit, clone_dir);
+	let commit_range = format!("{}...{}", prev_commit, next_commit);
 	let git_res = Command::new("git")
-		.args(&["diff", prev_commit, next_commit, "--numstat"])
+		.args(&["diff", &commit_range, "--numstat"])
 		.current_dir(clone_dir)
 		.output();
 	if git_res.is_err() {
@@ -330,7 +331,7 @@ pub fn process_diffmap(diffmap: &HashMap<String, String>) -> HashMap<String, Vec
 
 pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<String>>) ->  Vec<BlameItem>{
 	let mut blamevec = Vec::<BlameItem>::new();
-	let commit = review.pr_head_commit();
+	let commit = review.base_head_commit();
 	let clone_dir = review.clone_dir();
 	for (path, linevec) in linemap {
 		for line in linevec {
