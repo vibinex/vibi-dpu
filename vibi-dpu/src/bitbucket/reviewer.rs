@@ -1,19 +1,16 @@
-use reqwest::{Response, header::{HeaderMap, HeaderValue}};
-use serde::Serialize;
+use reqwest::Response;
 use serde_json::Value;
-use reqwest::Error;
-use std::io;
 
-use crate::{db::user::get_workspace_user_from_db, utils::user::WorkspaceUser};
+use crate::utils::user::WorkspaceUser;
 use crate::utils::review::Review;
 use crate::utils::user::BitbucketUser;
 
-use super::{config::{bitbucket_base_url, get_client, prepare_headers}};
+use super::config::{get_client, prepare_headers};
 
 pub async fn add_reviewers(user: &WorkspaceUser, review: &Review, access_token: &str) {
     let url = prepare_get_prinfo_url(review.repo_owner(), review.repo_name(), review.id());
-    let get_response = get_pr_info(&url, access_token).await;
-    let reviewers_opt = add_user_to_reviewers(get_response, user).await;
+    let pr_info = get_pr_info(&url, access_token).await;
+    let reviewers_opt = get_updated_reviewers_vec(pr_info, user).await;
     if reviewers_opt.is_none() {
         eprintln!("[add_reviewers] Unable to add reviewers for review: {}", review.id());
         return;
@@ -23,8 +20,8 @@ pub async fn add_reviewers(user: &WorkspaceUser, review: &Review, access_token: 
     put_reviewers(&url, access_token, &put_payload).await;
 }
 
-async fn add_user_to_reviewers(response_res: Option<Response>, user_from_db: &WorkspaceUser) -> Option<(Vec<BitbucketUser>, Value)> {
-    let reviewers_opt = parse_reviewers_from_prinfo(response_res).await;
+async fn get_updated_reviewers_vec(pr_opt: Option<Response>, user_from_db: &WorkspaceUser) -> Option<(Vec<BitbucketUser>, Value)> {
+    let reviewers_opt = parse_reviewers_from_prinfo(pr_opt).await;
     if reviewers_opt.is_none() {
         eprintln!("Unable to parse and add reviewers");
         return None;
@@ -66,23 +63,23 @@ fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, pr_info_json: &Value
     return Some(response_json);
 }
 
-async fn parse_reviewers_from_prinfo(response_res: Option<Response>) -> Option<(Vec<BitbucketUser>, Value)>{
-    if response_res.is_none() {
+async fn parse_reviewers_from_prinfo(pr_opt: Option<Response>) -> Option<(Vec<BitbucketUser>, Value)>{
+    if pr_opt.is_none() {
         eprintln!("Empty get response for pr_info");
         return None;
     }
-    let get_response = response_res.expect("Error in getting response");
-    println!("get API status: {}", get_response.status());
-    let response_json_res = get_response.json::<Value>().await;
-    if response_json_res.is_err() {
-        let e = response_json_res.expect_err("No error in response_json_res");
+    let pr_info_response = pr_opt.expect("Error in getting response");
+    println!("get API status: {}", pr_info_response.status());
+    let pr_info_json = pr_info_response.json::<Value>().await;
+    if pr_info_json.is_err() {
+        let e = pr_info_json.expect_err("No error in pr_info_json");
         eprintln!("Unable to deserialize response_json: {:?}", e);
         return None;
     }
-    let response_json = response_json_res.expect("Uncaught error in response_json_res");
-    let reviewers_opt = response_json.get("reviewers");
+    let pr_info = pr_info_json.expect("Uncaught error in pr_info_json");
+    let reviewers_opt = pr_info.get("reviewers");
     if reviewers_opt.is_none() {
-        eprintln!("No reviewers found in response: {:?}", &response_json);
+        eprintln!("No reviewers found in response: {:?}", &pr_info);
         return None;
     }
     let reviewers_value = reviewers_opt.expect("Empty reviewers_opt").to_owned();
@@ -93,10 +90,10 @@ async fn parse_reviewers_from_prinfo(response_res: Option<Response>) -> Option<(
         return None;
     }
     let reviewers: Vec<BitbucketUser> = reviewers_res.expect("Uncaught error in response_res");
-    return Some((reviewers, response_json));
+    return Some((reviewers, pr_info));
 }
 
-async fn put_reviewers(url: &str, access_token: &str,put_body_opt: &Option<Value>) {
+async fn put_reviewers(url: &str, access_token: &str, put_body_opt: &Option<Value>) {
     if put_body_opt.is_none() {
         eprintln!("Empty put request body, not adding reviewers");
         return;
