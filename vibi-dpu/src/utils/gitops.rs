@@ -331,7 +331,7 @@ pub fn process_diffmap(diffmap: &HashMap<String, String>) -> HashMap<String, Vec
 
 pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<String>>) ->  Vec<BlameItem>{
 	let mut blamevec = Vec::<BlameItem>::new();
-	let commit = review.pr_head_commit();
+	let commit = review.base_head_commit();
 	let clone_dir = review.clone_dir();
 	for (path, linevec) in linemap {
 		for line in linevec {
