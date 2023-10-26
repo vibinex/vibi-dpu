@@ -38,11 +38,14 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
         },
         "webhook_callback" => {
             let data_bytes_async = data_bytes.to_owned();
-            let deserialized_data = deserialized_data(&data_bytes_async);
-            let workspace_slug = deserialized_data.get("workspace").and_then(|workspace| workspace.get("slug")).and_then(|slug| slug.as_str());
-            let repo_slug = deserialized_data.get("repository").and_then(|repository| repository.get("slug")).and_then(|slug| slug.as_str());
-            let pr_number = deserialized_data.get("pullrequest").and_then(|pullrequest| pullrequest.get("number")).and_then(|number| number.as_str());
-            if process_and_update_pr_if_different(deserialized_data, workspace_slug, repo_slug, pr_number) == true {
+            let deserialized_data_opt = deserialized_data(&data_bytes_async);
+            let deserialised_msg_data = deserialized_data_opt.expect("Failed to deserialize data");
+            let workspace_slug = deserialised_msg_data.get("workspace").and_then(|workspace| workspace.get("slug")).and_then(|slug| slug.as_str()).expect("missing workspace slug");
+            let repo_slug = deserialised_msg_data.get("repository").and_then(|repository| repository.get("slug")).and_then(|slug| slug.as_str()).expect("missing repo slug");
+            let pr_number = deserialised_msg_data.get("pullrequest").and_then(|pullrequest| pullrequest.get("number")).and_then(|number| number.as_str()).expect("missing pr number");
+            
+            let process_result = process_and_update_pr_if_different(&deserialised_msg_data, workspace_slug, repo_slug, pr_number).await;
+            if let Ok(true) = process_result {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;
                     println!("Processed webhook callback message");
@@ -54,6 +57,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
         }
     };
 }
+
 
 async fn prcoess_install_callback(data_bytes: &[u8]) {
     println!("Processing install callback message");

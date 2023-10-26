@@ -54,7 +54,7 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
     println!("PR info updated successfully in the database. {:?} {:?}", key, pr_info);
 }
 
-pub async fn process_and_update_pr_if_different(webhook_data: Value, workspace_slug: &str, repo_slug: &str, pr_number: &str) -> Result<bool, String> {
+pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str) -> Result<bool, String> {
     let pr_head_commit = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("head"))
@@ -86,6 +86,12 @@ pub async fn process_and_update_pr_if_different(webhook_data: Value, workspace_s
         .ok_or("Missing pr_branch")?
         .to_string();
 
+    let updated_pr_info = prInfo { base_head_commit: base_head_commit,
+        pr_head_commit: pr_head_commit.clone(),
+        state: pr_state,
+        pr_branch: pr_branch 
+    };
+
     // Retrieve the existing pr_head_commit from the database
     let db = get_db();
     let db_pr_key = format!("{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
@@ -100,6 +106,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: Value, workspace_s
     let pr_info_opt = pr_info_res.expect("Uncaught error in pr_info res");
     if pr_info_opt.is_none() {
         eprintln!("No bitbucket pr info in db");
+        update_pr_info_in_db(workspace_slug, repo_slug, updated_pr_info, pr_number).await;
         return Ok(true); //If no info in db then it will be considered as new commit
     }
     
@@ -116,11 +123,6 @@ pub async fn process_and_update_pr_if_different(webhook_data: Value, workspace_s
     if pr_head_commit == stored_pr_head_commit_str{
         Ok(false) // commits are the same
     } else {
-        let updated_pr_info = prInfo { base_head_commit: base_head_commit,
-            pr_head_commit: pr_head_commit,
-            state: pr_state,
-            pr_branch: pr_branch };
-
         update_pr_info_in_db(workspace_slug, repo_slug, updated_pr_info, pr_number).await;
         Ok(true) // commits are different, and PR info should be updated
     }
