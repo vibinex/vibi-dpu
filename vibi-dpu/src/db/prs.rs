@@ -59,7 +59,8 @@ pub async fn process_and_update_pr_if_different(webhook_data: Value, workspace_s
         .get("pull_request")
         .and_then(|pr| pr.get("head"))
         .and_then(|head| head.get("sha"))
-        .and_then(|sha| sha.as_str());
+        .and_then(|sha| sha.as_str())
+        .to_string();
     
     if pr_head_commit.is_none() {
         return Err("pr_head_commit not found in webhook data".to_string());
@@ -69,17 +70,20 @@ pub async fn process_and_update_pr_if_different(webhook_data: Value, workspace_s
         .and_then(|pr| pr.get("base"))
         .and_then(|base| base.get("sha"))
         .and_then(|sha| sha.as_str())
+        .to_string();
 
     let pr_state = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("state"))
         .and_then(|state| state.as_str())
+        .to_string();
 
     let pr_branch = webhook_data
         .get("pull_request")
         .and_then(|pr| pr.get("head"))
         .and_then(|head| head.get("ref"))
         .and_then(|ref_val| ref_val.as_str())
+        .to_string();
 
     // Retrieve the existing pr_head_commit from the database
     let db = get_db();
