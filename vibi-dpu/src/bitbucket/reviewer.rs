@@ -10,7 +10,7 @@ use crate::utils::user::BitbucketUser;
 
 use super::{config::{bitbucket_base_url, get_client, prepare_headers}};
 
-pub async fn add_reviewers(user: &WorkspaceUser, review: &Review, access_token: &str) {
+pub async fn add_reviewers(user: &BitbucketUser, review: &Review, access_token: &str) {
     let url = prepare_get_prinfo_url(review.repo_owner(), review.repo_name(), review.id());
     let get_response = get_pr_info(&url, access_token).await;
     let reviewers_opt = add_user_to_reviewers(get_response, user).await;
@@ -23,7 +23,7 @@ pub async fn add_reviewers(user: &WorkspaceUser, review: &Review, access_token: 
     put_reviewers(&url, access_token, &put_payload).await;
 }
 
-async fn add_user_to_reviewers(response_res: Option<Response>, user_from_db: &WorkspaceUser) -> Option<(Vec<BitbucketUser>, Value)> {
+async fn add_user_to_reviewers(response_res: Option<Response>, user_from_db: &BitbucketUser) -> Option<(Vec<BitbucketUser>, Value)> {
     let reviewers_opt = parse_reviewers_from_prinfo(response_res).await;
     if reviewers_opt.is_none() {
         eprintln!("Unable to parse and add reviewers");
@@ -32,13 +32,9 @@ async fn add_user_to_reviewers(response_res: Option<Response>, user_from_db: &Wo
     let (mut reviewers, get_response_json) = reviewers_opt.expect("Empty reviewers_opt");
     println!("reviewers = {:?}", reviewers);
     println!("user_from_db = {:?}", &user_from_db);
-    // For each user in user_from_db.users()...
-    for user in user_from_db.users().iter() {
-        // If the reviewers vector doesn't contain the user...
-        if !reviewers.contains(user) {
-            // Add the user to reviewers
-            reviewers.push(user.clone());
-        }
+    if !reviewers.contains(user_from_db) {
+        // Add the user to reviewers
+        reviewers.push(user_from_db.clone());
     }
     println!("Updated reviewers = {:?}", reviewers);
     return Some((reviewers, get_response_json));
