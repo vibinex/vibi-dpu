@@ -48,24 +48,29 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             let data_bytes_async = data_bytes.to_owned();
             let deserialized_data_opt = deserialized_data(&data_bytes_async);
             let deserialised_msg_data = deserialized_data_opt.expect("Failed to deserialize data");
+            
             let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
             let workspace_slug = deserialised_msg_data["eventPayload"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
-            let repo_slug = deserialised_msg_data["eventPayload"]["repository"]["slug"].to_string().trim_matches('"').to_string();
-            let pr_number = deserialised_msg_data["eventPayload"]["pullRequest"]["number"].to_string().trim_matches('"').to_string();
+            let repo_slug = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
+            let pr_number = deserialised_msg_data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
             let eventType = deserialised_msg_data["eventType"].to_string().trim_matches('"').to_string();
+            let mut is_reviewable = false;
             
-            let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &workspace_slug, &repo_slug, &pr_number, &repo_provider).await;
-            if is_reviewable {
+            if eventType == "pullrequest:updated" {
+                is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &workspace_slug, &repo_slug, &pr_number, &repo_provider).await;
+            }
+            if is_reviewable || eventType == "pullrequest:created" || eventType == "pullrequest:approved" {
+                {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;
                     println!("Processed webhook callback message");
                 });
-            };
+            }
         }
-        _ => {
+        _=> {
             eprintln!("Message type not found for message : {:?}", attributes);
         }
-    };
+    }
 }
 
 
