@@ -55,6 +55,7 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
 }
 
 pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str) -> bool {
+    println!("[process_and_update_pr_if_different] {:?}, {:?}, {:?}, {:?}", workspace_slug, repo_slug, pr_number, repo_provider);
     let pr_info_parsed_opt = parse_webhook_data(webhook_data);
     if pr_info_parsed_opt.is_none() {
         eprintln!("[process_and_update_pr_if_different] Unable to parse webhook data");
@@ -77,13 +78,14 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
 }
 
 fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
-    let pr_head_commit_raw = webhook_data["pull_request"]["source"]["branch"]["commit"]["hash"].to_string();
+    println!("[parse_webhook_data] webhook_data: {:?}", &webhook_data);
+    let pr_head_commit_raw = webhook_data["pullrequest"]["source"]["branch"]["commit"]["hash"].to_string();
     let pr_head_commit = pr_head_commit_raw.trim_matches('"');
-    let base_head_commit_raw = webhook_data["pull_request"]["destination"]["branch"]["commit"]["hash"].to_string();
+    let base_head_commit_raw = webhook_data["pullrequest"]["destination"]["branch"]["commit"]["hash"].to_string();
     let base_head_commit = base_head_commit_raw.trim_matches('"');
-    let pr_state_raw = webhook_data["pull_request"]["state"].to_string();
+    let pr_state_raw = webhook_data["pullrequest"]["state"].to_string();
     let pr_state = pr_state_raw.trim_matches('"');
-    let pr_branch_raw = webhook_data["pull_request"]["source"]["branch"]["name"].to_string();
+    let pr_branch_raw = webhook_data["pullrequest"]["source"]["branch"]["name"].to_string();
     let pr_branch = pr_branch_raw.trim_matches('"');
     let pr_info = PrInfo { base_head_commit: base_head_commit.to_string(),
         pr_head_commit: pr_head_commit.to_string(),
