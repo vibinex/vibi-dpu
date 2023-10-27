@@ -37,7 +37,7 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
     }
 
     let response = response_result.expect("Uncaught error in parsing response");
-    if response.status().is_success() {
+    if !response.status().is_success() {
         eprintln!("[get_list_prs] Request failed with status: {:?}", response.status());
         return None;
     }
