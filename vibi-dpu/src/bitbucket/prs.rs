@@ -90,13 +90,14 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
         return None;
     }
     let pr_data: Value = response.json().await.unwrap_or_default();
-
-    Some(PrInfo {
+    let pr_info = PrInfo {
         base_head_commit: pr_data["destination"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
         pr_head_commit: pr_data["source"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
         state: pr_data["state"].as_str().unwrap_or_default().to_string(),
         pr_branch: pr_data["source"]["branch"]["name"].as_str().unwrap_or_default().to_string(),
-    })
+    };
+    println!("[get_pr_info] pr_info: {:?}", &pr_info);
+    Some(pr_info)
 }
 
 pub async fn get_and_store_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str, pr_number: &str) {
