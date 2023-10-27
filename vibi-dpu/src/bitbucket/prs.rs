@@ -71,6 +71,8 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
 pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Option<PrInfo> {
     let base_url = bitbucket_base_url();
     let url = format!("{}/repositories/{}/{}/pullrequests/{}", &base_url, workspace_slug, repo_slug, pr_number);
+    println!("[get_pr_info] url: {:?}", &url);
+    println!("[get_pr_info] access token: {:?}", access_token);
     let client = get_client();
     let response_result = client.get(&url)
         .header("Authorization", format!("Bearer {}", access_token))
@@ -88,14 +90,15 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
         println!("Failed to get PR info, response: {:?}", response);
         return None;
     }
-    let pr_data: Value = response.json().await.expect("Error parsing PR data");
-
-    Some(PrInfo {
-        base_head_commit: pr_data["destination"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
-        pr_head_commit: pr_data["source"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
-        state: pr_data["state"].to_string().trim_matches('"').to_string(),
-        pr_branch: pr_data["source"]["branch"]["name"].to_string().trim_matches('"').to_string(),
-    })
+    let pr_data: Value = response.json().await.unwrap_or_default(); //TODO - remove unwrap
+    let pr_info = PrInfo {
+        base_head_commit: pr_data["destination"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
+        pr_head_commit: pr_data["source"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
+        state: pr_data["state"].as_str().unwrap_or_default().to_string(),
+        pr_branch: pr_data["source"]["branch"]["name"].as_str().unwrap_or_default().to_string(),
+    };
+    println!("[get_pr_info] pr_info: {:?}", &pr_info);
+    Some(pr_info)
 }
 
 pub async fn get_and_store_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str, pr_number: &str) {
