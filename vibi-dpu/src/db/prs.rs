@@ -79,9 +79,9 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
 
 fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
     println!("[parse_webhook_data] webhook_data: {:?}", &webhook_data);
-    let pr_head_commit_raw = webhook_data["pullrequest"]["source"]["branch"]["commit"]["hash"].to_string();
+    let pr_head_commit_raw = webhook_data["pullrequest"]["source"]["commit"]["hash"].to_string();
     let pr_head_commit = pr_head_commit_raw.trim_matches('"');
-    let base_head_commit_raw = webhook_data["pullrequest"]["destination"]["branch"]["commit"]["hash"].to_string();
+    let base_head_commit_raw = webhook_data["pullrequest"]["destination"]["commit"]["hash"].to_string();
     let base_head_commit = base_head_commit_raw.trim_matches('"');
     let pr_state_raw = webhook_data["pullrequest"]["state"].to_string();
     let pr_state = pr_state_raw.trim_matches('"');
