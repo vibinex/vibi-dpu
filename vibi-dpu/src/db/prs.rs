@@ -63,7 +63,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     }
     let pr_info_parsed = pr_info_parsed_opt.expect("Empty pr_info_parsed_opt");
     // Retrieve the existing pr_head_commit from the database
-    let pr_info_db_opt = get_pr_info(workspace_slug, repo_slug, pr_number, repo_provider, &pr_info_parsed).await;
+    let pr_info_db_opt = get_pr_info_from_db(workspace_slug, repo_slug, pr_number, repo_provider, &pr_info_parsed).await;
     if pr_info_db_opt.is_none() {
         eprintln!("[process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
         return false;
@@ -96,7 +96,7 @@ fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
     return Some(pr_info);
 }
 
-pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str, pr_info_parsed: &PrInfo) -> Option<PrInfo> {
+pub async fn get_pr_info_from_db(workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str, pr_info_parsed: &PrInfo) -> Option<PrInfo> {
     let db = get_db();
     let db_pr_key = format!("{}/{}/{}/{}", repo_provider, workspace_slug, repo_slug, pr_number);
     let pr_info_res = db.get(IVec::from(db_pr_key.as_bytes()));

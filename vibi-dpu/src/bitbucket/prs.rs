@@ -2,7 +2,6 @@ use reqwest::header::HeaderMap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str;
-use std::env;
 use crate::utils::pr_info::PrInfo;
 use crate::db::prs::save_pr_info_to_db;
 
@@ -91,7 +90,7 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
         println!("Failed to get PR info, response: {:?}", response);
         return None;
     }
-    let pr_data: Value = response.json().await.unwrap_or_default();
+    let pr_data: Value = response.json().await.unwrap_or_default(); //TODO - remove unwrap
     let pr_info = PrInfo {
         base_head_commit: pr_data["destination"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
         pr_head_commit: pr_data["source"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
