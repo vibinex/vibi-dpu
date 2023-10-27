@@ -6,3 +6,4 @@ pub mod webhook;
 pub mod user;
 pub mod comment;
 pub mod reviewer;
+pub mod prs;

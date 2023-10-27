@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use futures_util::StreamExt;
 use google_cloud_auth::credentials::CredentialsFile;
 use google_cloud_default::WithAuthExt;
@@ -8,11 +7,13 @@ use google_cloud_pubsub::{
     subscription::{SubscriptionConfig, Subscription},
 };
 use serde::Deserialize;
+use serde_json::Value;
 use tokio::task;
 use std::collections::VecDeque;
 use sha256::digest;
 use tonic::Code;
-use crate::core::{setup::handle_install_bitbucket, review::process_review}; // To be added in future PR
+use crate::{db::prs::process_and_update_pr_if_different, utils::user::ProviderEnum};
+use crate::core::{setup::handle_install_bitbucket, review::process_review};
 
 #[derive(Debug, Deserialize)]
 struct InstallCallback {
@@ -45,15 +46,56 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
         },
         "webhook_callback" => {
             let data_bytes_async = data_bytes.to_owned();
-            task::spawn(async move {
-                process_review(&data_bytes_async).await;
-                println!("Processed webhook callback message");
-            });
+            let deserialized_data_opt = deserialized_data(&data_bytes_async);
+            let deserialised_msg_data = deserialized_data_opt.expect("Failed to deserialize data");
+            
+            let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
+            let workspace_slug = deserialised_msg_data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
+            let repo_slug = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
+            let pr_number = deserialised_msg_data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
+            let event_type = deserialised_msg_data["eventType"].to_string().trim_matches('"').to_string();
+            let mut is_reviewable = false;
+            
+            if event_type == "pullrequest:updated" {
+                is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &workspace_slug, &repo_slug, &pr_number, &repo_provider).await;
+            }
+            if is_reviewable || event_type == "pullrequest:created" || event_type == "pullrequest:approved" {
+                task::spawn(async move {
+                    process_review(&data_bytes_async).await;
+                    println!("Processed webhook callback message");
+                });
+            }
         }
-        _ => {
+        _=> {
             eprintln!("Message type not found for message : {:?}", attributes);
         }
     };
+}
+
+
+async fn prcoess_install_callback(data_bytes: &[u8]) {
+    println!("Processing install callback message");
+    let msg_data_res =  serde_json::from_slice::<InstallCallback>(data_bytes);
+    if msg_data_res.is_err() {
+        eprintln!("Error deserializing install callback: {:?}", msg_data_res);
+        return;
+    }
+    let data = msg_data_res.expect("msg_data not found");
+    if data.repository_provider == ProviderEnum::Github.to_string().to_lowercase() {
+        println!("To be Implemented");
+        // let code_async = data.installation_code.clone();
+        // task::spawn(async move {
+        //     handle_install_github(&code_async).await;
+        //     println!("Processed install callback message");
+        // });
+    }
+    if data.repository_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
+        let code_async = data.installation_code.clone();
+        task::spawn(async move {
+            handle_install_bitbucket(&code_async).await;
+            println!("Processed install callback message");
+        });
+    }
 }
 
 pub async fn get_pubsub_client_config(keypath: &str) -> ClientConfig {
@@ -123,4 +165,16 @@ pub async fn listen_messages(keypath: &str, topicname: &str) {
         // Ack or Nack message.
         let _ = message.ack().await;
     }
+}
+
+pub fn deserialized_data(message_data: &Vec<u8>) -> Option<Value> {
+    let msg_data_res = serde_json::from_slice::<Value>(message_data);
+    if msg_data_res.is_err() {
+		let e = msg_data_res.expect_err("No error in data_res");
+		eprintln!("Incoming message does not contain valid reviews: {:?}", e);
+		return None;
+	}
+	let deserialized_data = msg_data_res.expect("Uncaught error in deserializing message_data");
+	println!("deserialized_data == {:?}", &deserialized_data["eventPayload"]["repository"]);
+    Some(deserialized_data)
 }
