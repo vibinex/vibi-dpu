@@ -72,9 +72,11 @@ async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 	}
 	let (_, smallfiles) = fileopt.expect("fileopt is empty");
 	let diffmap = generate_diff(&review, &smallfiles);
-	println!("diffmap = {:?}", &diffmap);
+	println!("[process_review_changes] diffmap = {:?}", &diffmap);
 	let linemap = process_diffmap(&diffmap);
+	println!("[process_review_changes] linemap = {:?}", &linemap);
 	let blamevec = generate_blame(&review, &linemap).await;
+	println!("[process_review_changes] blamevec = {:?}", &blamevec);
 	let hmapitem = PrHunkItem::new(
 		review.id().to_string(),
 		review.author().to_string(),

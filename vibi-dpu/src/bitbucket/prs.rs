@@ -2,7 +2,6 @@ use reqwest::header::HeaderMap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str;
-use std::env;
 use crate::utils::pr_info::PrInfo;
 use crate::db::prs::save_pr_info_to_db;
 
@@ -72,7 +71,6 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
 pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Option<PrInfo> {
     let base_url = bitbucket_base_url();
     let url = format!("{}/repositories/{}/{}/pullrequests/{}", &base_url, workspace_slug, repo_slug, pr_number);
-
     let client = get_client();
     let response_result = client.get(&url)
         .header("Authorization", format!("Bearer {}", access_token))
@@ -87,7 +85,7 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
     }
     let response = response_result.expect("Uncaught error in response");
     if !response.status().is_success() {
-        println!("Failed to get PR info, status: {:?}", response.status());
+        println!("Failed to get PR info, response: {:?}", response);
         return None;
     }
     let pr_data: Value = response.json().await.expect("Error parsing PR data");

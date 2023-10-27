@@ -55,6 +55,7 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
 }
 
 pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str) -> bool {
+    println!("[process_and_update_pr_if_different] {:?}, {:?}, {:?}, {:?}", workspace_slug, repo_slug, pr_number, repo_provider);
     let pr_info_parsed_opt = parse_webhook_data(webhook_data);
     if pr_info_parsed_opt.is_none() {
         eprintln!("[process_and_update_pr_if_different] Unable to parse webhook data");
@@ -77,52 +78,21 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
 }
 
 fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
-    let pr_head_commit_opt = webhook_data
-        .get("pull_request")
-        .and_then(|pr| pr.get("head"))
-        .and_then(|head| head.get("sha"))
-        .and_then(|sha| sha.as_str());
-    if pr_head_commit_opt.is_none() {
-        eprintln!("[parse_webhook_data] pr_head_commit_opt not found: {:?}", webhook_data);
-        return None;
-    }
-    let pr_head_commit = pr_head_commit_opt.expect("Empty pr_head_commit_opt");
-
-    let base_head_commit_opt = webhook_data
-        .get("pull_request")
-        .and_then(|pr| pr.get("base"))
-        .and_then(|base| base.get("sha"))
-        .and_then(|sha| sha.as_str());
-    if base_head_commit_opt.is_none() {
-        eprintln!("[parse_webhook_data] base_head_commit_opt not found: {:?}", webhook_data);
-        return None;
-    }
-    let base_head_commit = base_head_commit_opt.expect("Empty base_head_commit_opt");
-
-    let pr_state_opt = webhook_data
-        .get("pull_request")
-        .and_then(|pr| pr.get("state"))
-        .and_then(|state| state.as_str());
-    if pr_state_opt.is_none() {
-        eprintln!("[parse_webhook_data] pr_state_opt not found: {:?}", webhook_data);
-        return None;
-    }
-    let pr_state = pr_state_opt.expect("Empty pr_state_opt");
-    let pr_branch_opt = webhook_data
-        .get("pull_request")
-        .and_then(|pr| pr.get("head"))
-        .and_then(|head| head.get("ref"))
-        .and_then(|ref_val| ref_val.as_str());
-    if pr_branch_opt.is_none() {
-        eprintln!("[parse_webhook_data] pr_branch_opt not found: {:?}", webhook_data);
-        return None;
-    }
-    let pr_branch = pr_branch_opt.expect("Empty pr_branch_opt");
+    println!("[parse_webhook_data] webhook_data: {:?}", &webhook_data);
+    let pr_head_commit_raw = webhook_data["pullrequest"]["source"]["commit"]["hash"].to_string();
+    let pr_head_commit = pr_head_commit_raw.trim_matches('"');
+    let base_head_commit_raw = webhook_data["pullrequest"]["destination"]["commit"]["hash"].to_string();
+    let base_head_commit = base_head_commit_raw.trim_matches('"');
+    let pr_state_raw = webhook_data["pullrequest"]["state"].to_string();
+    let pr_state = pr_state_raw.trim_matches('"');
+    let pr_branch_raw = webhook_data["pullrequest"]["source"]["branch"]["name"].to_string();
+    let pr_branch = pr_branch_raw.trim_matches('"');
     let pr_info = PrInfo { base_head_commit: base_head_commit.to_string(),
         pr_head_commit: pr_head_commit.to_string(),
         state: pr_state.to_string(),
         pr_branch: pr_branch.to_string()
     };
+    println!("[parse_webhook_data] pr_info :{:?}", &pr_info);
     return Some(pr_info);
 }
 
