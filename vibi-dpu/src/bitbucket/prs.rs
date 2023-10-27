@@ -37,7 +37,7 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
     }
 
     let response = response_result.expect("Uncaught error in parsing response");
-    if response.status().is_success() {
+    if !response.status().is_success() {
         eprintln!("[get_list_prs] Request failed with status: {:?}", response.status());
         return None;
     }
@@ -70,7 +70,8 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
 
 
 pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Option<PrInfo> {
-    let url = format!("{}/repositories/{}/{}/pullrequests/{}", env::var("SERVER_URL").expect("SERVER_URL must be set"), workspace_slug, repo_slug, pr_number);
+    let base_url = bitbucket_base_url();
+    let url = format!("{}/repositories/{}/{}/pullrequests/{}", &base_url, workspace_slug, repo_slug, pr_number);
 
     let client = get_client();
     let response_result = client.get(&url)
@@ -89,13 +90,13 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
         println!("Failed to get PR info, status: {:?}", response.status());
         return None;
     }
-    let pr_data: Value = response.json().await.unwrap_or_default();
+    let pr_data: Value = response.json().await.expect("Error parsing PR data");
 
     Some(PrInfo {
-        base_head_commit: pr_data["destination"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
-        pr_head_commit: pr_data["source"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
-        state: pr_data["state"].as_str().unwrap_or_default().to_string(),
-        pr_branch: pr_data["source"]["branch"]["name"].as_str().unwrap_or_default().to_string(),
+        base_head_commit: pr_data["destination"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
+        pr_head_commit: pr_data["source"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
+        state: pr_data["state"].to_string().trim_matches('"').to_string(),
+        pr_branch: pr_data["source"]["branch"]["name"].to_string().trim_matches('"').to_string(),
     })
 }
 
