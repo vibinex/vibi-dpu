@@ -79,8 +79,10 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
 fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
     let pr_head_commit_opt = webhook_data
         .get("pull_request")
-        .and_then(|pr| pr.get("head"))
-        .and_then(|head| head.get("sha"))
+        .and_then(|src| src.get("source"))//branch, commit, hash
+        .and_then(|branch| branch.get("branch"))
+        .and_then(|commit| commit.get("commit"))
+        .and_then(|hash_obj| hash_obj.get("hash"))
         .and_then(|sha| sha.as_str());
     if pr_head_commit_opt.is_none() {
         eprintln!("[parse_webhook_data] pr_head_commit_opt not found: {:?}", webhook_data);
@@ -90,8 +92,10 @@ fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
 
     let base_head_commit_opt = webhook_data
         .get("pull_request")
-        .and_then(|pr| pr.get("base"))
-        .and_then(|base| base.get("sha"))
+        .and_then(|dest| dest.get("destination"))//branch, commit, hash
+        .and_then(|branch| branch.get("branch"))
+        .and_then(|commit| commit.get("commit"))
+        .and_then(|hash_obj| hash_obj.get("hash"))
         .and_then(|sha| sha.as_str());
     if base_head_commit_opt.is_none() {
         eprintln!("[parse_webhook_data] base_head_commit_opt not found: {:?}", webhook_data);
@@ -110,9 +114,10 @@ fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
     let pr_state = pr_state_opt.expect("Empty pr_state_opt");
     let pr_branch_opt = webhook_data
         .get("pull_request")
-        .and_then(|pr| pr.get("head"))
-        .and_then(|head| head.get("ref"))
-        .and_then(|ref_val| ref_val.as_str());
+        .and_then(|src| src.get("source"))//branch, commit, hash
+        .and_then(|branch| branch.get("branch"))
+        .and_then(|commit| commit.get("name"))
+        .and_then(|branch_name| branch_name.as_str());
     if pr_branch_opt.is_none() {
         eprintln!("[parse_webhook_data] pr_branch_opt not found: {:?}", webhook_data);
         return None;
@@ -123,6 +128,7 @@ fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
         state: pr_state.to_string(),
         pr_branch: pr_branch.to_string()
     };
+    println!("[parse_webhook_data] pr_info :{:?}", &pr_info);
     return Some(pr_info);
 }
 
