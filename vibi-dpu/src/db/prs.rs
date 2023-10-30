@@ -4,7 +4,7 @@ use crate::db::config::get_db;
 use crate::utils::pr_info::PrInfo;
 
 pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info: &PrInfo, pr_number: &str) {
-    let key = format!("{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
+    let key = format!("pr_info/{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
     let db = get_db();
 
     let pr_info_json_result = serde_json::to_vec(&pr_info);
@@ -75,7 +75,7 @@ fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
 
 pub async fn get_pr_info_from_db(workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str, pr_info_parsed: &PrInfo) -> Option<PrInfo> {
     let db = get_db();
-    let db_pr_key = format!("{}/{}/{}/{}", repo_provider, workspace_slug, repo_slug, pr_number);
+    let db_pr_key = format!("pr_info/{}/{}/{}/{}", repo_provider, workspace_slug, repo_slug, pr_number);
     let pr_info_res = db.get(IVec::from(db_pr_key.as_bytes()));
 
     if pr_info_res.is_err() {
