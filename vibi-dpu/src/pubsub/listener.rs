@@ -59,7 +59,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             if event_type == "pullrequest:approved" {
                 todo!("Process approved event");
             }
-            println!("[process_message|webhook_callback] is_reviewable: {}; event_type: {}", is_reviewable, &event_type);
+            println!("[process_message|webhook_callback] is_reviewable: {}; event_type: {}", is_reviewable, &event_type); // TODO: remove
             if is_reviewable && (event_type == "pullrequest:created" || event_type == "pullrequest:updated" ) {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;

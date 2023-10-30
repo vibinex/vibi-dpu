@@ -18,7 +18,7 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
     let pr_info_bytes = pr_info_json_result.expect("empty pr_info_json_result");
 
     // Update the entry in the database. It will create a new entry if the key does not exist.
-    let update_result = db.insert(IVec::from(key.as_bytes()), IVec::from(pr_info_bytes));
+    let update_result = db.insert(IVec::from(key.as_bytes()), pr_info_bytes);
 
     if update_result.is_err() {
         let e = update_result.expect_err("No error in updating pr_info");
@@ -41,7 +41,6 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     let pr_info_db_opt = get_pr_info_from_db(workspace_slug, repo_slug, pr_number, repo_provider, &pr_info_parsed).await;
     if pr_info_db_opt.is_none() {
         eprintln!("[process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
-        update_pr_info_in_db(&workspace_slug, &repo_slug, &pr_info_parsed, &pr_number).await;
         return true; // new pr
     }
     let pr_info_db = pr_info_db_opt.expect("Empty pr_info_db_opt");
