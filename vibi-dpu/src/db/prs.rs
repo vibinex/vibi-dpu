@@ -38,6 +38,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     }
     let pr_info_parsed = pr_info_parsed_opt.expect("Empty pr_info_parsed_opt");
     // Retrieve the existing pr_head_commit from the database
+    print!("[process_and_update_pr_if_different] workspace_slug: {}, repo_slug: {},  pr_number: {}, pr_info_parsed: {:?}", &workspace_slug, &repo_slug,  &pr_number, &pr_info_parsed); // todo: remove
     let pr_info_db_opt = get_pr_info_from_db(workspace_slug, repo_slug, pr_number, repo_provider, &pr_info_parsed).await;
     if pr_info_db_opt.is_none() {
         eprintln!("[process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
