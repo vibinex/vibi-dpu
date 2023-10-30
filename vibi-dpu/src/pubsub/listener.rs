@@ -59,6 +59,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             if event_type == "pullrequest:approved" {
                 todo!("Process approved event");
             }
+            println!("[process_message|webhook_callback] is_reviewable: {}; event_type: {}", is_reviewable, &event_type);
             if is_reviewable && (event_type == "pullrequest:created" || event_type == "pullrequest:updated" ) {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;
@@ -73,7 +74,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
 }
 
 
-async fn prcoess_install_callback(data_bytes: &[u8]) {
+async fn process_install_callback(data_bytes: &[u8]) {
     println!("Processing install callback message");
     let msg_data_res =  serde_json::from_slice::<InstallCallback>(data_bytes);
     if msg_data_res.is_err() {
