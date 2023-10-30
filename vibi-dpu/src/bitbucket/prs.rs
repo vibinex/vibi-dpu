@@ -103,8 +103,7 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
 pub async fn get_and_store_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str, pr_number: &str) {
     if let Some(pr_info) = get_pr_info(workspace_slug, repo_slug, access_token, pr_number).await {
         // If PR information is available, store it in the database
-        println!("[get_and_store_pr_info|update_pr_info_in_db] workspace_slug: {}, repo_slug: {}, pr_number: {}, pr_info: {:?}", &workspace_slug, &repo_slug, &pr_number, &pr_info);
-        update_pr_info_in_db(workspace_slug, repo_slug, &pr_info, pr_number).await;
+       update_pr_info_in_db(workspace_slug, repo_slug, &pr_info, pr_number).await;
     } else {
         eprintln!("No PR info available for PR number: {:?} repository: {:?} repo_owner{:?}", pr_number, repo_slug, workspace_slug);
     }
