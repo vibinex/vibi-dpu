@@ -2,8 +2,7 @@ use reqwest::header::HeaderMap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str;
-use crate::utils::pr_info::PrInfo;
-use crate::db::prs::save_pr_info_to_db;
+use crate::{utils::pr_info::PrInfo, db::prs::update_pr_info_in_db};
 
 use super::config::{get_client, prepare_auth_headers, bitbucket_base_url};
 
@@ -104,7 +103,7 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
 pub async fn get_and_store_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str, pr_number: &str) {
     if let Some(pr_info) = get_pr_info(workspace_slug, repo_slug, access_token, pr_number).await {
         // If PR information is available, store it in the database
-       save_pr_info_to_db(workspace_slug, repo_slug, pr_info, pr_number).await;
+       update_pr_info_in_db(workspace_slug, repo_slug, &pr_info, pr_number).await;
     } else {
         eprintln!("No PR info available for PR number: {:?} repository: {:?} repo_owner{:?}", pr_number, repo_slug, workspace_slug);
     }
