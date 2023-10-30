@@ -90,7 +90,11 @@ pub async fn get_pr_info_from_db(workspace_slug: &str, repo_slug: &str, pr_numbe
     }
 
     let pr_info_ivec = pr_info_opt.expect("Empty pr_info_opt");
+    println!("[get_pr_info_from_db] pr_info_ivec = {:?}", &pr_info_ivec);
+
     let pr_info_parse = serde_json::from_slice(&pr_info_ivec);
+    println!("[get_pr_info_from_db] pr_info_parse = {:?}", &pr_info_parse);
+
     if pr_info_parse.is_err() {
         let e = pr_info_parse.expect_err("No error in pr_info_parse");
         eprintln!("Unable to deserialize pr_Info: {:?}", e);
