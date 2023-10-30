@@ -1,6 +1,5 @@
 use serde_json::Value;
 use sled::IVec;
-use std::error::Error;
 use crate::db::config::get_db;
 use crate::utils::pr_info::PrInfo;
 
