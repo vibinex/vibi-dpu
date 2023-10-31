@@ -13,7 +13,8 @@ use std::collections::VecDeque;
 use sha256::digest;
 use tonic::Code;
 use crate::db::prs::process_and_update_pr_if_different;
-use crate::core::{setup::handle_install_bitbucket, review::process_review};
+use crate::core::review::process_review;
+use crate::core::bitbucket::setup::handle_install_bitbucket;
 
 #[derive(Debug, Deserialize)]
 struct InstallCallback {
