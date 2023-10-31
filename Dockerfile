@@ -32,6 +32,7 @@ ENV SERVER_URL=$SERVER_URL
 
 COPY ./vibi-dpu/target/debug/vibi-dpu /app/vibi-dpu
 COPY ./pubsub-sa.json /app/pubsub-sa.json
+COPY ./repo-profiler.pem /app/repo-profiler.pem
 
 # Start the Rust application
 CMD ["/app/vibi-dpu"]
