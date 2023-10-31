@@ -1,4 +1,5 @@
 use crate::{core::bitbucket::setup::handle_install_bitbucket, utils::user::ProviderEnum};
+use crate::core::github::setup::handle_install_github;
 use crate::core::review::process_review;
 use crate::db::prs::process_and_update_pr_if_different;
 use futures_util::StreamExt;
@@ -31,18 +32,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
     let msgtype = msgtype_opt.expect("Empty msgtype");
     match msgtype.as_str() {
         "install_callback" => {
-            println!("Processing install callback message");
-            let msg_data_res = serde_json::from_slice::<InstallCallback>(data_bytes);
-            if msg_data_res.is_err() {
-                eprintln!("Error deserializing install callback: {:?}", msg_data_res);
-                return;
-            }
-            let data = msg_data_res.expect("msg_data not found");
-            let code_async = data.installation_code.clone();
-            task::spawn(async move {
-                handle_install_bitbucket(&code_async).await;
-                println!("Processed install callback message");
-            });
+            process_install_callback(&data_bytes).await;
         }
         "webhook_callback" => {
             let data_bytes_async = data_bytes.to_owned();
@@ -83,12 +73,11 @@ async fn process_install_callback(data_bytes: &[u8]) {
     }
     let data = msg_data_res.expect("msg_data not found");
     if data.repository_provider == ProviderEnum::Github.to_string().to_lowercase() {
-        println!("To be Implemented");
-        // let code_async = data.installation_code.clone();
-        // task::spawn(async move {
-        //     handle_install_github(&code_async).await;
-        //     println!("Processed install callback message");
-        // });
+        let code_async = data.installation_code.clone();
+        task::spawn(async move {
+            handle_install_github(&code_async).await;
+            println!("Processed install callback message");
+        });
     }
     if data.repository_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
         let code_async = data.installation_code.clone();

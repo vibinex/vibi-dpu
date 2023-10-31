@@ -20,7 +20,7 @@ struct Claims {
 }
 
 fn generate_jwt(github_app_id: &str) -> Option<String> {
-    let pem_file_path = "/app/repoprofiler_private.pem";
+    let pem_file_path = "/app/repo-profiler.pem";
     let pem_data_res = fs::read(pem_file_path);
     
     if pem_data_res.is_err() {
@@ -85,5 +85,6 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<Value> {
             return None;
         }
         let response_json: Value = parse_res.expect("Uncaught error in parse_res for AuthInfo");
+        // save_auth_info_to_db(&mut response_json);
         return Some(response_json);
 }
