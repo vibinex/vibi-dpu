@@ -1,1 +1,0 @@
-docker build --build-arg GCP_CREDENTIALS=/app/pubsub-sa.json --build-arg SERVER_URL=https://vibinex.com --build-arg INSTALL_ID=ablejobs-vishal --build-arg BITBUCKET_CLIENT_ID=bkaDR5BrSxWp64cmyK --build-arg BITBUCKET_CLIENT_SECRET=YbHEKGXRSjRqSAKtwruHackE4TE5tet5 --build-arg BITBUCKET_BASE_URL=https://api.bitbucket.org/2.0 -t tapish303/dpu:v1.0.4 .

@@ -7,18 +7,10 @@ use std::str;
 
 use super::config::{bitbucket_base_url, prepare_auth_headers};
 
-pub async fn list_prs_bitbucket(
-    repo_owner: &str,
-    repo_name: &str,
-    access_token: &str,
-    state: &str,
-) -> Option<Vec<String>> {
+pub async fn list_prs_bitbucket(repo_owner: &str,repo_name: &str,access_token: &str,state: &str,) -> Option<Vec<String>> {
     let headers_opt = prepare_auth_headers(access_token);
     if headers_opt.is_none() {
-        eprintln!(
-            "[list_prs_bitbucket] Unable to prepare auth headers: {}",
-            repo_name
-        );
+        eprintln!("[list_prs_bitbucket] Unable to prepare auth headers: {}", repo_name);
         return None;
     }
     let headers = headers_opt.expect("Empty headers_opt");
@@ -28,12 +20,7 @@ pub async fn list_prs_bitbucket(
     return pr_list_opt;
 }
 
-async fn get_list_prs(
-    headers: &HeaderMap,
-    params: &HashMap<String, String>,
-    repo_owner: &str,
-    repo_name: &str,
-) -> Option<Vec<String>> {
+async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, repo_owner: &str, repo_name: &str) -> Option<Vec<String>> {
     let client = get_client();
     let base_url = bitbucket_base_url();
     let response_result = client
