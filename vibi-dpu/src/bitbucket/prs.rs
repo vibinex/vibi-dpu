@@ -2,8 +2,7 @@ use reqwest::header::HeaderMap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str;
-use crate::utils::pr_info::PrInfo;
-use crate::db::prs::save_pr_info_to_db;
+use crate::{utils::pr_info::PrInfo, db::prs::update_pr_info_in_db};
 
 use super::config::{get_client, prepare_auth_headers, bitbucket_base_url};
 
@@ -71,6 +70,8 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
 pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) -> Option<PrInfo> {
     let base_url = bitbucket_base_url();
     let url = format!("{}/repositories/{}/{}/pullrequests/{}", &base_url, workspace_slug, repo_slug, pr_number);
+    println!("[get_pr_info] url: {:?}", &url);
+    println!("[get_pr_info] access token: {:?}", access_token);
     let client = get_client();
     let response_result = client.get(&url)
         .header("Authorization", format!("Bearer {}", access_token))
@@ -89,19 +90,20 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
         return None;
     }
     let pr_data: Value = response.json().await.expect("Error parsing PR data");
-
-    Some(PrInfo {
+    let pr_info = PrInfo {
         base_head_commit: pr_data["destination"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
         pr_head_commit: pr_data["source"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
         state: pr_data["state"].to_string().trim_matches('"').to_string(),
         pr_branch: pr_data["source"]["branch"]["name"].to_string().trim_matches('"').to_string(),
-    })
+    };
+    println!("[get_pr_info] pr_info: {:?}", &pr_info);
+    Some(pr_info)
 }
 
 pub async fn get_and_store_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str, pr_number: &str) {
     if let Some(pr_info) = get_pr_info(workspace_slug, repo_slug, access_token, pr_number).await {
         // If PR information is available, store it in the database
-       save_pr_info_to_db(workspace_slug, repo_slug, pr_info, pr_number).await;
+       update_pr_info_in_db(workspace_slug, repo_slug, &pr_info, pr_number).await;
     } else {
         eprintln!("No PR info available for PR number: {:?} repository: {:?} repo_owner{:?}", pr_number, repo_slug, workspace_slug);
     }

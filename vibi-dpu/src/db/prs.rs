@@ -1,35 +1,10 @@
 use serde_json::Value;
 use sled::IVec;
-use std::error::Error;
 use crate::db::config::get_db;
 use crate::utils::pr_info::PrInfo;
 
-
-pub async fn save_pr_info_to_db(workspace_slug: &str,repo_slug: &str,pr_info: PrInfo, pr_number: &str) {
-    let db = get_db();
-    let key = format!("{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
-
-    let pr_info_bytes = serde_json::to_vec(&pr_info);
-    if pr_info_bytes.is_err() {
-        let e = pr_info_bytes.expect_err("Empty error in pr_info_bytes");
-		eprintln!("Unable to serialize pr info: {:?}, error: {:?}", pr_info, e);
-		return;
-    }
-    let pr_info_json = pr_info_bytes.expect("Uncaught error in parse_res repo");
-
-    let insert_result = db.insert(key.as_bytes(), IVec::from(pr_info_json)); 
-    if insert_result.is_err() {
-        let e = insert_result.expect_err("No error in inserting pr_info");
-        eprintln!("Failed to insert PR info into the database. {:?}", e);
-        return;
-    }
-
-    println!("PR succesfully upserted: {:?} {:?}", key, pr_info);
-}
-
-
 pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info: &PrInfo, pr_number: &str) {
-    let key = format!("{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
+    let key = format!("pr_info/{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
     let db = get_db();
 
     let pr_info_json_result = serde_json::to_vec(&pr_info);
@@ -43,7 +18,7 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
     let pr_info_bytes = pr_info_json_result.expect("empty pr_info_json_result");
 
     // Update the entry in the database. It will create a new entry if the key does not exist.
-    let update_result = db.insert(IVec::from(key.as_bytes()), IVec::from(pr_info_bytes));
+    let update_result = db.insert(IVec::from(key.as_bytes()), pr_info_bytes);
 
     if update_result.is_err() {
         let e = update_result.expect_err("No error in updating pr_info");
@@ -66,7 +41,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     let pr_info_db_opt = get_pr_info_from_db(workspace_slug, repo_slug, pr_number, repo_provider, &pr_info_parsed).await;
     if pr_info_db_opt.is_none() {
         eprintln!("[process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
-        return false;
+        return true; // new pr
     }
     let pr_info_db = pr_info_db_opt.expect("Empty pr_info_db_opt");
     if pr_info_db.pr_head_commit().to_string().eq_ignore_ascii_case(pr_info_parsed.pr_head_commit()){
@@ -98,7 +73,7 @@ fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
 
 pub async fn get_pr_info_from_db(workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str, pr_info_parsed: &PrInfo) -> Option<PrInfo> {
     let db = get_db();
-    let db_pr_key = format!("{}/{}/{}/{}", repo_provider, workspace_slug, repo_slug, pr_number);
+    let db_pr_key = format!("pr_info/{}/{}/{}/{}", repo_provider, workspace_slug, repo_slug, pr_number);
     let pr_info_res = db.get(IVec::from(db_pr_key.as_bytes()));
 
     if pr_info_res.is_err() {

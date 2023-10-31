@@ -12,7 +12,7 @@ use tokio::task;
 use std::collections::VecDeque;
 use sha256::digest;
 use tonic::Code;
-use crate::{db::prs::process_and_update_pr_if_different, utils::user::ProviderEnum};
+use crate::db::prs::process_and_update_pr_if_different;
 use crate::core::{setup::handle_install_bitbucket, review::process_review};
 
 #[derive(Debug, Deserialize)]
@@ -54,12 +54,12 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             let repo_slug = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
             let pr_number = deserialised_msg_data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
             let event_type = deserialised_msg_data["eventType"].to_string().trim_matches('"').to_string();
-            let mut is_reviewable = false;
+            let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &workspace_slug, &repo_slug, &pr_number, &repo_provider).await;
             
-            if event_type == "pullrequest:updated" {
-                is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &workspace_slug, &repo_slug, &pr_number, &repo_provider).await;
+            if event_type == "pullrequest:approved" {
+                todo!("Process approved event");
             }
-            if is_reviewable || event_type == "pullrequest:created" || event_type == "pullrequest:approved" {
+            if is_reviewable && (event_type == "pullrequest:created" || event_type == "pullrequest:updated" ) {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;
                     println!("Processed webhook callback message");
@@ -70,32 +70,6 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             eprintln!("Message type not found for message : {:?}", attributes);
         }
     };
-}
-
-
-async fn prcoess_install_callback(data_bytes: &[u8]) {
-    println!("Processing install callback message");
-    let msg_data_res =  serde_json::from_slice::<InstallCallback>(data_bytes);
-    if msg_data_res.is_err() {
-        eprintln!("Error deserializing install callback: {:?}", msg_data_res);
-        return;
-    }
-    let data = msg_data_res.expect("msg_data not found");
-    if data.repository_provider == ProviderEnum::Github.to_string().to_lowercase() {
-        println!("To be Implemented");
-        // let code_async = data.installation_code.clone();
-        // task::spawn(async move {
-        //     handle_install_github(&code_async).await;
-        //     println!("Processed install callback message");
-        // });
-    }
-    if data.repository_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
-        let code_async = data.installation_code.clone();
-        task::spawn(async move {
-            handle_install_bitbucket(&code_async).await;
-            println!("Processed install callback message");
-        });
-    }
 }
 
 pub async fn get_pubsub_client_config(keypath: &str) -> ClientConfig {
