@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::env;
 use chrono::{Utc, Duration};
 use std::fs;
-use crate::{client::config::get_client, utils::auth::AuthInfo};
+use crate::{utils::reqwest_client::get_client, utils::auth::AuthInfo};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AccessTokenResponse {

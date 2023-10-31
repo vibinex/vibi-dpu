@@ -2,9 +2,10 @@ use reqwest::header::HeaderMap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str;
-use crate::{utils::pr_info::PrInfo, db::prs::update_pr_info_in_db};
+use crate::utils::{pr_info::PrInfo, reqwest_client::get_client};
+use crate::db::prs::update_pr_info_in_db;
 
-use super::config::{get_client, prepare_auth_headers, bitbucket_base_url};
+use super::config::{prepare_auth_headers, bitbucket_base_url};
 
 pub async fn list_prs_bitbucket(repo_owner: &str, repo_name: &str, access_token: &str, state: &str) -> Option<Vec<String>> {
     let headers_opt = prepare_auth_headers(access_token);
