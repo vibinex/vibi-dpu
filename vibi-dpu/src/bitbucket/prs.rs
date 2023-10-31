@@ -89,12 +89,12 @@ pub async fn get_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &s
         println!("Failed to get PR info, response: {:?}", response);
         return None;
     }
-    let pr_data: Value = response.json().await.unwrap_or_default(); //TODO - remove unwrap
+    let pr_data: Value = response.json().await.expect("Error parsing PR data");
     let pr_info = PrInfo {
-        base_head_commit: pr_data["destination"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
-        pr_head_commit: pr_data["source"]["commit"]["hash"].as_str().unwrap_or_default().to_string(),
-        state: pr_data["state"].as_str().unwrap_or_default().to_string(),
-        pr_branch: pr_data["source"]["branch"]["name"].as_str().unwrap_or_default().to_string(),
+        base_head_commit: pr_data["destination"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
+        pr_head_commit: pr_data["source"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
+        state: pr_data["state"].to_string().trim_matches('"').to_string(),
+        pr_branch: pr_data["source"]["branch"]["name"].to_string().trim_matches('"').to_string(),
     };
     println!("[get_pr_info] pr_info: {:?}", &pr_info);
     Some(pr_info)
