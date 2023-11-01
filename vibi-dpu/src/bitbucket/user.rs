@@ -1,9 +1,6 @@
-use chrono::{DateTime, Utc, FixedOffset};
-use crate::db::auth::auth_info;
+use crate::db::bitbucket::auth::bitbucket_auth_info;
 use crate::db::user::{add_bitbucket_user_to_workspace_user, get_workspace_user_from_db};
-use crate::utils::auth::AuthInfo;
-use crate::utils::lineitem::LineItem;
-use crate::utils::user::{BitbucketUser, User, Provider, ProviderEnum};
+use crate::utils::user::BitbucketUser;
 use super::config::{bitbucket_base_url, get_api_values, get_api_response};
 
 pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str) {
@@ -22,7 +19,7 @@ pub async fn author_from_commit(commit: &str, repo_name: &str, repo_owner: &str)
     let base_url = bitbucket_base_url();
     let commits_url = format!("{}/repositories/{}/{}/commit/{}", &base_url, repo_owner, repo_name, commit);
     println!("commits url = {}", &commits_url);
-    let authinfo_opt =  auth_info();
+    let authinfo_opt =  bitbucket_auth_info();
     if authinfo_opt.is_none() {
         return None;
     }

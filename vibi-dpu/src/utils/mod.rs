@@ -1,6 +1,7 @@
 pub mod repo;
 pub mod owner;
-pub mod auth;
+pub mod bitbucket_auth_info;
+pub mod github_auth_info;
 pub mod webhook;
 pub mod hunk;
 pub mod review;
