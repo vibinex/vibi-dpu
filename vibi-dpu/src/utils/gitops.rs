@@ -254,7 +254,9 @@ fn process_diff(filepath: &str, diff: &str, linemap: &mut HashMap<String, Vec<St
 	let mut limiterpos = Vec::new();
 	let delimitter = "@@";
 	for (idx, _) in diff.match_indices(delimitter) {
-		limiterpos.push(idx);
+		if has_deletions(&diff[idx..]) {
+            limiterpos.push(idx);
+        }
 	}
 	let mut idx: usize = 0;
 	let len = limiterpos.len();
@@ -319,6 +321,20 @@ fn process_diff(filepath: &str, diff: &str, linemap: &mut HashMap<String, Vec<St
 		idx += 1;
 	}
 	return linemap.to_owned();
+}
+
+fn has_deletions(hunk: &str) -> bool {
+    // Split the hunk into lines
+    let lines = hunk.split('\n').collect::<Vec<&str>>();
+    
+    // Iterate through the lines to check for deletions
+    for line in lines.iter() {
+        if line.starts_with('-') && !line.starts_with("---") {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 pub fn process_diffmap(diffmap: &HashMap<String, String>) -> HashMap<String, Vec<String>> {

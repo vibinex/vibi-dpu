@@ -112,19 +112,10 @@ pub async fn get_pr_info(
     }
     let pr_data: Value = response.json().await.expect("Error parsing PR data");
     let pr_info = PrInfo {
-        base_head_commit: pr_data["destination"]["commit"]["hash"]
-            .to_string()
-            .trim_matches('"')
-            .to_string(),
-        pr_head_commit: pr_data["source"]["commit"]["hash"]
-            .to_string()
-            .trim_matches('"')
-            .to_string(),
+        base_head_commit: pr_data["destination"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
+        pr_head_commit: pr_data["source"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
         state: pr_data["state"].to_string().trim_matches('"').to_string(),
-        pr_branch: pr_data["source"]["branch"]["name"]
-            .to_string()
-            .trim_matches('"')
-            .to_string(),
+        pr_branch: pr_data["source"]["branch"]["name"].to_string().trim_matches('"').to_string(),
     };
     println!("[get_pr_info] pr_info: {:?}", &pr_info);
     Some(pr_info)
