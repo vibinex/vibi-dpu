@@ -151,21 +151,22 @@ pub fn get_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatIte
 
 fn process_statoutput(statstr: &str) -> Option<(Vec<StatItem>, Vec<StatItem>)>{
     let statvec = process_statitems(statstr);
-    let mut bigfiles = Vec::<StatItem>::new();
-    let mut smallfiles = Vec::<StatItem>::new();
+    let mut excluded_files = Vec::<StatItem>::new();
+    let mut filtered_files = Vec::<StatItem>::new();
     let line_threshold = 500;
     for item in statvec {
         // logic for exclusion
         if (item.additions > line_threshold) || 
         (item.deletions > line_threshold) || 
-        (item.additions + item.deletions > line_threshold) {
-            bigfiles.push(item);
+        (item.additions + item.deletions > line_threshold) ||
+		(item.deletions < 0) {
+            excluded_files.push(item);
         }
         else {
-            smallfiles.push(item);
+            filtered_files.push(item);
         }
     }
-    return Some((bigfiles, smallfiles));
+    return Some((excluded_files, filtered_files));
 }
 
 fn generate_statitem(statitems: &Vec<&str>) -> StatItem {
