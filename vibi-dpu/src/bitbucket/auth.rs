@@ -2,9 +2,8 @@ use std::env;
 use std::str;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
-use reqwest::Client;
-use super::config::get_client;
 use crate::db::auth::{save_auth_info_to_db, auth_info};
+use crate::utils::reqwest_client::get_client;
 use crate::utils::auth::AuthInfo;
 use crate::utils::review::Review;
 
