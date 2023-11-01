@@ -66,8 +66,7 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
     return Some(access_token);
 }
 
-pub async fn update_access_token(auth_info: &BitbucketAuthInfo,
-        clone_url: &str, directory: &str) -> Option<BitbucketAuthInfo> {
+pub async fn update_access_token(auth_info: &BitbucketAuthInfo, clone_url: &str, directory: &str) -> Option<BitbucketAuthInfo> {
     let now = SystemTime::now();
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
     let timestamp_opt = auth_info.timestamp();
