@@ -16,8 +16,6 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use tokio::task;
 use tonic::Code;
-use crate::db::prs::process_and_update_pr_if_different;
-use crate::core::{setup::handle_install_bitbucket, review::process_review};
 
 #[derive(Debug, Deserialize)]
 struct InstallCallback {
