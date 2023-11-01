@@ -11,12 +11,12 @@ use crate::{
 					get_excluded_files, 
 					generate_diff, 
 					process_diffmap, 
-					generate_blame}}, 
+					generate_blame},
+			reqwest_client::get_client}, 
 	db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, 
 		repo::get_clone_url_clone_dir, 
 		review::save_review_to_db,
 		repo_config::save_repo_config_to_db},
-	bitbucket::config::get_client,
 	core::coverage::process_coverage};
 
 pub async fn process_review(message_data: &Vec<u8>) {

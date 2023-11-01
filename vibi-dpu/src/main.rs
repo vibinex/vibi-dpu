@@ -3,6 +3,7 @@ mod pubsub;
 mod db;
 mod core;
 mod bitbucket;
+mod github;
 mod utils;
 
 #[tokio::main]
