@@ -159,7 +159,7 @@ fn process_statoutput(statstr: &str) -> Option<(Vec<StatItem>, Vec<StatItem>)>{
         if (item.additions > line_threshold) || 
         (item.deletions > line_threshold) || 
         (item.additions + item.deletions > line_threshold) ||
-		(item.deletions < 0) {
+		(item.deletions < 1) {
             excluded_files.push(item);
         }
         else {
