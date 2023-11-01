@@ -1,19 +1,8 @@
 use std::{env, collections::HashMap};
-use std::error::Error;
 
 use reqwest::{Response, header::{HeaderMap, HeaderValue}};
 use serde_json::Value;
-use std::sync::Arc;
-use once_cell::sync::Lazy;
-use reqwest::Client;
-
-static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| {
-    Arc::new(Client::new())
-});
-
-pub fn get_client() -> Arc<Client> {
-    Arc::clone(&CLIENT)
-}
+use crate::utils::reqwest_client::get_client;
 
 pub fn bitbucket_base_url() -> String {
     env::var("BITBUCKET_BASE_URL").expect("BITBUCKET_BASE_URL must be set")

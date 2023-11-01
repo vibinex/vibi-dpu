@@ -38,6 +38,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     }
     let pr_info_parsed = pr_info_parsed_opt.expect("Empty pr_info_parsed_opt");
     // Retrieve the existing pr_head_commit from the database
+    print!("[process_and_update_pr_if_different|get_pr_info_from_db] workspace_slug: {}, repo_slug: {},  pr_number: {}, pr_info_parsed: {:?}", &workspace_slug, &repo_slug,  &pr_number, &pr_info_parsed); // todo: remove
     let pr_info_db_opt = get_pr_info_from_db(workspace_slug, repo_slug, pr_number, repo_provider, &pr_info_parsed).await;
     if pr_info_db_opt.is_none() {
         eprintln!("[process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
@@ -47,6 +48,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     if pr_info_db.pr_head_commit().to_string().eq_ignore_ascii_case(pr_info_parsed.pr_head_commit()){
         return false; // commits are the same
     } else {
+        println!("[process_and_update_pr_if_different|update_pr_info_in_db] workspace_slug: {}, repo_slug: {}, pr_info_parsed: {:?}, pr_number: {}", &workspace_slug, &repo_slug, &pr_info_parsed, &pr_number);
         update_pr_info_in_db(&workspace_slug, &repo_slug, &pr_info_parsed, &pr_number).await;
         return true; // commits are different, and PR info should be updated
     }
@@ -90,7 +92,11 @@ pub async fn get_pr_info_from_db(workspace_slug: &str, repo_slug: &str, pr_numbe
     }
 
     let pr_info_ivec = pr_info_opt.expect("Empty pr_info_opt");
+    println!("[get_pr_info_from_db] pr_info_ivec = {:?}", &pr_info_ivec);
+
     let pr_info_parse = serde_json::from_slice(&pr_info_ivec);
+    println!("[get_pr_info_from_db] pr_info_parse = {:?}", &pr_info_parse);
+
     if pr_info_parse.is_err() {
         let e = pr_info_parse.expect_err("No error in pr_info_parse");
         eprintln!("Unable to deserialize pr_Info: {:?}", e);

@@ -1,15 +1,8 @@
-use std::{env, collections::HashMap};
-
-use reqwest::{Response, header::{HeaderMap, HeaderValue}};
 use serde::Serialize;
-use serde_json::Value;
 
-use crate::db::auth::auth_info;
-use crate::db::user::get_workspace_user_from_db;
 use crate::utils::review::Review;
-use crate::utils::user::BitbucketUser;
-
-use super::{config::{bitbucket_base_url, get_client, prepare_headers}};
+use crate::utils::reqwest_client::get_client;
+use super::config::{bitbucket_base_url, prepare_headers};
 
 #[derive(Serialize)]
 struct Comment {

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{task, fs};
 
 use crate::bitbucket::auth::get_access_token_from_bitbucket;
-use crate::bitbucket::config::get_client;
+use crate::utils::reqwest_client::get_client;
 use crate::bitbucket::repo::get_workspace_repos;
 use crate::bitbucket::workspace::get_bitbucket_workspaces;
 use crate::bitbucket::webhook::{get_webhooks_in_repo, add_webhook};
@@ -93,7 +93,6 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
     } 
     send_setup_info(&pubreqs).await;
 }
-
 
 async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
     let installation_id = env::var("INSTALL_ID")
