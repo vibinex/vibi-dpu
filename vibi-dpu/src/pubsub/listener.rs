@@ -66,6 +66,29 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
     };
 }
 
+async fn process_install_callback(data_bytes: &[u8]) {
+    println!("Processing install callback message");
+    let msg_data_res = serde_json::from_slice::<InstallCallback>(data_bytes);
+    if msg_data_res.is_err() {
+        eprintln!("Error deserializing install callback: {:?}", msg_data_res);
+        return;
+    }
+    let data = msg_data_res.expect("msg_data not found");
+    if data.repository_provider == ProviderEnum::Github.to_string().to_lowercase() {
+        let code_async = data.installation_code.clone();
+        task::spawn(async move {
+            handle_install_github(&code_async).await;
+            println!("Processed install callback message");
+        });
+    }
+    if data.repository_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
+        let code_async = data.installation_code.clone();
+        task::spawn(async move {
+            handle_install_bitbucket(&code_async).await;
+            println!("Processed install callback message");
+        });
+    }
+}
 
 pub async fn get_pubsub_client_config(keypath: &str) -> ClientConfig {
     let credfile = CredentialsFile::new_from_file(keypath.to_string())
