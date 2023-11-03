@@ -21,7 +21,7 @@ pub async fn get_github_app_installed_repos(access_token: &str) -> Option<Vec<Re
             repo_json["id"].to_string().trim_matches('"').to_string(),
             repo_json["owner"]["login"].to_string().trim_matches('"').to_string(),
             is_private,
-            repo_json["ssh_url"].as_array()
+            repo_json["ssh_url"].as_array() // TODO - fix this, as_array might not be required
                 .expect("Unable to convert clone to array").iter().filter(|clone_val| {
                 clone_val["name".to_string()].as_str() == Some("ssh")
             }).collect::<Vec<&Value>>()[0]["href"].to_string().replace('\"',""),

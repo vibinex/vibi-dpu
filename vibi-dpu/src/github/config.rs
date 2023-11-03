@@ -10,13 +10,13 @@ pub fn github_base_url() -> String {
 
 pub async fn get_api_values(url: &str, access_token: &str, params: Option<HashMap<&str, &str>> ) -> Vec<Value> {
     let headers = prepare_headers(access_token);
-    let initial_response = get_api_response(url, None, &params, &client).await?;
+    let initial_response = get_api_response(url, None, &params, &client).await;
 
-    let PaginatedResponse { mut response_values, next_url } = deserialize_paginated_response(&initial_response).await?;
+    let PaginatedResponse { mut response_values, next_url } = deserialize_paginated_response(&initial_response).await;
 
     if next_url.is_some() {
-        let mut additional_values = get_all_pages(&url, &headers, &client).await?;
-        values.append(&mut additional_values);
+        let mut additional_values = get_all_pages(&url, &headers, &client).await;
+        response_values.append(&mut additional_values);
     }
 
     return response_values;
@@ -55,7 +55,7 @@ async fn get_api_response(url: &str, headers: Option<reqwest::header::HeaderMap>
 }
 
 async fn get_all_pages(next_url: Option<String>, access_token: &str, params: &Option<HashMap<&str, &str>>) -> Vec<Value>{
-    let mut values_vec = Vec::new();
+    let mut all_values = Vec::new();
     let mut next_url_mut = next_url;
 
     while next_url_mut.is_some() {
@@ -69,9 +69,9 @@ async fn get_all_pages(next_url: Option<String>, access_token: &str, params: &Op
             break;   
         }
         let response = get_api_response(&url, None, access_token, params).await;
-        let PaginatedResponse { mut values, next_url: new_next_url } = deserialize_paginated_response(&response).await?;
+        let PaginatedResponse { mut values, next_url: new_next_url } = deserialize_paginated_response(&response).await;
         all_values.extend(&mut values);
-        let next_url = next_url.clone();
+        next_url_mut = next_url.clone();
     }
 
     return all_values;
@@ -91,7 +91,7 @@ async fn deserialize_paginated_response(response_opt: &Response) -> PaginatedRes
         return (values_vec, None);
     }
     let response_json = parse_res.expect("Uncaught error in parse_res in deserialize_response");
-    let res_values_opt = response_json["values"].as_array();
+    let res_values_opt = response_json["values"].as_array(); // TODO - find out if as_array is needed
     if res_values_opt.is_none() {
         eprintln!("response_json[values] is empty");
         return (values_vec, None);
@@ -129,7 +129,7 @@ struct PaginatedResponse {
     values: Vec<Value>,
     next_url: Option<String>,
 }
-
+// TODO -find all "?" after await specially
 pub fn prepare_headers(access_token: &str) -> Option<HeaderMap> {
     let mut headers = HeaderMap::new();
 

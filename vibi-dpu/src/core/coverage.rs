@@ -19,34 +19,35 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
         println!("!coverage_map.is_empty() = {:?}", &coverage_cond);
         println!("repo_config.comment() = {:?}", repo_config.comment());
         println!("repo_config.auto_assign() = {:?}", repo_config.auto_assign());
-        if !coverage_map.is_empty() {
-            if repo_config.comment() {
-                println!("Inserting comment...");
-                // create comment text
-                let comment = comment_text(coverage_map, repo_config.auto_assign());
-                // add comment
-                add_comment(&comment, review, &access_token).await;
-            }
-            if repo_config.auto_assign() {
-                let mut author_set: HashSet<String> = HashSet::new();
-                author_set.insert(prhunk.author().to_string());
-                for blame in prhunk.blamevec() {
-                    let blame_author_opt = author_from_commit(blame.commit(),
-                        hunkmap.repo_name(), hunkmap.repo_owner()).await;
-                    if blame_author_opt.is_none() {
-                        eprintln!("[process_coverage] Unable to get blame author from bb for commit: {}", &blame.commit());
-                        continue;
-                    }
-                    let blame_author = blame_author_opt.expect("Empty blame_author_opt");
-                    let author_uuid = blame_author.uuid();
-                    if author_set.contains(author_uuid) {
-                        continue;
-                    }
-                    add_reviewers(&blame_author, review, &access_token).await;
-                    author_set.insert(author_uuid.to_string());
+        if coverage_map.is_empty() {
+            continue;
+        }
+        if repo_config.comment() {
+            println!("Inserting comment...");
+            // create comment text
+            let comment = comment_text(coverage_map, repo_config.auto_assign());
+            // add comment
+            add_comment(&comment, review, &access_token).await;
+        }
+        if repo_config.auto_assign() {
+            let mut author_set: HashSet<String> = HashSet::new();
+            author_set.insert(prhunk.author().to_string());
+            for blame in prhunk.blamevec() {
+                let blame_author_opt = author_from_commit(blame.commit(),
+                    hunkmap.repo_name(), hunkmap.repo_owner()).await;
+                if blame_author_opt.is_none() {
+                    eprintln!("[process_coverage] Unable to get blame author from bb for commit: {}", &blame.commit());
+                    continue;
                 }
+                let blame_author = blame_author_opt.expect("Empty blame_author_opt");
+                let author_uuid = blame_author.uuid();
+                if author_set.contains(author_uuid) {
+                    continue;
+                }
+                add_reviewers(&blame_author, review, &access_token).await;
+                author_set.insert(author_uuid.to_string());
             }
-        }    
+        }  
     }
 }
 

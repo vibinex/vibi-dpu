@@ -120,7 +120,7 @@ pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, di
 
 }
 
-fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str) {
+fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str) { // TODO - replace provider specific part
     let clone_url = git_url.to_string()
         .replace("git@", format!("https://x-access-token:{access_token}@").as_str())
         .replace("github.com:", "github.com/");

@@ -123,6 +123,7 @@ async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
 
 async fn clone_git_repo(repo: &mut Repository, access_token: &str) {
     let git_url = repo.clone_ssh_url();
+    // call function for provider specific git url formatting
     let clone_url = git_url.to_string()
         .replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
         .replace("bitbucket.org:", "bitbucket.org/");
