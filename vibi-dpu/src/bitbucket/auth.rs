@@ -1,8 +1,8 @@
 use std::env;
 use std::str;
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::db::bitbucket::auth::{save_bitbucket_auth_info_to_db, bitbucket_auth_info};
+use crate::utils::gitops::set_git_remote_url;
 use crate::utils::reqwest_client::get_client;
 use crate::utils::bitbucket_auth_info::BitbucketAuthInfo;
 use crate::utils::review::Review;
@@ -67,6 +67,7 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
 }
 
 pub async fn update_access_token(auth_info: &BitbucketAuthInfo, clone_url: &str, directory: &str) -> Option<BitbucketAuthInfo> {
+    let repo_provider = "bitbucket".to_string();
     let now = SystemTime::now();
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
     let timestamp_opt = auth_info.timestamp();
@@ -87,7 +88,7 @@ pub async fn update_access_token(auth_info: &BitbucketAuthInfo, clone_url: &str,
         .expect("empty auhtinfo_opt from update_access_token");
     println!("New auth info  = {:?}", &new_auth_info);
     let access_token = new_auth_info.access_token().to_string();
-    set_git_remote_url(clone_url, directory, &access_token);
+    set_git_remote_url(clone_url, directory, &access_token, &repo_provider);
     save_bitbucket_auth_info_to_db(&mut new_auth_info);
     return new_auth_info_opt;
 }
@@ -131,28 +132,6 @@ async fn bitbucket_refresh_token(refresh_token: &str) -> Option<BitbucketAuthInf
     }
     let refresh_token_resbody = parse_res.expect("Uncaught error in parse_res");
     return Some(refresh_token_resbody);
-}
-
-fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str) {
-    let clone_url = git_url.to_string()
-        .replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
-        .replace("bitbucket.org:", "bitbucket.org/");
-    let output = Command::new("git")
-		.arg("remote").arg("set-url").arg("origin")
-		.arg(clone_url)
-		.current_dir(directory)
-		.output()
-		.expect("failed to execute git pull");
-    // Only for debug purposes
-	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("set_git_url stderr = {:?}", v),
-		Err(e) => eprintln!("set_git_url stderr error: {}", e), 
-	};
-	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("set_git_urll stdout = {:?}", v),
-		Err(e) => eprintln!("set_git_url stdout error: {}", e), 
-	};
-	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
 }
 
 pub async fn get_access_token_review(review: &Review) -> Option<String> {

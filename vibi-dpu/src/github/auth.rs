@@ -3,12 +3,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::str;
-use std::process::Command;
 use chrono::{Utc, Duration};
 use std::fs;
 use crate::db::github::auth::github_auth_info;
 use crate::{utils::reqwest_client::get_client, utils::github_auth_info::GithubAuthInfo, db::github::auth::save_github_auth_info_to_db};
 use crate::utils::review::Review;
+use crate::utils::gitops::set_git_remote_url;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct AccessTokenResponse {
@@ -88,20 +88,16 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo>
             eprintln!("error deserializing GithubAuthInfo: {:?}", e);
             return None;
         }
-        let response_json = parse_res.expect("Uncaught error in parse_res for AuthInfo");
+        let mut response_json = parse_res.expect("Uncaught error in parse_res for AuthInfo");
+        save_github_auth_info_to_db(&mut response_json);
         return Some(response_json);
 }
 
 pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, directory: &str) -> Option<GithubAuthInfo> {
+    let repo_provider = "github".to_string();
 	let app_installation_id = auth_info.installation_id(); 
 	let now = SystemTime::now();
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
-    let timestamp_opt = auth_info.timestamp();
-    if timestamp_opt.is_none() {
-        eprintln!("No timestamp in GithubAuthInfo");
-        return None;
-    }
-    let timestamp = timestamp_opt.expect("Empty timestamp");
     let expires_at = auth_info.expires_at();
     if expires_at > now_secs {  
         eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
@@ -114,32 +110,10 @@ pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, di
         .expect("empty auhtinfo_opt from update_access_token");
     println!("New github auth info  = {:?}", &new_auth_info);
     let access_token = new_auth_info.access_token().to_string();
-    set_git_remote_url(clone_url, directory, &access_token);
+    set_git_remote_url(clone_url, directory, &access_token, &repo_provider);
     save_github_auth_info_to_db(&mut new_auth_info);
     return new_auth_info_opt;
 
-}
-
-fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str) { // TODO - replace provider specific part
-    let clone_url = git_url.to_string()
-        .replace("git@", format!("https://x-access-token:{access_token}@").as_str())
-        .replace("github.com:", "github.com/");
-    let output = Command::new("git")
-		.arg("remote").arg("set-url").arg("origin")
-		.arg(clone_url)
-		.current_dir(directory)
-		.output()
-		.expect("failed to execute git pull");
-    // Only for debug purposes
-	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("set_git_url stderr = {:?}", v),
-		Err(e) => eprintln!("set_git_url stderr error: {}", e), 
-	};
-	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("set_git_urll stdout = {:?}", v),
-		Err(e) => eprintln!("set_git_url stdout error: {}", e), 
-	};
-	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
 }
 
 pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String>{
