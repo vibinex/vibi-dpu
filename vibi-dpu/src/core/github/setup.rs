@@ -27,6 +27,7 @@ pub async fn handle_install_github(installation_code: &str) {
     let mut pubreqs: Vec<SetupInfo> = Vec::new();
 
     let repos = get_github_app_installed_repos(&access_token).await;
+    println!("Got repos: {:?}", repos);
 
     // 2. Fetch user repositories and other necessary data
     // 3. Process webhooks or other setup tasks
