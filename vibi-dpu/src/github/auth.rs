@@ -24,7 +24,7 @@ struct Claims {
 }
 
 fn generate_jwt(github_app_id: &str) -> Option<String> {
-    let pem_file_path = "/app/repoprofiler_private.pem";
+    let pem_file_path = "/app/repo-profiler.pem";
     let pem_data_res = fs::read(pem_file_path);
     
     if pem_data_res.is_err() {
