@@ -1,21 +1,14 @@
 // setup_gh.rs
+use serde::{Deserialize, Serialize};
 
 use crate::github::auth::fetch_access_token; // Import shared utilities
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use tokio::task;
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct SetupInfoGithub {
-    provider: String,
-    owner: String,
-    repos: Vec<String>,
-}
+use crate::utils::setup_info::SetupInfo;
+use crate::github::repos::get_github_app_installed_repos;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct PublishRequestGithub {
     installationId: String,
-    info: Vec<SetupInfoGithub>,
+    info: Vec<SetupInfo>,
 }
 
 pub async fn handle_install_github(installation_code: &str) {
@@ -23,23 +16,30 @@ pub async fn handle_install_github(installation_code: &str) {
 
     // For example:
     // 1. Get access token from GitHub using the installation code
-    let auth_info = fetch_access_token(installation_code).await;
-    println!("[handle_install_github] auth_info = {:?}", &auth_info);
+    let authinfo_opt = fetch_access_token(installation_code).await;
+    println!("[handle_install_github] auth_info = {:?}", &authinfo_opt);
+    if authinfo_opt.is_none() {
+        eprintln!("Unable to get authinfo from fetch_access_token in Github setup");;
+        return;
+    }
+    let authinfo = authinfo_opt.expect("Empty authinfo_opt");
+    let access_token = authinfo.access_token().clone();
+    let mut pubreqs: Vec<SetupInfo> = Vec::new();
+
+    let repos = get_github_app_installed_repos(&access_token).await;
+    println!("Got repos: {:?}", repos);
+
     // 2. Fetch user repositories and other necessary data
     // 3. Process webhooks or other setup tasks
     // 4. Send setup info or any other post-processing
 }
 
-async fn get_github_repositories(access_token: &str) -> Vec<String> {
-    // TODO: Implement the logic to fetch user repositories from GitHub
-    Vec::new()
-}
 
 async fn process_webhooks_github(repo_name: String, access_token: String) {
     // TODO: Implement the logic to process GitHub webhooks
 }
 
-async fn send_setup_info_github(setup_info: &Vec<SetupInfoGithub>) {
+async fn send_setup_info_github(setup_info: &Vec<SetupInfo>) {
     // TODO: Implement the logic to send setup info for GitHub
 }
 

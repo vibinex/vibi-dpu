@@ -496,3 +496,42 @@ fn extract_timestamp(wordvec: &Vec<&str>, mut idx: usize) -> String {
 	}
 	return timestamp.to_string();
 }
+
+pub fn create_clone_url(git_url: &str, access_token: &str, repo_provider: &str) -> Option<String> {
+	let mut clone_url = None;
+	if repo_provider == "github" {
+		clone_url = Some(git_url.to_string()
+			.replace("git@", format!("https://x-access-token:{access_token}@").as_str())
+			.replace("github.com:", "github.com/"));
+	} else if repo_provider == "bitbucket" {
+		clone_url = Some(git_url.to_string()
+			.replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
+			.replace("bitbucket.org:", "bitbucket.org/"));
+	}
+	return clone_url;
+}
+
+pub fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str, repo_provider: &str) {
+    let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
+    if clone_url_opt.is_none() {
+        eprintln!("Unable to create clone url for repo provider {:?}, empty clone_url_opt", repo_provider);
+        return;
+    }
+    let clone_url = clone_url_opt.expect("empty clone_url_opt");
+    let output = Command::new("git")
+		.arg("remote").arg("set-url").arg("origin")
+		.arg(clone_url)
+		.current_dir(directory)
+		.output()
+		.expect("failed to execute git pull");
+    // Only for debug purposes
+	match str::from_utf8(&output.stderr) {
+		Ok(v) => println!("set_git_url stderr = {:?}", v),
+		Err(e) => eprintln!("set_git_url stderr error: {}", e), 
+	};
+	match str::from_utf8(&output.stdout) {
+		Ok(v) => println!("set_git_urll stdout = {:?}", v),
+		Err(e) => eprintln!("set_git_url stdout error: {}", e), 
+	};
+	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
+}

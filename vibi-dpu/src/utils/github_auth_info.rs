@@ -2,20 +2,20 @@ use serde::Deserialize;
 use serde::Serialize;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct AuthInfo {
+pub struct GithubAuthInfo {
     access_token: String,
-    refresh_token: String,
-    expires_in: u64,
+    installation_id: String,
+    expires_at: u64,
     timestamp: Option<u64>,
 }
 
-impl AuthInfo {
+impl GithubAuthInfo {
     // Constructor
-    pub fn new(access_token: String, refresh_token: String, expires_in: u64, timestamp: Option<u64>) -> Self {
+    pub fn new(access_token: String, installation_id: String, expires_at: u64, timestamp: Option<u64>) -> Self {
         Self {
             access_token,
-            refresh_token,
-            expires_in,
+            installation_id,
+            expires_at,
             timestamp,
         }
     }
@@ -25,12 +25,12 @@ impl AuthInfo {
         &self.access_token
     }
 
-    pub fn refresh_token(&self) -> &String {
-        &self.refresh_token
+    pub fn installation_id(&self) -> &String {
+        &self.installation_id
     }
 
-    pub fn expires_in(&self) -> u64 {
-        self.expires_in
+    pub fn expires_at(&self) -> u64 {
+        self.expires_at
     }
 
     pub fn timestamp(&self) -> &Option<u64> {

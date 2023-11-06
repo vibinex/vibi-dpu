@@ -8,7 +8,7 @@ pub struct Repository {
     owner: String,
     is_private: bool,
     clone_ssh_url: String,
-    project: String,
+    project: Option<String>,
     workspace: String,
     local_dir: Option<String>,
     provider: String,
@@ -22,7 +22,7 @@ impl Repository {
         owner: String,
         is_private: bool,
         clone_ssh_url: String,
-        project: String,
+        project: Option<String>,
         workspace: String,
         local_dir: Option<String>,
         provider: String,
@@ -61,7 +61,7 @@ impl Repository {
         &self.clone_ssh_url
     }
 
-    pub fn project(&self) -> &String {
+    pub fn project(&self) -> &Option<String> {
         &self.project
     }
 
