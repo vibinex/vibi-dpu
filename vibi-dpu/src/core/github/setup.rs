@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::github::auth::fetch_access_token; // Import shared utilities
 use crate::utils::setup_info::SetupInfo;
+use crate::github::repos::get_github_app_installed_repos;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct PublishRequestGithub {
@@ -24,6 +25,8 @@ pub async fn handle_install_github(installation_code: &str) {
     let authinfo = authinfo_opt.expect("Empty authinfo_opt");
     let access_token = authinfo.access_token().clone();
     let mut pubreqs: Vec<SetupInfo> = Vec::new();
+
+    let repos = get_github_app_installed_repos(&access_token).await;
 
     // 2. Fetch user repositories and other necessary data
     // 3. Process webhooks or other setup tasks
