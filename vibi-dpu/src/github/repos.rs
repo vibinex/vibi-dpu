@@ -33,5 +33,6 @@ pub async fn get_github_app_installed_repos(access_token: &str) -> Option<Vec<Re
         save_repo_to_db(&val);
         repos_data.push(val);
     }
+    println(format!("Fetched {} repositories from GitHub", repos_data));
     Some(repos_data)
 }

@@ -11,3 +11,4 @@ pub mod lineitem;
 pub mod repo_config;
 pub mod pr_info;
 pub mod reqwest_client;
+pub mod setup_info;

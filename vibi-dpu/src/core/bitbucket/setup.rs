@@ -16,13 +16,7 @@ use crate::bitbucket::prs::{list_prs_bitbucket, get_and_store_pr_info};
 use crate::db::repo::save_repo_to_db;
 use crate::db::webhook::save_webhook_to_db;
 use crate::utils::repo::Repository;
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct SetupInfo {
-    provider: String,
-    owner: String,
-    repos: Vec<String>,
-}
+use crate::utils::setup_info::SetupInfo;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct PublishRequest {
@@ -89,7 +83,8 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
         pubreqs.push(SetupInfo {
             provider: "bitbucket".to_owned(),
             owner: workspace_slug.clone(),
-            repos: reponames });
+            repos: reponames
+        });
     } 
     send_setup_info(&pubreqs).await;
 }
