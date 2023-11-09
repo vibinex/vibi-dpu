@@ -1,53 +1,56 @@
 use std::env;
+use std::collections::HashMap;
 
 use reqwest::{header::HeaderValue, Response, Error};
-use serde_json::json;
+use serde_json::{json, Value};
 
-use crate::{db::webhook::save_webhook_to_db, utils::bitbucket_webhook::{Webhook, WebhookResponse}, bitbucket::config::{bitbucket_base_url, get_api_values}};
+use crate::{db::webhook::save_webhook_to_db, utils::github_webhook::Webhook, github::config::{github_base_url, get_api_values}};
 use crate::utils::reqwest_client::get_client;
-use super::config::prepare_auth_headers;
+use super::config::prepare_headers;
 
 
-pub async fn get_webhooks_in_repo(workspace_slug: &str, repo_slug: &str, access_token: &str) -> Vec<Webhook> {
-    let url = format!("{}/repositories/{}/{}/hooks", bitbucket_base_url(), workspace_slug, repo_slug);
+pub async fn get_webhooks_in_repo(repo_owner: &str, repo_name: &str, access_token: &str) -> Vec<Webhook> {
+    let url = format!("{}/repos/{}/{}/hooks", github_base_url(), repo_owner, repo_name);
     println!("Getting webhooks from {}", url);
     let response_json = get_api_values(&url, access_token, None).await;
     let mut webhooks = Vec::new();
     for webhook_json in response_json {
         let active = matches!(webhook_json["active"].to_string().trim_matches('"'), "true" | "false");
         let webhook = Webhook::new(
-            webhook_json["uuid"].to_string(),
+            webhook_json["id"].to_string(),
             active,
             webhook_json["created_at"].to_string().replace('"', ""),
             webhook_json["events"].as_array().expect("Unable to deserialize events").into_iter()
                 .map(|events| events.as_str().expect("Unable to convert event").to_string()).collect(),
-            webhook_json["links"]["self"]["href"].to_string().replace('"', ""),
+            webhook_json["ping_url"].to_string().replace('"', ""),
             webhook_json["url"].to_string().replace('"', ""),
+            webhook_json.get("config")
+                .and_then(Value::as_object)
+                .map(|config_obj| {
+                    config_obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect::<HashMap<String, Value>>()
+                }).expect("Config should be a JSON object")
         );
         webhooks.push(webhook);
     }
     return webhooks;
 }
 
-pub async fn add_webhook(workspace_slug: &str, repo_slug: &str, access_token: &str) {
-    let url = format!(
-        "{}/repositories/{}/{}/hooks", 
-        bitbucket_base_url(), workspace_slug, repo_slug
-    );
+pub async fn add_webhook(repo_owner: &str, repo_name: &str, access_token: &str) {
+    let url = format!("{}/repos/{}/{}/hooks", github_base_url(), repo_owner, repo_name);
 
-    let headers_map_opt = prepare_auth_headers(&access_token);
+    let headers_map_opt = prepare_headers(&access_token);
     if headers_map_opt.is_none() {
         return;
     }
     let mut headers_map = headers_map_opt.expect("Empty headers_map_opt");
     headers_map.insert("Accept", HeaderValue::from_static("application/vnd.github+json"));
-    let callback_url = format!("{}/api/bitbucket/callbacks/webhook", 
+    let callback_url = format!("{}/api/github/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
     let payload = json!({
-        "description": "Webhook for PRs when raised and when something is pushed to the open PRs",
-        "url": callback_url,
+        "name": "pullrequest webhook fro pr related events", 
+        "events": ["push", "pull_request", "pull_request_review"],
+        "config": { "url": callback_url, "content_type":"json", "insecure_ssl":"0"},
         "active": true,
-        "events": ["pullrequest:created", "pullrequest:updated"] 
     });
     let response = get_client()
         .post(&url)
@@ -70,7 +73,7 @@ async fn process_add_webhook_response(response: Result<Response, Error>){
             res.status(), res.text().await);
         return;
     }
-    let webhook_res = res.json::<WebhookResponse>().await;
+    let webhook_res = res.json::<Webhook>().await;
     if webhook_res.is_err() {
         let err = webhook_res.expect_err("No error in webhook response");
         eprintln!("Failed to parse webhook_res: {:?}", err);
@@ -78,12 +81,13 @@ async fn process_add_webhook_response(response: Result<Response, Error>){
     }
     let webhook = webhook_res.expect("Uncaught error in webhook response");
     let webhook_data = Webhook::new(
-        webhook.uuid().to_string(),
+        webhook.id().to_string(),
         webhook.active(),
         webhook.created_at().to_string(),
         webhook.events().to_owned(),
-        webhook.links()["self"]["href"].clone(),
+        webhook.ping_url().clone(),
         webhook.url().to_string(),
+        webhook.config().clone()
     );
     save_webhook_to_db(&webhook_data); 
 }
