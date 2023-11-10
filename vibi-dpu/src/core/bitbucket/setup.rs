@@ -79,8 +79,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 }
 
 async fn process_webhooks(workspace_slug: String, repo_name: String, access_token: String) {
-    let webhooks_data = get_webhooks_in_repo(
-        &workspace_slug, &repo_name, &access_token).await;
+    let webhooks_data = get_webhooks_in_repo(&workspace_slug, &repo_name, &access_token).await;
     let webhook_callback_url = format!("{}/api/bitbucket/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
     if webhooks_data.is_empty() {
