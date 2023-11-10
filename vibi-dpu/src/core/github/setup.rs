@@ -3,7 +3,8 @@ use std::env;
 use std::str;
 use tokio::task;
 
-use crate::github::auth::fetch_access_token; // Import shared utilities
+use crate::github::auth::fetch_access_token; use crate::github::prs::{list_prs_github, get_and_store_pr_info};
+// Import shared utilities
 use crate::utils::setup_info::SetupInfo;
 use crate::github::repos::get_github_app_installed_repos;
 use crate::utils::gitops::clone_git_repo;
@@ -47,9 +48,9 @@ pub async fn handle_install_github(installation_code: &str) {
         let repo_name_async = repo_name.clone();
         let repo_owner_async = repo_owner.clone();
         let access_token_async = access_token.clone();
-        // task::spawn(async move {
-        //     process_prs(&repo_owner_async, &repo_name_async, &access_token_async).await
-        // })
+        task::spawn(async move {
+            process_prs(&repo_owner_async, &repo_name_async, &access_token_async).await;
+        });
     }
     pubreqs.push(SetupInfo {
         provider: "github".to_owned(),
@@ -98,6 +99,22 @@ async fn process_webhooks(repo_owner: String, repo_name: String, access_token: S
     save_webhook_to_db(&webhook);
 }
 
-async fn process_prs(repo_owner: &String, repo_name: &String, access_token: &String) {
+async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access_token_async: &String) {
+    let pr_list_opt = list_prs_github(&repo_owner_async, &repo_name_async, &access_token_async, "OPEN").await;
+    if pr_list_opt.is_none() {
+        println!("No open pull requests found for processing.");
+        return;
+    }
+    let pr_list = pr_list_opt.expect("Empty pr_list_opt");
 
+    for pr_id in &pr_list {
+        let repo_owner = repo_owner_async.clone(); //Instead of cloning each time, I could have used ARC but not sure what is the best way.
+        let repo_name = repo_name_async.clone();
+        let access_token = access_token_async.clone();
+        let pr_id_async = pr_id.clone();
+        task::spawn(async move {
+            get_and_store_pr_info(&repo_owner, &repo_name, &access_token, &pr_id_async).await;
+        });
+    }
+    
 }

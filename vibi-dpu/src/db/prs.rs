@@ -3,8 +3,8 @@ use sled::IVec;
 use crate::db::config::get_db;
 use crate::utils::pr_info::PrInfo;
 
-pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info: &PrInfo, pr_number: &str) {
-    let key = format!("pr_info/{}/{}/{}/{}", "bitbucket", workspace_slug, repo_slug, pr_number);
+pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info: &PrInfo, pr_number: &str, repo_provider: &str) {
+    let key = format!("pr_info/{}/{}/{}/{}", repo_provider, workspace_slug, repo_slug, pr_number);
     let db = get_db();
 
     let pr_info_json_result = serde_json::to_vec(&pr_info);
@@ -49,7 +49,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
         return false; // commits are the same
     } else {
         println!("[process_and_update_pr_if_different|update_pr_info_in_db] workspace_slug: {}, repo_slug: {}, pr_info_parsed: {:?}, pr_number: {}", &workspace_slug, &repo_slug, &pr_info_parsed, &pr_number);
-        update_pr_info_in_db(&workspace_slug, &repo_slug, &pr_info_parsed, &pr_number).await;
+        update_pr_info_in_db(&workspace_slug, &repo_slug, &pr_info_parsed, &pr_number, repo_provider).await;
         return true; // commits are different, and PR info should be updated
     }
 }
@@ -87,7 +87,7 @@ pub async fn get_pr_info_from_db(workspace_slug: &str, repo_slug: &str, pr_numbe
     let pr_info_opt = pr_info_res.expect("Uncaught error in pr_info res");
     if pr_info_opt.is_none() {
         eprintln!("No bitbucket pr info in db");
-        update_pr_info_in_db(&workspace_slug, &repo_slug, pr_info_parsed, &pr_number).await;
+        update_pr_info_in_db(&workspace_slug, &repo_slug, pr_info_parsed, &pr_number, repo_provider).await;
         return None; //If no info in db then it will be considered as new commit
     }
 

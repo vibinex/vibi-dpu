@@ -79,12 +79,7 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
     return Some(pr_list);
 }
 
-pub async fn get_pr_info(
-    workspace_slug: &str,
-    repo_slug: &str,
-    access_token: &str,
-    pr_number: &str,
-) -> Option<PrInfo> {
+pub async fn get_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str,pr_number: &str) -> Option<PrInfo> {
     let base_url = bitbucket_base_url();
     let url = format!(
         "{}/repositories/{}/{}/pullrequests/{}",
@@ -121,15 +116,11 @@ pub async fn get_pr_info(
     Some(pr_info)
 }
 
-pub async fn get_and_store_pr_info(
-    workspace_slug: &str,
-    repo_slug: &str,
-    access_token: &str,
-    pr_number: &str,
-) {
+pub async fn get_and_store_pr_info(workspace_slug: &str, repo_slug: &str, access_token: &str, pr_number: &str) {
+    let repo_provider = "bitbucket";
     if let Some(pr_info) = get_pr_info(workspace_slug, repo_slug, access_token, pr_number).await {
         // If PR information is available, store it in the database
-        update_pr_info_in_db(workspace_slug, repo_slug, &pr_info, pr_number).await;
+        update_pr_info_in_db(workspace_slug, repo_slug, &pr_info, pr_number, repo_provider).await;
     } else {
         eprintln!(
             "No PR info available for PR number: {:?} repository: {:?} repo_owner{:?}",
