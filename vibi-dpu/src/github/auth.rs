@@ -83,6 +83,7 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo>
             );
             return None;
         }
+        println!("[fetch_access_token] response access token = {:?}", &response_access_token);
         let parse_res = response_access_token.json::<GithubAuthInfo>().await ;
         if parse_res.is_err() {
             let e = parse_res.expect_err("No error in parse_res for AuthInfo");
