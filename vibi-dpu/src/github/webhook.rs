@@ -73,7 +73,6 @@ async fn process_add_webhook_response(response: Result<Response, Error>){
         return;
     }
     let webhook_json = res.json::<Value>().await.expect("[process_add_webhook_response] Unable to deserialize res to Value");
-    println!("Webhook val = {:?}", &webhook_json);
     let webhook = Webhook::new(
         webhook_json["id"].to_string(),
         webhook_json["active"].as_bool().expect("Unable to deserialize active"),
