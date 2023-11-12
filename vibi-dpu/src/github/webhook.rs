@@ -46,7 +46,7 @@ pub async fn add_webhook(repo_owner: &str, repo_name: &str, access_token: &str) 
     let callback_url = format!("{}/api/github/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
     let payload = json!({
-        "name": "vibinex-webhook-pr-events", 
+        "name": "web", 
         "events": ["push", "pull_request", "pull_request_review"],
         "config": { "url": callback_url, "content_type":"json", "insecure_ssl":"0"},
         "active": true,
