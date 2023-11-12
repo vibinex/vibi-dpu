@@ -23,7 +23,7 @@ pub async fn get_webhooks_in_repo(repo_owner: &str, repo_name: &str, access_toke
             webhook_json["events"].as_array().expect("Unable to deserialize events").into_iter()
                 .map(|events| events.as_str().expect("Unable to convert event").to_string()).collect(),
             webhook_json["ping_url"].to_string().replace('"', ""),
-            webhook_json["url"].to_string().replace('"', ""),
+            webhook_json["config"]["url"].to_string().replace('"', ""),
             webhook_json.get("config")
                 .and_then(Value::as_object)
                 .map(|config_obj| {
@@ -80,7 +80,7 @@ async fn process_add_webhook_response(response: Result<Response, Error>){
         webhook_json["events"].as_array().expect("Unable to deserialize events").into_iter()
             .map(|events| events.as_str().expect("Unable to convert event").to_string()).collect(),
         webhook_json["ping_url"].to_string().replace('"', ""),
-        webhook_json["url"].to_string().replace('"', ""),
+        webhook_json["config"]["url"].to_string().replace('"', ""),
         webhook_json.get("config")
             .and_then(Value::as_object)
             .map(|config_obj| {
