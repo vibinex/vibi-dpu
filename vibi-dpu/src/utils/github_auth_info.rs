@@ -3,7 +3,7 @@ use serde::Serialize;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GithubAuthInfo {
-    access_token: String,
+    token: String,
     installation_id: String,
     expires_at: String,
     timestamp: Option<u64>,
@@ -11,9 +11,9 @@ pub struct GithubAuthInfo {
 
 impl GithubAuthInfo {
     // Constructor
-    pub fn new(access_token: String, installation_id: String, expires_at: String, timestamp: Option<u64>) -> Self {
+    pub fn new(token: String, installation_id: String, expires_at: String, timestamp: Option<u64>) -> Self {
         Self {
-            access_token,
+            token,
             installation_id,
             expires_at,
             timestamp,
@@ -21,8 +21,8 @@ impl GithubAuthInfo {
     }
 
     // Public getter methods
-    pub fn access_token(&self) -> &String {
-        &self.access_token
+    pub fn token(&self) -> &String {
+        &self.token
     }
 
     pub fn installation_id(&self) -> &String {

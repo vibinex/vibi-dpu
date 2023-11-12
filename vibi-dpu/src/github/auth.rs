@@ -117,7 +117,7 @@ pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, di
     let mut new_auth_info = new_auth_info_opt.clone()
         .expect("empty auhtinfo_opt from update_access_token");
     println!("New github auth info  = {:?}", &new_auth_info);
-    let access_token = new_auth_info.access_token().to_string();
+    let access_token = new_auth_info.token().to_string();
     set_git_remote_url(clone_url, directory, &access_token, &repo_provider);
     save_github_auth_info_to_db(&mut new_auth_info);
     return new_auth_info_opt;
@@ -136,7 +136,7 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
         return None;
     }
     let latest_authinfo = authinfo_opt.expect("Empty authinfo_opt");
-    let access_token = latest_authinfo.access_token().to_string();
+    let access_token = latest_authinfo.token().to_string();
     return Some(access_token);
 }
 
