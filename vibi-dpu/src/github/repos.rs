@@ -17,7 +17,7 @@ pub async fn get_github_app_installed_repos(access_token: &str) -> Option<Vec<Re
             repo_json["id"].to_string().trim_matches('"').to_string(),
             repo_json["owner"]["login"].to_string().trim_matches('"').to_string(),
             is_private,
-            repo_json["ssh_url"].to_string(), // TODO - fix this, as_array might not be required
+            repo_json["ssh_url"].to_string().trim_matches('"').to_string(),
             None,    
             repo_json["owner"]["login"].to_string().trim_matches('"').to_string(),
             None,
