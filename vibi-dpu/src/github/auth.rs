@@ -108,11 +108,11 @@ pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, di
     let expires_at_dt = expires_at_dt_res.expect("Uncaught error in expires_at_dt_res");
     let expires_at_ts = expires_at_dt.timestamp();
     if expires_at_ts > now_ts {  
-        eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
+        eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
         return Some(auth_info.to_owned());
     }
     // auth info has expired
-    println!("github auth info expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
+    println!("github auth info expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
     let new_auth_info_opt = fetch_access_token(app_installation_id.as_str()).await;
     let mut new_auth_info = new_auth_info_opt.clone()
         .expect("empty auhtinfo_opt from update_access_token");
