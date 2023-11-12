@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use reqwest::{header::HeaderValue, Response, Error};
 use serde_json::{json, Value};
 
-use crate::{db::webhook::save_webhook_to_db, utils::github_webhook::Webhook, github::config::{github_base_url, get_api_values}};
+use crate::{db::webhook::save_webhook_to_db, utils::github_webhook::Webhook, github::config::{github_base_url, get_api_values, get_webhook_api_values}};
 use crate::utils::reqwest_client::get_client;
 use super::config::prepare_headers;
 
@@ -12,7 +12,7 @@ use super::config::prepare_headers;
 pub async fn get_webhooks_in_repo(repo_owner: &str, repo_name: &str, access_token: &str) -> Vec<Webhook> {
     let url = format!("{}/repos/{}/{}/hooks", github_base_url(), repo_owner, repo_name);
     println!("Getting webhooks from {}", url);
-    let response_json = get_api_values(&url, access_token, None).await;
+    let response_json = get_webhook_api_values(&url, access_token, None).await;
     let mut webhooks = Vec::new();
     for webhook_json in response_json {
         let active = matches!(webhook_json["active"].to_string().trim_matches('"'), "true" | "false");
