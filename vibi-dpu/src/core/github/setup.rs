@@ -22,7 +22,7 @@ pub async fn handle_install_github(installation_code: &str) {
         return;
     }
     let auth_info = auth_info_opt.expect("Empty authinfo_opt");
-    let access_token = auth_info.access_token().clone();
+    let access_token = auth_info.token().clone();
     
     let mut pubreqs: Vec<SetupInfo> = Vec::new();
     let repos_opt = get_github_app_installed_repos(&access_token).await;
