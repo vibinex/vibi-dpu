@@ -66,19 +66,6 @@ async fn process_webhooks(repo_owner: String, repo_name: String, access_token: S
     let webhooks_data = get_webhooks_in_repo(&repo_owner, &repo_name, &access_token).await;
     let webhook_callback_url = format!("{}/api/github/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
-    if webhooks_data.is_empty() {
-        println!("Adding new webhook...");
-        let repo_name_async = repo_name.clone();
-        let repo_owner_async = repo_owner.clone();
-        let access_token_async = access_token.clone();
-        task::spawn(async move {
-            add_webhook(
-                &repo_owner_async, 
-                &repo_name_async, 
-                &access_token_async).await;
-        });
-        return;
-    }
     let matching_webhook = webhooks_data.into_iter()
         .find(|w| w.url().to_string() == webhook_callback_url);
     if matching_webhook.is_none() {
