@@ -4,19 +4,17 @@ use serde::Serialize;
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GithubAuthInfo {
     token: String,
-    installation_id: String,
     expires_at: String,
-    timestamp: Option<u64>,
+    installation_id: Option<String>
 }
 
 impl GithubAuthInfo {
     // Constructor
-    pub fn new(token: String, installation_id: String, expires_at: String, timestamp: Option<u64>) -> Self {
+    pub fn new(token: String, expires_at: String, installation_id: Option<String>) -> Self {
         Self {
             token,
-            installation_id,
             expires_at,
-            timestamp,
+            installation_id,
         }
     }
 
@@ -25,20 +23,15 @@ impl GithubAuthInfo {
         &self.token
     }
 
-    pub fn installation_id(&self) -> &String {
-        &self.installation_id
-    }
-
     pub fn expires_at(&self) -> &String {
         &self.expires_at
     }
 
-    pub fn timestamp(&self) -> &Option<u64> {
-        &self.timestamp
+    pub fn installation_id(&self) -> &Option<String> {
+        &self.installation_id
     }
 
-    // Public setters
-    pub fn set_timestamp(&mut self, timestamp: u64) {
-        self.timestamp = Some(timestamp);
+    pub fn set_installation_id(&mut self, installation_id: &str) {
+        self.installation_id = Some(installation_id.to_string());
     }
 }
