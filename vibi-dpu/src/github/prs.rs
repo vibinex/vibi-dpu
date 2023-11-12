@@ -62,7 +62,7 @@ async fn get_list_prs_github(headers: &HeaderMap, params: &HashMap<String, Strin
     }
     let prs_data = parse_result.expect("Uncaught error in parsing PRs data");
 
-    let pr_list = prs_data["items"].as_array()
+    let pr_list = prs_data.as_array()
         .expect("Expected an array of PRs")
         .iter()
         .map(|pr| pr["number"].to_string())
