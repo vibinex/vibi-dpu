@@ -72,14 +72,21 @@ async fn process_add_webhook_response(response: Result<Response, Error>){
             res.status(), res.text().await);
         return;
     }
-    let webhook_val = res.json::<Value>().await.expect("[process_add_webhook_response] Unable to deserialize res to Value");
-    println!("Webhook val = {:?}", &webhook_val);
-    let webhook_res = serde_json::from_value::<Webhook>(webhook_val);
-    if webhook_res.is_err() {
-        let err = webhook_res.expect_err("No error in webhook response");
-        eprintln!("Failed to parse webhook_res: {:?}", err);
-        return;
-    }
-    let webhook = webhook_res.expect("Uncaught error in webhook response");
+    let webhook_json = res.json::<Value>().await.expect("[process_add_webhook_response] Unable to deserialize res to Value");
+    println!("Webhook val = {:?}", &webhook_json);
+    let webhook = Webhook::new(
+        webhook_json["id"].to_string(),
+        webhook_json["active"].as_bool().expect("Unable to deserialize active"),
+        webhook_json["created_at"].to_string().replace('"', ""),
+        webhook_json["events"].as_array().expect("Unable to deserialize events").into_iter()
+            .map(|events| events.as_str().expect("Unable to convert event").to_string()).collect(),
+        webhook_json["ping_url"].to_string().replace('"', ""),
+        webhook_json["url"].to_string().replace('"', ""),
+        webhook_json.get("config")
+            .and_then(Value::as_object)
+            .map(|config_obj| {
+                config_obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect::<HashMap<String, Value>>()
+            }).expect("Config should be a JSON object")
+    );
     save_webhook_to_db(&webhook); 
 }
