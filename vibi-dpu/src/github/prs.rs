@@ -1,6 +1,6 @@
 use crate::db::prs::update_pr_info_in_db;
 use crate::utils::{pr_info::PrInfo, reqwest_client::get_client};
-use reqwest::header::HeaderMap;
+use reqwest::header::{HeaderMap, USER_AGENT};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str;
@@ -78,12 +78,12 @@ pub async fn get_pr_info_github(repo_owner: &str, repo_name: &str, access_token:
         &base_url, repo_owner, repo_name, pr_number
     );
     println!("[get_pr_info_github] URL: {:?}", &url);
-
     let client = get_client();
     let response_result = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", access_token))
         .header("Accept", "application/json")
+        .header(USER_AGENT, "Vibinex code review Test App")
         .send()
         .await;
 
