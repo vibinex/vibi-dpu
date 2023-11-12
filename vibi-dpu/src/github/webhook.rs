@@ -72,21 +72,14 @@ async fn process_add_webhook_response(response: Result<Response, Error>){
             res.status(), res.text().await);
         return;
     }
-    let webhook_res = res.json::<Webhook>().await;
+    let webhook_val = res.json::<Value>().await.expect("[process_add_webhook_response] Unable to deserialize res to Value");
+    println!("Webhook val = {:?}", &webhook_val);
+    let webhook_res = serde_json::from_value::<Webhook>(webhook_val);
     if webhook_res.is_err() {
         let err = webhook_res.expect_err("No error in webhook response");
         eprintln!("Failed to parse webhook_res: {:?}", err);
         return;
     }
     let webhook = webhook_res.expect("Uncaught error in webhook response");
-    let webhook_data = Webhook::new(
-        webhook.id().to_string(),
-        webhook.active(),
-        webhook.created_at().to_string(),
-        webhook.events().to_owned(),
-        webhook.ping_url().clone(),
-        webhook.url().to_string(),
-        webhook.config().clone()
-    );
-    save_webhook_to_db(&webhook_data); 
+    save_webhook_to_db(&webhook); 
 }
