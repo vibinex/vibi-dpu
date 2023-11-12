@@ -42,12 +42,11 @@ pub async fn add_webhook(repo_owner: &str, repo_name: &str, access_token: &str) 
     if headers_map_opt.is_none() {
         return;
     }
-    let mut headers_map = headers_map_opt.expect("Empty headers_map_opt");
-    headers_map.insert("Accept", HeaderValue::from_static("application/vnd.github+json"));
+    let headers_map = headers_map_opt.expect("Empty headers_map_opt");
     let callback_url = format!("{}/api/github/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
     let payload = json!({
-        "name": "pullrequest webhook fro pr related events", 
+        "name": "vibinex-webhook-pr-events", 
         "events": ["push", "pull_request", "pull_request_review"],
         "config": { "url": callback_url, "content_type":"json", "insecure_ssl":"0"},
         "active": true,
