@@ -1,5 +1,3 @@
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
 use sled::IVec;
 
 use crate::db::config::get_db;
@@ -7,9 +5,6 @@ use crate::utils::github_auth_info::GithubAuthInfo;
 
 pub fn save_github_auth_info_to_db(auth_info: &mut GithubAuthInfo) {
     let db = get_db();
-    let now = SystemTime::now();
-    let since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");  
-    auth_info.set_timestamp(since_epoch.as_secs());
     println!("auth info = {:?}", &auth_info);
     let json = serde_json::to_string(&auth_info).expect("Failed to serialize auth info");
     // Convert JSON string to bytes

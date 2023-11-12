@@ -91,13 +91,19 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo>
             return None;
         }
         let mut response_json = parse_res.expect("Uncaught error in parse_res for AuthInfo");
+        response_json.set_installation_id(installation_id);
         save_github_auth_info_to_db(&mut response_json);
         return Some(response_json);
 }
 
 pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, directory: &str) -> Option<GithubAuthInfo> {
     let repo_provider = "github".to_string();
-	let app_installation_id = auth_info.installation_id(); 
+	let app_installation_id_opt = auth_info.installation_id().to_owned();
+    if app_installation_id_opt.is_none() {
+        eprintln!("[update_access_token] app_installation_id empty");
+        return None;
+    }
+    let app_installation_id = app_installation_id_opt.expect("Empty app_installation_id_opt");
     let now_ts = Utc::now().timestamp();
     let expires_at = auth_info.expires_at();
     let expires_at_dt_res = DateTime::parse_from_rfc3339(expires_at);
