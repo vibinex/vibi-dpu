@@ -5,13 +5,13 @@ use serde::Serialize;
 pub struct GithubAuthInfo {
     access_token: String,
     installation_id: String,
-    expires_at: u64,
+    expires_at: String,
     timestamp: Option<u64>,
 }
 
 impl GithubAuthInfo {
     // Constructor
-    pub fn new(access_token: String, installation_id: String, expires_at: u64, timestamp: Option<u64>) -> Self {
+    pub fn new(access_token: String, installation_id: String, expires_at: String, timestamp: Option<u64>) -> Self {
         Self {
             access_token,
             installation_id,
@@ -29,8 +29,8 @@ impl GithubAuthInfo {
         &self.installation_id
     }
 
-    pub fn expires_at(&self) -> u64 {
-        self.expires_at
+    pub fn expires_at(&self) -> &String {
+        &self.expires_at
     }
 
     pub fn timestamp(&self) -> &Option<u64> {

@@ -1,3 +1,4 @@
+use chrono::DateTime;
 use jsonwebtoken::{encode, Header, EncodingKey, Algorithm};
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
@@ -96,10 +97,17 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo>
 pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, directory: &str) -> Option<GithubAuthInfo> {
     let repo_provider = "github".to_string();
 	let app_installation_id = auth_info.installation_id(); 
-	let now = SystemTime::now();
-    let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
+    let now_ts = Utc::now().timestamp();
     let expires_at = auth_info.expires_at();
-    if expires_at > now_secs {  
+    let expires_at_dt_res = DateTime::parse_from_rfc3339(expires_at);
+    if expires_at_dt_res.is_err() {
+        let e = expires_at_dt_res.expect_err("No error in expires_at_dt_res");
+        eprintln!("[update_access_token] Unable to parse expires_at to datetime: {:?}", e);
+        return None;
+    }
+    let expires_at_dt = expires_at_dt_res.expect("Uncaught error in expires_at_dt_res");
+    let expires_at_ts = expires_at_dt.timestamp();
+    if expires_at_ts > now_ts {  
         eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
         return Some(auth_info.to_owned());
     }
