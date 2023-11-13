@@ -1,3 +1,4 @@
+use chrono::DateTime;
 use jsonwebtoken::{encode, Header, EncodingKey, Algorithm};
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
@@ -89,27 +90,40 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo>
             return None;
         }
         let mut response_json = parse_res.expect("Uncaught error in parse_res for AuthInfo");
+        response_json.set_installation_id(installation_id);
         save_github_auth_info_to_db(&mut response_json);
         return Some(response_json);
 }
 
 pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, directory: &str) -> Option<GithubAuthInfo> {
     let repo_provider = "github".to_string();
-	let app_installation_id = auth_info.installation_id(); 
-	let now = SystemTime::now();
-    let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
+	let app_installation_id_opt = auth_info.installation_id().to_owned();
+    if app_installation_id_opt.is_none() {
+        eprintln!("[update_access_token] app_installation_id empty");
+        return None;
+    }
+    let app_installation_id = app_installation_id_opt.expect("Empty app_installation_id_opt");
+    let now_ts = Utc::now().timestamp();
     let expires_at = auth_info.expires_at();
-    if expires_at > now_secs {  
-        eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
+    let expires_at_dt_res = DateTime::parse_from_rfc3339(expires_at);
+    if expires_at_dt_res.is_err() {
+        let e = expires_at_dt_res.expect_err("No error in expires_at_dt_res");
+        eprintln!("[update_access_token] Unable to parse expires_at to datetime: {:?}", e);
+        return None;
+    }
+    let expires_at_dt = expires_at_dt_res.expect("Uncaught error in expires_at_dt_res");
+    let expires_at_ts = expires_at_dt.timestamp();
+    if expires_at_ts > now_ts {  
+        eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
         return Some(auth_info.to_owned());
     }
     // auth info has expired
-    println!("github auth info expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
+    println!("github auth info expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
     let new_auth_info_opt = fetch_access_token(app_installation_id.as_str()).await;
     let mut new_auth_info = new_auth_info_opt.clone()
         .expect("empty auhtinfo_opt from update_access_token");
     println!("New github auth info  = {:?}", &new_auth_info);
-    let access_token = new_auth_info.access_token().to_string();
+    let access_token = new_auth_info.token().to_string();
     set_git_remote_url(clone_url, directory, &access_token, &repo_provider);
     save_github_auth_info_to_db(&mut new_auth_info);
     return new_auth_info_opt;
@@ -128,7 +142,7 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
         return None;
     }
     let latest_authinfo = authinfo_opt.expect("Empty authinfo_opt");
-    let access_token = latest_authinfo.access_token().to_string();
+    let access_token = latest_authinfo.token().to_string();
     return Some(access_token);
 }
 
