@@ -29,11 +29,11 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
     println!("PR info updated successfully in the database. {:?} {:?}", key, pr_info);
 }
 
-pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str) -> bool {
-    println!("[process_and_update_pr_if_different] {:?}, {:?}, {:?}, {:?}", workspace_slug, repo_slug, pr_number, repo_provider);
-    let pr_info_parsed_opt = parse_webhook_data(webhook_data);
+pub async fn bitbucket_process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str) -> bool {
+    println!("[bitbucket_process_and_update_pr_if_different] {:?}, {:?}, {:?}, {:?}", workspace_slug, repo_slug, pr_number, repo_provider);
+    let pr_info_parsed_opt = parse_bitbucket_webhook_data(webhook_data);
     if pr_info_parsed_opt.is_none() {
-        eprintln!("[process_and_update_pr_if_different] Unable to parse webhook data");
+        eprintln!("[bitbucket_process_and_update_pr_if_different] Unable to parse webhook data");
         return false;
     }
     let pr_info_parsed = pr_info_parsed_opt.expect("Empty pr_info_parsed_opt");
@@ -41,7 +41,7 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     print!("[process_and_update_pr_if_different|get_pr_info_from_db] workspace_slug: {}, repo_slug: {},  pr_number: {}, pr_info_parsed: {:?}", &workspace_slug, &repo_slug,  &pr_number, &pr_info_parsed); // todo: remove
     let pr_info_db_opt = get_pr_info_from_db(workspace_slug, repo_slug, pr_number, repo_provider, &pr_info_parsed).await;
     if pr_info_db_opt.is_none() {
-        eprintln!("[process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
+        eprintln!("[bitbucket_process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
         return true; // new pr
     }
     let pr_info_db = pr_info_db_opt.expect("Empty pr_info_db_opt");
@@ -54,8 +54,8 @@ pub async fn process_and_update_pr_if_different(webhook_data: &Value, workspace_
     }
 }
 
-fn parse_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
-    println!("[parse_webhook_data] webhook_data: {:?}", &webhook_data);
+fn parse_bitbucket_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
+    println!("[parse_bitbucket_webhook_data] webhook_data: {:?}", &webhook_data);
     let pr_head_commit_raw = webhook_data["pullrequest"]["source"]["commit"]["hash"].to_string();
     let pr_head_commit = pr_head_commit_raw.trim_matches('"');
     let base_head_commit_raw = webhook_data["pullrequest"]["destination"]["commit"]["hash"].to_string();
@@ -86,7 +86,7 @@ pub async fn get_pr_info_from_db(workspace_slug: &str, repo_slug: &str, pr_numbe
 
     let pr_info_opt = pr_info_res.expect("Uncaught error in pr_info res");
     if pr_info_opt.is_none() {
-        eprintln!("No bitbucket pr info in db");
+        eprintln!("No {} pr info in db", repo_provider);
         update_pr_info_in_db(&workspace_slug, &repo_slug, pr_info_parsed, &pr_number, repo_provider).await;
         return None; //If no info in db then it will be considered as new commit
     }
@@ -104,4 +104,50 @@ pub async fn get_pr_info_from_db(workspace_slug: &str, repo_slug: &str, pr_numbe
     }
     let pr_info: PrInfo = pr_info_parse.expect("Failed to deserialize PR info");
     return Some(pr_info);
+}
+
+pub async fn github_process_and_update_pr_if_different(webhook_data: &Value, repo_owner: &str, repo_name: &str, pr_number: &str, repo_provider: &str) -> bool {
+    println!("[github_process_and_update_pr_if_different] {:?}, {:?}, {:?}, {:?}", repo_owner, repo_name, pr_number, repo_provider);
+    let event_action = webhook_data["action"].to_string().trim_matches('"').to_string();
+
+    let pr_info_parsed_opt = parse_github_webhook_data(webhook_data);
+    if pr_info_parsed_opt.is_none() {
+        eprintln!("[github_process_and_update_pr_if_different] Unable to parse webhook data");
+        return false;
+    }
+    let pr_info_parsed = pr_info_parsed_opt.expect("Empty pr_info_parsed_opt");
+
+    if event_action == "opened" {
+        // new PR opened
+        println!("[github_process_and_update_pr_if_different|new_pr_opened] {:?}", pr_info_parsed);
+        update_pr_info_in_db(&repo_owner, &repo_owner, &pr_info_parsed, &pr_number, repo_provider).await;
+        return true;
+    }
+    if event_action == "synchronize" {
+        println!("[github_process_and_update_pr_if_different|update_pr_info_in_db] repo_owner: {}, repo_name: {}, pr_info_parsed: {:?}, pr_number: {}", &repo_owner, &repo_name, &pr_info_parsed, &pr_number);
+        update_pr_info_in_db(&repo_owner, &repo_name, &pr_info_parsed, &pr_number, repo_provider).await;
+        return true // commits are different, and PR info should be updated
+    } else {
+        println!("[github_process_and_update_pr_if_different|no_update_needed] event is not open or synchronize");
+        return false; // event is not open or synchronize
+    }
+}
+
+fn parse_github_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
+    println!("[parse_github_webhook_data] webhook_data: {:?}", &webhook_data);
+    let pr_head_commit_raw = webhook_data["pull_request"]["head"]["sha"].to_string();
+    let pr_head_commit = pr_head_commit_raw.trim_matches('"');
+    let base_head_commit_raw = webhook_data["pull_request"]["base"]["sha"].to_string();
+    let base_head_commit = base_head_commit_raw.trim_matches('"');
+    let pr_state_raw = webhook_data["pull_request"]["state"].to_string();
+    let pr_state = pr_state_raw.trim_matches('"');
+    let pr_branch_raw = webhook_data["pull_request"]["head"]["ref"].to_string();
+    let pr_branch = pr_branch_raw.trim_matches('"');
+    let pr_info = PrInfo { base_head_commit: base_head_commit.to_string(),
+        pr_head_commit: pr_head_commit.to_string(),
+        state: pr_state.to_string(),
+        pr_branch: pr_branch.to_string()
+    };
+    println!("[parse_github_webhook_data] pr_info :{:?}", &pr_info);
+    return Some(pr_info)
 }
