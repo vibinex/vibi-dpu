@@ -95,7 +95,7 @@ pub async fn get_pr_info_github(repo_owner: &str, repo_name: &str, access_token:
 
     let response = response_result.expect("Uncaught error in response");
     if !response.status().is_success() {
-        eprintln!("Failed to get PR info, response: {:?}", response);
+        eprintln!("Failed to get PR info, response: {:?}", response.text().await);
         return None;
     }
 
