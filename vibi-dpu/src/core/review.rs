@@ -12,7 +12,7 @@ use crate::{
 					generate_diff, 
 					process_diffmap, 
 					generate_blame},
-			reqwest_client::get_client}, 
+			reqwest_client::get_client, user::Provider}, 
 	db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, 
 		repo::get_clone_url_clone_dir, 
 		review::save_review_to_db,
@@ -110,6 +110,11 @@ fn parse_review(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)>{
 	let deserialized_data = data_res.expect("Uncaught error in deserializing message_data");
 	println!("deserialized_data == {:?}", &deserialized_data["eventPayload"]["repository"]);
 	let repo_provider = deserialized_data["repositoryProvider"].to_string().trim_matches('"').to_string();
+
+	if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
+
+	}
+	
 	let repo_name = deserialized_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
 	println!("repo NAME == {}", &repo_name);
 	let workspace_name = deserialized_data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
@@ -168,4 +173,33 @@ fn publish_hunkmap(hunkmap: &HunkMap) {
 			}
 		};
 	});
+}
+
+fn create_and_save_bitbucket_review_object(deserialised_data: &Value) {
+	println!("[create_and_save_bitbucket_review_object] deserialised_data {}", deserialised_data);
+	let workspace_name = deserialised_data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
+	let repo_name = deserialised_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
+	let repo_provider = ProviderEnum::Bitbucket.to_string().to_lowercase();
+	let clone_opt = get_clone_url_clone_dir(&repo_provider, &workspace_name, &repo_name);
+	if clone_opt.is_none() {
+		eprintln!("[create_and_save_bitbucket_review_object] Unable to get clone url and directory for bitbucket review");
+		return None;
+	}
+	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");
+	let pr_id = deserialized_data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
+
+	let review = Review::new(
+		deserialized_data["eventPayload"]["pullrequest"]["destination"]["commit"]["hash"].to_string().replace("\"", ""),
+		deserialized_data["eventPayload"]["pullrequest"]["source"]["commit"]["hash"].to_string().replace("\"", ""),
+		pr_id.clone(),
+		repo_name.clone(),
+		workspace_name.clone(),
+		repo_provider.clone(),
+		format!("bitbucket/{}/{}/{}", &workspace_name, &repo_name, &pr_id),
+		clone_dir,
+		clone_url,
+		deserialized_data["eventPayload"]["pullrequest"]["author"]["uuid"].to_string().replace("\"", ""),
+	);
+	println!("review = {:?}", &review);
+	save_review_to_db(&review);
 }
