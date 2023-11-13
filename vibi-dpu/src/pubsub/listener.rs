@@ -40,7 +40,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             let deserialised_msg_data = deserialized_data_opt.expect("Failed to deserialize data");
             
             println!("[webhook_callback | deserialised_msg data] {} ", deserialised_msg_data);
-            let is_reviewable = process_webhook_callback(&deserialised_msg_data).await;
+            let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data).await;
             if is_reviewable {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;
@@ -173,7 +173,7 @@ pub fn deserialized_data(message_data: &Vec<u8>) -> Option<Value> {
     Some(deserialized_data)
 }
 
-async fn process_webhook_callback(deserialised_msg_data: &Value) -> bool {
+async fn process_and_update_pr_if_different(deserialised_msg_data: &Value) -> bool {
     println!("[process_webhook_callback] {}", deserialised_msg_data);
     let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
     let mut is_reviewable = false;
