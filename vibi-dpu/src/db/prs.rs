@@ -124,13 +124,25 @@ pub async fn github_process_and_update_pr_if_different(webhook_data: &Value, rep
         return true;
     }
     if event_action == "synchronize" {
-        println!("[github_process_and_update_pr_if_different|update_pr_info_in_db] repo_owner: {}, repo_name: {}, pr_info_parsed: {:?}, pr_number: {}", &repo_owner, &repo_name, &pr_info_parsed, &pr_number);
+        println!("[github_process_and_update_pr_if_different| event_action synchronise] pr_info_parsed: {:?}", &pr_info_parsed);
         update_pr_info_in_db(&repo_owner, &repo_name, &pr_info_parsed, &pr_number, repo_provider).await;
         return true // commits are different, and PR info should be updated
+    } 
+    if event_action == "submitted" {
+        let event_review_status = webhook_data["review"]["state"].to_string().trim_matches('"').to_string();
+        if event_review_status == "approved" {
+            println!("[github_process_and_update_pr_if_different| pr has been approved] pr_info_parsed: {:?}", &pr_info_parsed);
+            update_pr_info_in_db(&repo_owner, &repo_name, &pr_info_parsed, &pr_number, repo_provider).await;
+            return true
+        } else {
+            println!("[github_process_and_update_pr_if_different|no_update_needed] event is not approved");
+            return false; // event is not open or synchronize
+        }
     } else {
-        println!("[github_process_and_update_pr_if_different|no_update_needed] event is not open or synchronize");
-        return false; // event is not open or synchronize
+        println!("[github_process_and_update_pr_if_different | no update needed] event is not opened or synchronise or approved");
+        return false;
     }
+
 }
 
 fn parse_github_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
