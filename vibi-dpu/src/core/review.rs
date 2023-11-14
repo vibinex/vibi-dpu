@@ -111,22 +111,19 @@ fn parse_review(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)> {
 	let deserialized_data = data_res.expect("Uncaught error in deserializing message_data");
 	println!("deserialized_data == {:?}", &deserialized_data["eventPayload"]["repository"]);
 	let repo_provider = deserialized_data["repositoryProvider"].to_string().trim_matches('"').to_string();
-	let mut review; 
 
-	if repo_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
-		let review_opt = create_and_save_bitbucket_review_object(&deserialized_data);
-		if review_opt.is_none() {
-			return None;
-		}
-		review = review_opt.expect("empty review_opt in parse_review")
+	let review_opt = if repo_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
+		create_and_save_bitbucket_review_object(&deserialized_data)
+	} else if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
+		create_and_save_github_review_object(&deserialized_data)
+	} else {
+		None
+	};
+
+	if review_opt.is_none() {
+		return None;
 	}
-	if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
-		let review_opt = create_and_save_github_review_object(&deserialized_data);
-		if review_opt.is_none() {
-			return None;
-		}
-		review = review_opt.expect("empty review_opt in parse_review");
-	}
+	let review = review_opt.expect("Empty review_opt");
 
 	let repo_config_res = serde_json::from_value(deserialized_data["repoConfig"].clone());
 	if repo_config_res.is_err() {
