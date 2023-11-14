@@ -9,10 +9,6 @@ use rand::{thread_rng, Rng};
 use tokio::fs;
 use std::io::ErrorKind;
 
-use crate::bitbucket;
-use crate::github;
-use crate::utils::user::ProviderEnum;
-
 use super::hunk::BlameItem;
 use super::review::Review;
 use super::lineitem::LineItem;
