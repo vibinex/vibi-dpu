@@ -40,14 +40,3 @@ fn prepare_body(comment_text: &str) -> Value {
         "body": comment_text
     });
 }
-
-// def add_pr_comment(repo_name, repo_owner, pr_number, access_token, body):
-// 	url = f"{github_api}/repos/{repo_owner}/{repo_name}/issues/{pr_number}/comments"
-// 	headers = {
-// 		"Authorization": f"Bearer {access_token}",
-// 		"Accept": "application/vnd.github+json"
-// 	}
-// 	response = requests.post(url, headers=headers, json={"body": body})
-// 	if response.status_code != 201:
-// 		raise Exception(f"Error adding comment on pr {pr_number}: {response.status_code}, {response.content.decode()}")
-// 	return response
