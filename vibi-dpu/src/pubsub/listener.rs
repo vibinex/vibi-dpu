@@ -40,7 +40,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             let deserialised_msg_data = deserialized_data_opt.expect("Failed to deserialize data");
             
             println!("[webhook_callback | deserialised_msg data] {} ", deserialised_msg_data);
-            let is_reviewable = process_webhook_callback(&deserialised_msg_data).await;
+            let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data).await;
             if is_reviewable {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;
@@ -173,11 +173,11 @@ pub fn deserialized_data(message_data: &Vec<u8>) -> Option<Value> {
     Some(deserialized_data)
 }
 
-async fn process_webhook_callback(deserialised_msg_data: &Value) -> bool {
+async fn process_and_update_pr_if_different(deserialised_msg_data: &Value) -> bool {
     println!("[process_webhook_callback] {}", deserialised_msg_data);
     let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
     let mut is_reviewable = false;
-    if repo_provider== ProviderEnum::Github.to_string().to_lowercase() {
+    if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
         let repo_owner = deserialised_msg_data["eventPayload"]["repository"]["owner"]["login"].to_string().trim_matches('"').to_string();
         let repo_name = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
         let pr_number = deserialised_msg_data["eventPayload"]["pull_request"]["number"].to_string().trim_matches('"').to_string();
@@ -185,7 +185,8 @@ async fn process_webhook_callback(deserialised_msg_data: &Value) -> bool {
 
         println!("[process_webhook_callback] {}, {}, {}, {}", event_type, repo_owner, repo_name, pr_number);
         if event_type == "pull_request_review" {
-            todo!("decide what to do in the case")
+			println!("[process_webhook_callback] Github PR review event");
+			is_reviewable = github_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &repo_owner, &repo_name, &pr_number, &repo_provider).await;
         }
         if event_type == "pull_request" {
             println!("[process_webhook_callback] Github PR opened");
