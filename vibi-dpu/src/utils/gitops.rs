@@ -69,27 +69,9 @@ pub fn commit_exists(commit: &str, directory: &str) -> bool {
 	return true;
 }
 
-pub async fn git_pull(review: &Review) {
+pub async fn git_pull(review: &Review, access_token: &str) {
 	let directory = review.clone_dir();
 	println!("directory = {}", &directory);
-	let access_token: String;
-	if review.provider().to_string() == ProviderEnum::Bitbucket.to_string().to_lowercase() {
-		let access_token_opt = bitbucket::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
-		if access_token_opt.is_none() {
-			eprintln!("no refresh token acquired");
-		}
-		access_token = access_token_opt.expect("Empty access_token_opt");
-	} 
-	else if review.provider().to_string() == ProviderEnum::Github.to_string().to_lowercase(){
-		let access_token_opt = github::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
-		if access_token_opt.is_none() {
-			eprintln!("no refresh token acquired");
-		}
-		access_token = access_token_opt.expect("Empty access_token");
-	} else {
-		eprintln!("[git pull] | repo provider is not github or bitbucket");
-		return;
-	}
     set_git_url(review.clone_url(), directory, &access_token, review.provider());
 	let output_res = Command::new("git")
 		.arg("pull")

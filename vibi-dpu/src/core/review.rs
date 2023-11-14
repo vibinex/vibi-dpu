@@ -19,6 +19,8 @@ use crate::{
 		repo_config::save_repo_config_to_db},
 	core::{coverage::process_coverage, review}};
 use crate::utils::user::ProviderEnum;
+use crate::bitbucket;
+use crate::github;
 
 pub async fn process_review(message_data: &Vec<u8>) {
 	let review_opt = parse_review(message_data);
@@ -32,12 +34,40 @@ pub async fn process_review(message_data: &Vec<u8>) {
 		return;
 	}
 	println!("Processing PR : {}", &review.id());
-	commit_check(&review).await;
+	let access_token_opt = get_access_token(&review).await;
+	if access_token_opt.is_none(){
+		eprintln!("[porcess_review] empty access_token_opt");
+		return;
+	}
+	let access_token = access_token_opt.expect("empty access_token_opt");
+	commit_check(&review, &access_token).await;
 	let hunkmap_opt = process_review_changes(&review).await;
-	send_hunkmap(&hunkmap_opt, &review, &repo_config).await;
+	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token).await;
 }
-
-async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review, repo_config: &RepoConfig) {
+async fn get_access_token (review: &Review) -> Option<String> {
+	let access_token: String;
+	if review.provider().to_string() == ProviderEnum::Bitbucket.to_string().to_lowercase() {
+		let access_token_opt = bitbucket::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
+		if access_token_opt.is_none() {
+			eprintln!("no refresh token acquired");
+			return None;
+		}
+		access_token = access_token_opt.expect("Empty access_token_opt");
+	} 
+	else if review.provider().to_string() == ProviderEnum::Github.to_string().to_lowercase(){
+		let access_token_opt = github::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
+		if access_token_opt.is_none() {
+			eprintln!("no refresh token acquired");
+			return None;
+		}
+		access_token = access_token_opt.expect("Empty access_token");
+	} else {
+		eprintln!("[git pull] | repo provider is not github or bitbucket");
+		return None;
+	}
+	return Some(access_token);
+}
+async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review, repo_config: &RepoConfig, access_token: &str) {
 	if hunkmap_opt.is_none() {
 		eprintln!("Empty hunkmap in send_hunkmap");
 		return;
@@ -49,7 +79,7 @@ async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review, repo_confi
 	let hunkmap_async = hunkmap.clone();
 	let review_async = review.clone();
 	let mut repo_config_clone = repo_config.clone();
-	process_coverage(&hunkmap_async, &review_async, &mut repo_config_clone).await;
+	process_coverage(&hunkmap_async, &review_async, &mut repo_config_clone, access_token).await;
 }
 
 fn hunk_already_exists(review: &Review) -> bool {
@@ -93,11 +123,11 @@ async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 	return Some(hunkmap);
 }
 
-async fn commit_check(review: &Review) {
+async fn commit_check(review: &Review, access_token: &str) {
 	if !commit_exists(&review.base_head_commit(), &review.clone_dir()) 
 		|| !commit_exists(&review.pr_head_commit(), &review.clone_dir()) {
 		println!("Pulling repository {} for commit history", &review.repo_name());
-		git_pull(review).await;
+		git_pull(review, access_token).await;
 	}
 }
 

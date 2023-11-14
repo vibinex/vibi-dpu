@@ -1,17 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{utils::{hunk::{HunkMap, PrHunkItem}, user::{BitbucketUser, WorkspaceUser, Provider, ProviderEnum}}, db::user::{get_workspace_user_from_db}, bitbucket::{user::author_from_commit, reviewer::add_reviewers, self}, core::github};
+use crate::{utils::{hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}, db::user::{get_workspace_user_from_db}, bitbucket::{user::author_from_commit, reviewer::add_reviewers, self}, core::github};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
-use crate::bitbucket::auth::get_access_token_review;
 
-pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &mut RepoConfig) {
-    let access_token_opt = get_access_token_review(review).await;
-    if access_token_opt.is_none() {
-        eprintln!("Unable to acquire access_token in process_coverage");
-        return;
-    }
-    let access_token = access_token_opt.expect("Empty access_token_opt");
+pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &mut RepoConfig, access_token: &str) {
     for prhunk in hunkmap.prhunkvec() {
         // calculate number of hunks for each userid
         let coverage_map = calculate_coverage(&hunkmap.repo_owner(),
