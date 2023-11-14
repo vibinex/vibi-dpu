@@ -6,7 +6,7 @@ use crate::utils::repo::Repository;
 pub fn save_repo_to_db(repo: &Repository) {
     let db = get_db();
     let repo_key = format!("{}/{}/{}", repo.provider(), repo.workspace(), repo.name());
-    println!("repo_key = {}, {:?}", &repo_key, IVec::from(repo_key.as_bytes()));
+    println!("repo_key = {}",  &repo_key);
   
     // Serialize repo struct to JSON 
     let parse_res = serde_json::to_vec(repo);
@@ -29,9 +29,7 @@ pub fn save_repo_to_db(repo: &Repository) {
 pub fn get_clone_url_clone_dir(repo_provider: &str, workspace_name: &str, repo_name: &str) -> Option<(String, String)> {
 	let db = get_db();
 	let key = format!("{}/{}/{}", repo_provider, workspace_name, repo_name);
-	println!("[get_clone_url_clone_dir] | {}, {}, {}, {:?}", repo_provider, workspace_name, repo_name, IVec::from(key.as_bytes()));
 	let repo_res = db.get(IVec::from(key.as_bytes()));
-	println!("[get_clone_url_clone_dir] | {:?}", repo_res);
 	if repo_res.is_err() {
 		let e = repo_res.expect_err("No error in repo_res");
 		eprintln!("Unable to get repo from db: {:?}", e);

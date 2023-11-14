@@ -146,16 +146,3 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
     let access_token = latest_authinfo.token().to_string();
     return Some(access_token);
 }
-
-pub async fn get_access_token_review(review: &Review) -> Option<String> {
-	let clone_url = review.clone_url();
-	let directory = review.clone_dir();
-	
-	let access_token_opt = refresh_git_auth(clone_url, directory).await;
-	if access_token_opt.is_none(){
-		return None;
-	}
-
-	let access_token = access_token_opt.expect("empty access token option");
-	return Some(access_token);
-}
