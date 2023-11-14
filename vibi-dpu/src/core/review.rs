@@ -121,6 +121,7 @@ fn parse_review(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)> {
 	};
 
 	if review_opt.is_none() {
+		println!("[Parse_review] | empty review object");
 		return None;
 	}
 	let review = review_opt.expect("Empty review_opt");
@@ -186,7 +187,7 @@ fn create_and_save_bitbucket_review_object(deserialized_data: &Value) -> Option<
 		clone_url,
 		deserialized_data["eventPayload"]["pullrequest"]["author"]["uuid"].to_string().replace("\"", ""),
 	);
-	println!("review = {:?}", &review);
+	println!("bitbucket review object= {:?}", &review);
 	save_review_to_db(&review);
 	return Some(review);
 }
@@ -216,7 +217,7 @@ fn create_and_save_github_review_object(deserialized_data: &Value) -> Option<Rev
 		clone_url,
 		deserialized_data["eventPayload"]["pull_request"]["user"]["id"].to_string().replace("\"", ""),
 	);
-	println!("review = {:?}", &review);
+	println!("github review object = {:?}", &review);
 	save_review_to_db(&review);
 	return Some(review);
 }
