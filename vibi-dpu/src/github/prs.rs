@@ -83,7 +83,7 @@ pub async fn get_pr_info_github(repo_owner: &str, repo_name: &str, access_token:
         .get(&url)
         .header("Authorization", format!("Bearer {}", access_token))
         .header("Accept", "application/json")
-        .header(USER_AGENT, "Vibinex code review Test App")
+        .header(USER_AGENT, "Vibinex code review app")
         .send()
         .await;
 
