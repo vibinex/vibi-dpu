@@ -16,6 +16,20 @@ pub fn github_base_url() -> String {
     env::var("GITHUB_BASE_URL").expect("BITBUCKET_BASE_URL must be set")
 }
 
+pub async fn get_webhook_api_values(url: &str, access_token: &str, params: Option<HashMap<&str, &str>> ) -> Vec<Value> {
+    let headers = prepare_headers(access_token);
+    let initial_response = get_api_response(url, None, &access_token, &params).await;
+
+    let PaginatedResponse { mut values, next_url } = deserialize_paginated_webhook_response(initial_response).await;
+
+    if next_url.is_some() {
+        let mut additional_values = get_all_pages(next_url, &access_token, &params).await;
+        values.append(&mut additional_values);
+    }
+
+    return values;
+}
+
 pub async fn get_api_values(url: &str, access_token: &str, params: Option<HashMap<&str, &str>> ) -> Vec<Value> {
     let headers = prepare_headers(access_token);
     let initial_response = get_api_response(url, None, &access_token, &params).await;
@@ -83,6 +97,38 @@ async fn get_all_pages(next_url: Option<String>, access_token: &str, params: &Op
     }
 
     return all_values;
+}
+
+async fn deserialize_paginated_webhook_response(response_opt: Option<Response>) -> PaginatedResponse {
+    let mut values_vec = Vec::new();
+    if response_opt.is_none() {
+        eprintln!("Response is None, can't deserialize");
+        return PaginatedResponse {
+            values: values_vec,
+            next_url: None
+        };
+    }
+    let response = response_opt.expect("Uncaught empty response_opt");
+    let headers = response.headers().clone();
+    let parse_res = response.json::<Vec<Value>>().await;
+    if parse_res.is_err() {
+        let e = parse_res.expect_err("No error in parse_res");
+        eprintln!("Unable to deserialize response: {}", e);
+        return PaginatedResponse {
+            values: values_vec,
+            next_url: None
+        };
+    }
+    let response_json = parse_res.expect("Uncaught error in parse_res in deserialize_response");
+    for value in response_json {
+        values_vec.push(value.to_owned()); 
+    }
+    let next_url = extract_next_url(headers.get(header::LINK));
+
+    return PaginatedResponse {
+        values: values_vec.to_vec(),
+        next_url: next_url
+    };
 }
 
 async fn deserialize_paginated_response(response_opt: Option<Response>) -> PaginatedResponse {
