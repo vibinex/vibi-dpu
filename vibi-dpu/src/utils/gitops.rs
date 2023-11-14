@@ -9,7 +9,9 @@ use rand::{thread_rng, Rng};
 use tokio::fs;
 use std::io::ErrorKind;
 
-use crate::bitbucket::auth::refresh_git_auth;
+use crate::bitbucket;
+use crate::github;
+use crate::utils::user::ProviderEnum;
 
 use super::hunk::BlameItem;
 use super::review::Review;
@@ -70,12 +72,25 @@ pub fn commit_exists(commit: &str, directory: &str) -> bool {
 pub async fn git_pull(review: &Review) {
 	let directory = review.clone_dir();
 	println!("directory = {}", &directory);
-	let access_token_opt = refresh_git_auth(review.clone_url(), review.clone_dir()).await;
-	if access_token_opt.is_none() {
-		eprintln!("no refresh token acquired");
+	let access_token: String;
+	if review.provider().to_string() == ProviderEnum::Bitbucket.to_string().to_lowercase() {
+		let access_token_opt = bitbucket::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
+		if access_token_opt.is_none() {
+			eprintln!("no refresh token acquired");
+		}
+		access_token = access_token_opt.expect("Empty access_token_opt");
+	} 
+	else if review.provider().to_string() == ProviderEnum::Github.to_string().to_lowercase(){
+		let access_token_opt = github::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
+		if access_token_opt.is_none() {
+			eprintln!("no refresh token acquired");
+		}
+		access_token = access_token_opt.expect("Empty access_token");
+	} else {
+		eprintln!("[git pull] | repo provider is not github or bitbucket");
+		return;
 	}
-	let access_token = access_token_opt.expect("Empty access_token");
-    set_git_url(review.clone_url(), directory, &access_token);
+    set_git_url(review.clone_url(), directory, &access_token, review.provider());
 	let output_res = Command::new("git")
 		.arg("pull")
 		.current_dir(directory)
@@ -96,10 +111,12 @@ pub async fn git_pull(review: &Review) {
 	};
 }
 
-fn set_git_url(git_url: &str, directory: &str, access_token: &str) {
-    let clone_url = git_url.to_string()
-        .replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
-        .replace("bitbucket.org:", "bitbucket.org/");
+fn set_git_url(git_url: &str, directory: &str, access_token: &str, repo_provider: &str) {
+    let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
+	if clone_url_opt.is_none(){
+		return
+	}
+	let clone_url = clone_url_opt.expect("empty clone_url_opt");
     let output_res = Command::new("git")
 		.arg("remote").arg("set-url").arg("origin")
 		.arg(clone_url)
