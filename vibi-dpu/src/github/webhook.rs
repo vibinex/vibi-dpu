@@ -47,7 +47,7 @@ pub async fn add_webhook(repo_owner: &str, repo_name: &str, access_token: &str) 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
     let payload = json!({
         "name": "web", 
-        "events": ["push", "pull_request", "pull_request_review"],
+        "events": ["pull_request", "pull_request_review"],
         "config": { "url": callback_url, "content_type":"json", "insecure_ssl":"0"},
         "active": true,
     });

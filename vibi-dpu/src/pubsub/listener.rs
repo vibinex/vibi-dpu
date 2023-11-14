@@ -1,7 +1,7 @@
 use crate::{core::bitbucket::setup::handle_install_bitbucket, utils::user::ProviderEnum};
 use crate::core::github::setup::handle_install_github;
 use crate::core::review::process_review;
-use crate::db::prs::process_and_update_pr_if_different;
+use crate::db::prs::{bitbucket_process_and_update_pr_if_different, github_process_and_update_pr_if_different};
 use futures_util::StreamExt;
 use google_cloud_auth::credentials::CredentialsFile;
 use google_cloud_default::WithAuthExt;
@@ -38,20 +38,10 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             let data_bytes_async = data_bytes.to_owned();
             let deserialized_data_opt = deserialized_data(&data_bytes_async);
             let deserialised_msg_data = deserialized_data_opt.expect("Failed to deserialize data");
-
-            let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
-            let workspace_slug = deserialised_msg_data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
-            let repo_slug = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
-            let pr_number = deserialised_msg_data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
-            let event_type = deserialised_msg_data["eventType"].to_string().trim_matches('"').to_string();
-            let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"],&workspace_slug,&repo_slug,&pr_number,&repo_provider,
-            )
-            .await;
-
-            if event_type == "pullrequest:approved" {
-                todo!("Process approved event");
-            }
-            if is_reviewable && (event_type == "pullrequest:created" || event_type == "pullrequest:updated") {
+            
+            println!("[webhook_callback | deserialised_msg data] {} ", deserialised_msg_data);
+            let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data).await;
+            if is_reviewable {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;
                     println!("Processed webhook callback message");
@@ -181,4 +171,45 @@ pub fn deserialized_data(message_data: &Vec<u8>) -> Option<Value> {
         &deserialized_data["eventPayload"]["repository"]
     );
     Some(deserialized_data)
+}
+
+async fn process_and_update_pr_if_different(deserialised_msg_data: &Value) -> bool {
+    println!("[process_webhook_callback] {}", deserialised_msg_data);
+    let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
+    let mut is_reviewable = false;
+    if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
+        let repo_owner = deserialised_msg_data["eventPayload"]["repository"]["owner"]["login"].to_string().trim_matches('"').to_string();
+        let repo_name = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
+        let pr_number = deserialised_msg_data["eventPayload"]["pull_request"]["number"].to_string().trim_matches('"').to_string();
+        let event_type = deserialised_msg_data["eventType"].to_string().trim_matches('"').to_string();
+
+        println!("[process_webhook_callback] {}, {}, {}, {}", event_type, repo_owner, repo_name, pr_number);
+        if event_type == "pull_request_review" {
+			println!("[process_webhook_callback] Github PR review event");
+			is_reviewable = github_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &repo_owner, &repo_name, &pr_number, &repo_provider).await;
+        }
+        if event_type == "pull_request" {
+            println!("[process_webhook_callback] Github PR opened");
+            is_reviewable = github_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &repo_owner, &repo_name, &pr_number, &repo_provider).await;
+        }
+    }
+    if repo_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
+        let workspace_slug = deserialised_msg_data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
+        let repo_slug = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
+        let pr_number = deserialised_msg_data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
+        let event_type = deserialised_msg_data["eventType"].to_string().trim_matches('"').to_string();
+        let if_process_pr = bitbucket_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"],&workspace_slug,&repo_slug,&pr_number,&repo_provider,
+        )
+        .await;
+
+        if event_type == "pullrequest:approved" {
+            is_reviewable = false;
+            todo!("Process approved event");
+        };
+        if if_process_pr && (event_type == "pullrequest:created" || event_type == "pullrequest:updated") {
+            is_reviewable = true;
+        };
+    };
+    return is_reviewable;
+
 }

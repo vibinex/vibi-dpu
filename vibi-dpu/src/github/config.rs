@@ -31,7 +31,6 @@ pub async fn get_webhook_api_values(url: &str, access_token: &str, params: Optio
 }
 
 pub async fn get_api_values(url: &str, access_token: &str, params: Option<HashMap<&str, &str>> ) -> Vec<Value> {
-    let headers = prepare_headers(access_token);
     let initial_response = get_api_response(url, None, &access_token, &params).await;
 
     let PaginatedResponse { mut values, next_url } = deserialize_paginated_response(initial_response).await;
@@ -45,7 +44,7 @@ pub async fn get_api_values(url: &str, access_token: &str, params: Option<HashMa
 }
 
 async fn get_api_response(url: &str, headers_opt: Option<reqwest::header::HeaderMap>, access_token: &str,  params: &Option<HashMap<&str, &str>>) -> Option<Response> {
-    let mut headers;
+    let headers;
     if headers_opt.is_none() {
         let headers_opt_new = prepare_headers(&access_token);
         if headers_opt_new.is_none() {
@@ -152,7 +151,6 @@ async fn deserialize_paginated_response(response_opt: Option<Response>) -> Pagin
         };
     }
     let response_json = parse_res.expect("Uncaught error in parse_res in deserialize_response");
-    println!("[deserialize_paginated_response] response_json: {:?}", &response_json);
     let res_values_opt = response_json["repositories"].as_array();
     if res_values_opt.is_none() {
         eprintln!("response_json[values] is empty");

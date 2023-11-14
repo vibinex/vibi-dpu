@@ -1,6 +1,6 @@
 use crate::db::prs::update_pr_info_in_db;
 use crate::utils::{pr_info::PrInfo, reqwest_client::get_client};
-use reqwest::header::HeaderMap;
+use reqwest::header::{HeaderMap, USER_AGENT};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str;
@@ -62,7 +62,7 @@ async fn get_list_prs_github(headers: &HeaderMap, params: &HashMap<String, Strin
     }
     let prs_data = parse_result.expect("Uncaught error in parsing PRs data");
 
-    let pr_list = prs_data["items"].as_array()
+    let pr_list = prs_data.as_array()
         .expect("Expected an array of PRs")
         .iter()
         .map(|pr| pr["number"].to_string())
@@ -78,12 +78,12 @@ pub async fn get_pr_info_github(repo_owner: &str, repo_name: &str, access_token:
         &base_url, repo_owner, repo_name, pr_number
     );
     println!("[get_pr_info_github] URL: {:?}", &url);
-
     let client = get_client();
     let response_result = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", access_token))
         .header("Accept", "application/json")
+        .header(USER_AGENT, "Vibinex code review app")
         .send()
         .await;
 
@@ -95,7 +95,7 @@ pub async fn get_pr_info_github(repo_owner: &str, repo_name: &str, access_token:
 
     let response = response_result.expect("Uncaught error in response");
     if !response.status().is_success() {
-        eprintln!("Failed to get PR info, response: {:?}", response);
+        eprintln!("Failed to get PR info, response: {:?}", response.text().await);
         return None;
     }
 
