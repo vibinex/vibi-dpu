@@ -16,6 +16,7 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
         if coverage_map.is_empty() {
             continue;
         }
+        // TODO: remove this after implementing reviewer auto-assign in GitHub through DPU
         if review.provider().to_string() == ProviderEnum::Github.to_string() {
             repo_config.set_auto_assign(false);
         }
