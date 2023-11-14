@@ -29,7 +29,9 @@ pub fn save_repo_to_db(repo: &Repository) {
 pub fn get_clone_url_clone_dir(repo_provider: &str, workspace_name: &str, repo_name: &str) -> Option<(String, String)> {
 	let db = get_db();
 	let key = format!("{}/{}/{}", repo_provider, workspace_name, repo_name);
+	println!("[get_clone_url_clone_dir] | {}, {}, {}", repo_provider, workspace_name, repo_name);
 	let repo_res = db.get(IVec::from(key.as_bytes()));
+	println!("[get_clone_url_clone_dir] | {:?}", repo_res);
 	if repo_res.is_err() {
 		let e = repo_res.expect_err("No error in repo_res");
 		eprintln!("Unable to get repo from db: {:?}", e);
