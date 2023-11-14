@@ -1,6 +1,5 @@
 use chrono::DateTime;
 use jsonwebtoken::{encode, Header, EncodingKey, Algorithm};
-use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::str;
@@ -8,7 +7,6 @@ use chrono::{Utc, Duration};
 use std::fs;
 use crate::db::github::auth::github_auth_info;
 use crate::{utils::reqwest_client::get_client, utils::github_auth_info::GithubAuthInfo, db::github::auth::save_github_auth_info_to_db};
-use crate::utils::review::Review;
 use crate::utils::gitops::set_git_remote_url;
 
 #[derive(Debug, Serialize, Deserialize)]
