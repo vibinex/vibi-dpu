@@ -36,7 +36,7 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	println!("Processing PR : {}", &review.id());
 	let access_token_opt = get_access_token(&review).await;
 	if access_token_opt.is_none(){
-		eprintln!("[porcess_review] empty access_token_opt");
+		eprintln!("[process_review] empty access_token_opt");
 		return;
 	}
 	let access_token = access_token_opt.expect("empty access_token_opt");
