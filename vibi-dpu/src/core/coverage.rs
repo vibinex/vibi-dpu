@@ -1,20 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{utils::{hunk::{HunkMap, PrHunkItem}, user::{BitbucketUser, WorkspaceUser}}, db::user::{get_workspace_user_from_db}, bitbucket::{user::author_from_commit, comment::add_comment, reviewer::add_reviewers}};
+use crate::{utils::{hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}, db::user::{get_workspace_user_from_db}, bitbucket::{user::author_from_commit, reviewer::add_reviewers, self}, core::github};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
-use crate::bitbucket::auth::get_access_token_review;
 
-pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &RepoConfig) {
-    let access_token_opt = get_access_token_review(review).await;
-    if access_token_opt.is_none() {
-        eprintln!("Unable to acquire access_token in process_coverage");
-        return;
-    }
-    let access_token = access_token_opt.expect("Empty access_token_opt");
+pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &mut RepoConfig, access_token: &str) {
     for prhunk in hunkmap.prhunkvec() {
         // calculate number of hunks for each userid
-        let coverage_map = calculate_coverage(&hunkmap.repo_owner(), prhunk);
+        let coverage_map = calculate_coverage(&hunkmap.repo_owner(),
+            prhunk, &review.provider());
         let coverage_cond = !coverage_map.is_empty();
         println!("!coverage_map.is_empty() = {:?}", &coverage_cond);
         println!("repo_config.comment() = {:?}", repo_config.comment());
@@ -22,12 +16,22 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
         if coverage_map.is_empty() {
             continue;
         }
+        // TODO: remove this after implementing reviewer auto-assign in GitHub through DPU
+        if review.provider().to_string() == ProviderEnum::Github.to_string() {
+            repo_config.set_auto_assign(false);
+        }
         if repo_config.comment() {
             println!("Inserting comment...");
             // create comment text
             let comment = comment_text(coverage_map, repo_config.auto_assign());
             // add comment
-            add_comment(&comment, review, &access_token).await;
+            if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
+                bitbucket::comment::add_comment(&comment, review, &access_token).await;
+            }
+            if review.provider().to_string() == ProviderEnum::Github.to_string() {
+                github::comment::add_comment(&comment, review, &access_token).await;
+            }
+            
         }
         if repo_config.auto_assign() {
             let mut author_set: HashSet<String> = HashSet::new();
@@ -51,7 +55,7 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
     }
 }
 
-fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem) -> HashMap<String, String>{
+fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem, repo_provider: &str) -> HashMap<String, String>{
     let mut coverage_floatmap = HashMap::<String, f32>::new();
     let mut total = 0.0;
     for blame in prhunk.blamevec() {
@@ -76,14 +80,20 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem) -> HashMap<String, 
     for (blame_author, coverage) in coverage_floatmap.iter_mut() {
         *coverage = *coverage / total * 100.0;
         let formatted_value = format!("{:.2}", *coverage);
-        let user = get_workspace_user_from_db(blame_author);
-        if user.is_none() {
-            eprintln!("No user name found for {}", blame_author);
-            coverage_map.insert(blame_author.to_string(), formatted_value);
-            continue;
+        let coverage_key: String;
+        if repo_provider.to_string() == ProviderEnum::Bitbucket.to_string() {
+            let user = get_workspace_user_from_db(blame_author);
+            if user.is_none() {
+                eprintln!("No user name found for {}", blame_author);
+                coverage_map.insert(blame_author.to_string(), formatted_value);
+                continue;
+            }
+            let user_val = user.expect("user is empty");
+            coverage_key = user_val.display_name().to_owned();
         }
-        let user_val = user.expect("user is empty");
-        let coverage_key = user_val.display_name().to_owned();
+        else {
+            coverage_key = blame_author.to_string(); // TODO - get github user id and username here
+        }
         coverage_map.insert(coverage_key, formatted_value);
     }
     return coverage_map;

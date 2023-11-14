@@ -1,6 +1,5 @@
 use chrono::DateTime;
 use jsonwebtoken::{encode, Header, EncodingKey, Algorithm};
-use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::str;
@@ -8,7 +7,6 @@ use chrono::{Utc, Duration};
 use std::fs;
 use crate::db::github::auth::github_auth_info;
 use crate::{utils::reqwest_client::get_client, utils::github_auth_info::GithubAuthInfo, db::github::auth::save_github_auth_info_to_db};
-use crate::utils::review::Review;
 use crate::utils::gitops::set_git_remote_url;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -145,17 +143,4 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
     let latest_authinfo = authinfo_opt.expect("Empty authinfo_opt");
     let access_token = latest_authinfo.token().to_string();
     return Some(access_token);
-}
-
-pub async fn get_access_token_review(review: &Review) -> Option<String> {
-	let clone_url = review.clone_url();
-	let directory = review.clone_dir();
-	
-	let access_token_opt = refresh_git_auth(clone_url, directory).await;
-	if access_token_opt.is_none(){
-		return None;
-	}
-
-	let access_token = access_token_opt.expect("empty access token option");
-	return Some(access_token);
 }

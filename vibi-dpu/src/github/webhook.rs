@@ -1,7 +1,7 @@
 use std::env;
 use std::collections::HashMap;
 
-use reqwest::{header::HeaderValue, Response, Error};
+use reqwest::{Response, Error};
 use serde_json::{json, Value};
 
 use crate::{db::webhook::save_webhook_to_db, utils::github_webhook::Webhook, github::config::{github_base_url, get_api_values, get_webhook_api_values}};

@@ -6,7 +6,7 @@ use crate::utils::repo::Repository;
 pub fn save_repo_to_db(repo: &Repository) {
     let db = get_db();
     let repo_key = format!("{}/{}/{}", repo.provider(), repo.workspace(), repo.name());
-    println!("repo_key = {}", &repo_key);
+    println!("repo_key = {}",  &repo_key);
   
     // Serialize repo struct to JSON 
     let parse_res = serde_json::to_vec(repo);
