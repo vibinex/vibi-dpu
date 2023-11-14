@@ -147,18 +147,14 @@ pub async fn github_process_and_update_pr_if_different(webhook_data: &Value, rep
 
 fn parse_github_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
     println!("[parse_github_webhook_data] webhook_data: {:?}", &webhook_data);
-    let pr_head_commit_raw = webhook_data["pull_request"]["head"]["sha"].to_string();
-    let pr_head_commit = pr_head_commit_raw.trim_matches('"');
-    let base_head_commit_raw = webhook_data["pull_request"]["base"]["sha"].to_string();
-    let base_head_commit = base_head_commit_raw.trim_matches('"');
-    let pr_state_raw = webhook_data["pull_request"]["state"].to_string();
-    let pr_state = pr_state_raw.trim_matches('"');
-    let pr_branch_raw = webhook_data["pull_request"]["head"]["ref"].to_string();
-    let pr_branch = pr_branch_raw.trim_matches('"');
-    let pr_info = PrInfo { base_head_commit: base_head_commit.to_string(),
-        pr_head_commit: pr_head_commit.to_string(),
-        state: pr_state.to_string(),
-        pr_branch: pr_branch.to_string()
+    let pr_head_commit = webhook_data["pull_request"]["head"]["sha"].to_string().trim_matches('"').to_string();
+    let base_head_commit = webhook_data["pull_request"]["base"]["sha"].to_string().trim_matches('"').to_string();
+    let pr_state = webhook_data["pull_request"]["state"].to_string().trim_matches('"').to_string();
+    let pr_branch = webhook_data["pull_request"]["head"]["ref"].to_string().trim_matches('"').to_string();
+    let pr_info = PrInfo { base_head_commit: base_head_commit,
+        pr_head_commit: pr_head_commit,
+        state: pr_state,
+        pr_branch: pr_branch,
     };
     println!("[parse_github_webhook_data] pr_info :{:?}", &pr_info);
     return Some(pr_info)
