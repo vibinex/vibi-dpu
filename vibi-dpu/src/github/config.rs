@@ -106,7 +106,8 @@ async fn deserialize_paginated_response(response_opt: Option<Response>) -> Pagin
         };
     }
     let response_json = parse_res.expect("Uncaught error in parse_res in deserialize_response");
-    let res_values_opt = response_json["values"].as_array(); // TODO - find out if as_array is needed
+    println!("[deserialize_paginated_response] response_json: {:?}", &response_json);
+    let res_values_opt = response_json["repositories"].as_array();
     if res_values_opt.is_none() {
         eprintln!("response_json[values] is empty");
         return PaginatedResponse {
