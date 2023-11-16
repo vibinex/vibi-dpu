@@ -172,6 +172,7 @@ fn parse_review(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)> {
 fn publish_hunkmap(hunkmap: &HunkMap) {
 	let client = get_client();
 	let hunkmap_json = serde_json::to_string(&hunkmap).expect("Unable to serialize hunkmap");
+	println!("[publish_hunkmap] Hunkmap JSON = {}", hunkmap_json);
 	let key_clone = hunkmap.db_key().to_string();
 	tokio::spawn(async move {
 		let url = format!("{}/api/hunks",
