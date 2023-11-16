@@ -14,11 +14,11 @@ To run Vibi-DPU locally:
 
 1. Generate public url using ngrok - `ngrok http 3000`. We will run our next server locally on port 3000 in later steps.
 2. Paste this in OAuth consumers in callback_url field.
-3. Clone [team-monitor-webiste](https://github.com/Alokit-Innovations/team-monitor-website/) locally.
-4. Paste the client id and secret in team-monitor-wesite in .env.local in root directory. Also use them in the docker command below.
+3. Clone [vibinex-server](https://github.com/Alokit-Innovations/vibinex-server/) locally.
+4. Paste the client id and secret in vibinex-server in .env.local in root directory. Also use them in the docker command below.
 5. Fire up cloud sql proxy - `./cloud-sql-proxy --port 5432 vibi-test-394606:asia-south1:test-db`
-6. Change url in team-monitor-website in .env.local - `NEXTAUTH_URL=https://example.ngrok-free.app`
-7. Start team-monitor-website - `npm run dev`
+6. Change url in vibinex-server in .env.local - `NEXTAUTH_URL=https://example.ngrok-free.app`
+7. Start vibinex-server - `npm run dev`
 8. Build vibi-dpu, go to vibi-dpu/vibi-dpu and run - `cargo build`
 9. Go up to the root directory of vibi-dpu - `cd ../`
 10. **Build the Docker image**: In the root directory of the project, run the following command to build a Docker image with the name "dpu".
