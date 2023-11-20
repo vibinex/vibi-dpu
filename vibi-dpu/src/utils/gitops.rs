@@ -228,6 +228,7 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 		format!("-- {filepath}"),
 		"-U0".to_string(),
 		];
+		println!("[generate_diff] | clone_dir = {:?}, filepath = {:?}, param = {:?}", clone_dir, filepath, params);
 		let output_res = Command::new("git").args(&params)
 		.current_dir(&clone_dir)
 		.output();
@@ -237,8 +238,11 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 			continue;
 		}
 		let result = output_res.expect("Uncaught error in output_res");
+		println!("[generate_diff] | diff result = {:?}", result);
 		let diff = result.stdout;
+		println!("[generate_diff] | diff stdout = {:?}", diff);
 		let diffstr_res = str::from_utf8(&diff);
+		println!("[generate_diff] | dif_str = {:?}", diffstr_res);
 		if diffstr_res.is_err() {
 			let e = diffstr_res.expect_err("No error in diffstr_res");
 			eprintln!("Unable to deserialize diff: {:?}", e);
