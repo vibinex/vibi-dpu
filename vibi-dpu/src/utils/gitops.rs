@@ -224,7 +224,7 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 		let filepath = item.filepath.as_str();
 		let params = vec![
 		"diff".to_string(),
-		format!("{}...{}", prev_commit, curr_commit),
+		format!("{} {}", prev_commit, curr_commit),
 		format!("-- {}", filepath),
 		"-U0".to_string(),
 		];
