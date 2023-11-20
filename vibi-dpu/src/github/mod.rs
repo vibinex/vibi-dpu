@@ -3,4 +3,3 @@ pub mod repos;
 pub mod config;
 pub mod webhook;
 pub mod prs;
-pub mod member;
