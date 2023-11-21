@@ -5,56 +5,50 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::reqwest_client::get_client;
 
-// Helper struct for deserialized paginated response
-#[derive(Debug, Serialize, Deserialize)]
-struct PaginatedResponse {
-    values: Vec<Value>,
-    next_url: Option<String>,
-}
-
 pub fn github_base_url() -> String {
     env::var("GITHUB_BASE_URL").expect("BITBUCKET_BASE_URL must be set")
 }
 
-pub async fn get_webhook_api_values(url: &str, access_token: &str, params: Option<HashMap<&str, &str>> ) -> Vec<Value> {
-    let headers = prepare_headers(access_token);
-    let initial_response = get_api_response(url, None, &access_token, &params).await;
-
-    let PaginatedResponse { mut values, next_url } = deserialize_paginated_webhook_response(initial_response).await;
-
-    if next_url.is_some() {
-        let mut additional_values = get_all_pages(next_url, &access_token, &params).await;
-        values.append(&mut additional_values);
+pub async fn get_api_paginated(url: &str, access_token: &str, params: Option<HashMap<&str, &str>> ) -> Option<Vec<Value>> {
+    let mut is_first_call = true;
+    let mut next_url_mut: Option<String> = None;
+    let mut get_url = url.to_string();
+    let mut values = Vec::<Value>::new();
+    while is_first_call || next_url_mut.is_some() {
+        if is_first_call {
+            is_first_call = false;
+        } else {
+            get_url = next_url_mut.expect("Empty next_url_mut");
+        }
+        let response_opt = get_api_response(&get_url, None, &access_token, &params).await;
+        if response_opt.is_none() {
+            eprintln!("[get_api_paginated] Unable to call get api and get initial response for: 
+                {:?}, {:?}, {:?}", url, access_token, params);
+            return None
+        }
+        let response = response_opt.expect("Empty initial_response");
+        let next_url = extract_next_url(&response);
+        let deserialized_opt = deserialize_response(response).await;
+        if deserialized_opt.is_none() {
+            eprintln!("[get_api_paginated] deserialization failed for: 
+                {:?}, {:?}, {:?}", url, access_token, params);
+            return None
+        }
+        let deserialized_val = deserialized_opt.expect("Empty deserialized_opt");
+        values.push(deserialized_val);
+        next_url_mut = next_url.clone();
+        
     }
-
-    return values;
-}
-
-pub async fn get_api_values(url: &str, access_token: &str, params: Option<HashMap<&str, &str>> ) -> Vec<Value> {
-    let initial_response = get_api_response(url, None, &access_token, &params).await;
-
-    let PaginatedResponse { mut values, next_url } = deserialize_paginated_response(initial_response).await;
-
-    if next_url.is_some() {
-        let mut additional_values = get_all_pages(next_url, &access_token, &params).await;
-        values.append(&mut additional_values);
-    }
-
-    return values;
+    return Some(values);
 }
 
 async fn get_api_response(url: &str, headers_opt: Option<reqwest::header::HeaderMap>, access_token: &str,  params: &Option<HashMap<&str, &str>>) -> Option<Response> {
-    let headers;
-    if headers_opt.is_none() {
-        let headers_opt_new = prepare_headers(&access_token);
-        if headers_opt_new.is_none() {
-            eprintln!("Unable to prepare_headers, empty headers_opt");
-            return None;
-        }
-        headers = headers_opt_new.expect("Empty headers_opt");
-    } else {
-        headers = headers_opt.expect("Empty headers_opt");
+    let get_headers_opt = get_headers(&headers_opt, access_token);
+    if get_headers_opt.is_none() {
+        eprintln!("[get_api_response] Unable to prepare headers, headers_opt: {:?}", &headers_opt);
+        return None;
     }
+    let headers = get_headers_opt.expect("Uncaught error in get_headers_opt");
     let client = get_client();
     let get_response = client.get(url)
         .headers(headers.clone())
@@ -64,126 +58,64 @@ async fn get_api_response(url: &str, headers_opt: Option<reqwest::header::Header
 
     if get_response.is_err() {
         let e = get_response.expect_err("No error in get_response");
-        eprintln!("Error sending GET request without params to {}, error: {}", url, e);
+        eprintln!("[get_api_response] Error sending GET request without params
+             to {}, error: {}", url, e);
         return None;
     }
     let response = get_response.expect("Uncaught error in get_res");
     if !response.status().is_success() {
-        eprintln!("Failed to call Github API {}, status: {}", url, response.status());
+        eprintln!("[get_api_response] Failed to call Github API {}, status: {}",
+            url, response.status());
         return None;
     }
     return Some(response);
 }
 
-async fn get_all_pages(next_url: Option<String>, access_token: &str, params: &Option<HashMap<&str, &str>>) -> Vec<Value>{
-    let mut all_values = Vec::new();
-    let mut next_url_mut = next_url;
+async fn deserialize_response(response: Response) -> Option<Value> {
+    let res_val = response.json::<Value>().await;
+    if res_val.is_err() {
+        let e = res_val.expect_err("Empty error in res_val");
+        eprintln!("[deserialize_response] Unable to deserialize response, error: {:?}", e);
+        return None;
+    }
+    let deserialized = res_val.expect("Uncaught error in res_val");
+    return Some(deserialized);
+}
 
-    while next_url_mut.is_some() {
-        let url_opt = next_url_mut.as_ref();
-        if url_opt.is_none() {
-            eprintln!("next_url is none");
-            break;
+fn get_headers(headers_opt: &Option<reqwest::header::HeaderMap>, access_token: &str) -> Option<reqwest::header::HeaderMap> {
+    let headers;
+    if headers_opt.is_none() {
+        let headers_opt_new = prepare_headers(access_token);
+        if headers_opt_new.is_none() {
+            eprintln!("[get_headers] Unable to prepare_headers, empty headers_opt");
+            return None;
         }
-        let url = url_opt.expect("Empty next url_opt").trim_matches('"');
-        if url == "null" {
-            break;   
-        }
-        let response = get_api_response(&url, None, access_token, params).await;
-        let PaginatedResponse { mut values, next_url } = deserialize_paginated_response(response).await;
-        all_values.append(&mut values);
-        next_url_mut = next_url.clone();
+        headers = headers_opt_new.expect("Empty headers_opt");
+    } else {
+        headers = headers_opt.to_owned().expect("Empty headers_opt");
     }
-
-    return all_values;
+    return Some(headers);
 }
 
-async fn deserialize_paginated_webhook_response(response_opt: Option<Response>) -> PaginatedResponse {
-    let mut values_vec = Vec::new();
-    if response_opt.is_none() {
-        eprintln!("Response is None, can't deserialize");
-        return PaginatedResponse {
-            values: values_vec,
-            next_url: None
-        };
-    }
-    let response = response_opt.expect("Uncaught empty response_opt");
+fn extract_next_url(response: &Response) -> Option<String> {
     let headers = response.headers().clone();
-    let parse_res = response.json::<Vec<Value>>().await;
-    if parse_res.is_err() {
-        let e = parse_res.expect_err("No error in parse_res");
-        eprintln!("Unable to deserialize response: {}", e);
-        return PaginatedResponse {
-            values: values_vec,
-            next_url: None
-        };
-    }
-    let response_json = parse_res.expect("Uncaught error in parse_res in deserialize_response");
-    for value in response_json {
-        values_vec.push(value.to_owned()); 
-    }
-    let next_url = extract_next_url(headers.get(header::LINK));
-
-    return PaginatedResponse {
-        values: values_vec.to_vec(),
-        next_url: next_url
-    };
-}
-
-async fn deserialize_paginated_response(response_opt: Option<Response>) -> PaginatedResponse {
-    let mut values_vec = Vec::new();
-    if response_opt.is_none() {
-        eprintln!("Response is None, can't deserialize");
-        return PaginatedResponse {
-            values: values_vec,
-            next_url: None
-        };
-    }
-    let response = response_opt.expect("Uncaught empty response_opt");
-    let headers = response.headers().clone();
-    let parse_res = response.json::<serde_json::Value>().await;
-    if parse_res.is_err() {
-        let e = parse_res.expect_err("No error in parse_res");
-        eprintln!("Unable to deserialize response: {}", e);
-        return PaginatedResponse {
-            values: values_vec,
-            next_url: None
-        };
-    }
-    let response_json = parse_res.expect("Uncaught error in parse_res in deserialize_response");
-    let res_values_opt = response_json["repositories"].as_array();
-    if res_values_opt.is_none() {
-        eprintln!("response_json[values] is empty");
-        return PaginatedResponse {
-            values: values_vec,
-            next_url: None
-        };
-    }
-    let values = res_values_opt.expect("res_values_opt is empty");
-    for value in values {
-        values_vec.push(value.to_owned()); 
-    }
-    let next_url = extract_next_url(headers.get(header::LINK));
-
-    return PaginatedResponse {
-        values: values_vec.to_vec(),
-        next_url: next_url
-    };
-}
-
-fn extract_next_url(link_header: Option<&HeaderValue>) -> Option<String> {
-    link_header.and_then(|value| {
+    let link_header = headers.get(header::LINK);
+    let next_url_opt = link_header.and_then(|value| {
         value.to_str().ok().and_then(|header_value| {
             header_value.split(',')
                 .find(|part| part.contains(r#"rel="next""#))
                 .and_then(|next_link_part| {
                     next_link_part.split(';')
                         .next()
-                        .map(|url| url.trim_matches(&[' ', '<', '>'] as &[_]))
+                        .map(|url| url.trim_matches(&[' ', '<', '>', '"'] as &[_]))
                         .map(str::to_string)
                 })
         })
-    })
+    });
+    if next_url_opt.as_ref().is_some_and(|url| url == "null") {
+        return None;
+    }
+    return next_url_opt;
 }
 
 // TODO -find all "?" after await specially
