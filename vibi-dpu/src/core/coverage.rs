@@ -32,6 +32,7 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
         }
         if repo_config.auto_assign() {
             println!("Auto assigning reviewers...");
+            println!("review.provider() = {:?}", review.provider());
             if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
                 add_bitbucket_reviewers(&prhunk, hunkmap, review, &access_token).await;
             }
@@ -46,8 +47,9 @@ async fn add_github_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review: &R
     let mut reviewers: HashSet<String> = HashSet::new();
     for blame in prhunk.blamevec() {
         let blame_author_opt = get_blame_user(blame, review, access_token).await;
+        println!("[add_github_reviewers] blame_author_opt = {:?}", &blame_author_opt);
         if blame_author_opt.is_none() {
-            return;
+            continue;
         }
         let blame_author = blame_author_opt.expect("Empty blame_author_opt");
         if reviewers.contains(&blame_author) || prhunk.author().to_string() == blame_author {
