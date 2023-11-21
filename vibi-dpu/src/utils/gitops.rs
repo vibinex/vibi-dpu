@@ -222,16 +222,13 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 	let clone_dir = review.clone_dir();
 	for item in smallfiles {
 		let filepath = item.filepath.as_str();
-		let params = vec![
-		"diff".to_string(),
-		format!("{}...{}", prev_commit, curr_commit),
-		format!("-- {}", filepath),
-		"-U0".to_string(),
-		];
-		println!("[generate_diff] | clone_dir = {:?}, filepath = {:?}, param = {:?}", clone_dir, filepath, params);
-		let output_res = Command::new("git").args(&params)
-		.current_dir(&clone_dir)
-		.output();
+		let commit_range = format!("{}...{}", prev_commit, curr_commit);
+		let file_arg = format!("-- {}", filepath);
+		println!("[generate_diff] | clone_dir = {:?}, filepath = {:?}", clone_dir, filepath);
+		let output_res = Command::new("git")
+			.args(&["diff", &commit_range, &file_arg, "-U0"])
+			.current_dir(clone_dir)
+			.output();
 		if output_res.is_err() {
 			let commanderr = output_res.expect_err("No error in output_res");
 			eprintln!("[generate_diff] git diff command failed to start : {:?}", commanderr);
