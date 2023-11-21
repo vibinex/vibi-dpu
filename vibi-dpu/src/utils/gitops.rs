@@ -223,13 +223,12 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 	for item in smallfiles {
 		let filepath = item.filepath.as_str();
 		let commit_range = format!("{}...{}", prev_commit, curr_commit);
-		let file_arg = format!("-- {}", filepath);
 		println!("[generate_diff] | clone_dir = {:?}, filepath = {:?}", clone_dir, filepath);
 		let output_res = Command::new("git")
 			.arg("diff")
-			.arg(&commit_range)
-			.arg(&file_arg)
 			.arg("-U0")
+			.arg(&commit_range)
+			.arg(&filepath)
 			.current_dir(clone_dir)
 			.output();
 		if output_res.is_err() {
