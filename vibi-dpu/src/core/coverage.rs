@@ -10,6 +10,7 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
         let coverage_map = calculate_coverage(&hunkmap.repo_owner(),
             prhunk, &review.provider());
         let coverage_cond = !coverage_map.is_empty();
+        println!("coverage_map = {:?}", &coverage_map);
         println!("!coverage_map.is_empty() = {:?}", &coverage_cond);
         println!("repo_config.comment() = {:?}", repo_config.comment());
         println!("repo_config.auto_assign() = {:?}", repo_config.auto_assign());
@@ -30,6 +31,7 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
             
         }
         if repo_config.auto_assign() {
+            println!("Auto assigning reviewers...");
             if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
                 add_bitbucket_reviewers(&prhunk, hunkmap, review, &access_token).await;
             }
@@ -53,10 +55,12 @@ async fn add_github_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review: &R
         }
         reviewers.insert(blame_author);
     }
+    println!("[add_github_reviewers] reviewers = {:?}", &reviewers);
     if reviewers.is_empty() {
         return;
     }
     let reviewers_vec: Vec<String> = reviewers.into_iter().collect();
+    println!("[add_github_reviewers] reviewers vec = {:?}", &reviewers_vec);
     github::reviewer::add_reviewers(&reviewers_vec, review, access_token).await;
 }
 
@@ -98,7 +102,7 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem, repo_provider: &str
             coverage_floatmap.insert(author_id, num_lines);
         }
     }
-    println!("[calculate_coverage] coverage floatmap = {:?}", &coverage_floatmap);
+    println!("[calculate_coverage] coverage floatmap = {:?}, total ={:?}", &coverage_floatmap, total);
     let mut coverage_map = HashMap::<String, String>::new();
     if total <= 0.0 {
         return coverage_map;
@@ -120,6 +124,7 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem, repo_provider: &str
         else {
             coverage_key = blame_author.to_string(); // TODO - get github user id and username here
         }
+        println!("[calculate_coverage] key = {:?}, value = {:?}, map = {:?}", &coverage_key, &formatted_value, &coverage_map);
         coverage_map.insert(coverage_key, formatted_value);
     }
     return coverage_map;

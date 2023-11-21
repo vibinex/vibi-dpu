@@ -17,6 +17,7 @@ pub async fn add_reviewers(reviewers: &Vec<String>, review: &Review, access_toke
         "reviewers": reviewers
     });
     let body = body_json.to_string();
+    println!("[add_reviewers] url = {:?}, body = {:?}", &url, &body);
     let client = get_client();
     let response_res = client.post(url).headers(headers).body(body).send().await;
     if response_res.is_err() {
