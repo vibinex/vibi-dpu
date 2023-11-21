@@ -365,7 +365,7 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 				"-w",
 				"-e",
 				"--date=unix",
-				"--long",
+				"-l",
 				path.as_str(),
 			);
 			let blame_res = Command::new("git").args(paramvec)
