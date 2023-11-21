@@ -3,9 +3,9 @@ use std::env;
 use reqwest::{header::HeaderValue, Response, Error};
 use serde_json::json;
 
-use crate::{db::webhook::save_webhook_to_db, utils::webhook::{Webhook, WebhookResponse}, bitbucket::config::{bitbucket_base_url, get_api_values}};
-
-use super::config::{get_client, prepare_auth_headers};
+use crate::{db::webhook::save_webhook_to_db, utils::bitbucket_webhook::{Webhook, WebhookResponse}, bitbucket::config::{bitbucket_base_url, get_api_values}};
+use crate::utils::reqwest_client::get_client;
+use super::config::prepare_auth_headers;
 
 
 pub async fn get_webhooks_in_repo(workspace_slug: &str, repo_slug: &str, access_token: &str) -> Vec<Webhook> {

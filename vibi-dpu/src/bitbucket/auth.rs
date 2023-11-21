@@ -1,14 +1,13 @@
 use std::env;
 use std::str;
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
-use reqwest::Client;
-use super::config::get_client;
-use crate::db::auth::{save_auth_info_to_db, auth_info};
-use crate::utils::auth::AuthInfo;
+use crate::db::bitbucket::auth::{save_bitbucket_auth_info_to_db, bitbucket_auth_info};
+use crate::utils::gitops::set_git_remote_url;
+use crate::utils::reqwest_client::get_client;
+use crate::utils::bitbucket_auth_info::BitbucketAuthInfo;
 use crate::utils::review::Review;
 
-pub async fn get_access_token_from_bitbucket(code: &str) -> Option<AuthInfo> {
+pub async fn get_access_token_from_bitbucket(code: &str) -> Option<BitbucketAuthInfo> {
     let client = get_client();
     let bitbucket_client_id = env::var("BITBUCKET_CLIENT_ID").unwrap();
     let bitbucket_client_secret = env::var("BITBUCKET_CLIENT_SECRET").unwrap();
@@ -40,26 +39,26 @@ pub async fn get_access_token_from_bitbucket(code: &str) -> Option<AuthInfo> {
         );
         return None;
     }
-    let parse_res = res.json::<AuthInfo>().await ;
+    let parse_res = res.json::<BitbucketAuthInfo>().await ;
     if parse_res.is_err() {
-        let e = parse_res.expect_err("No error in parse_res for AuthInfo");
-        eprintln!("error deserializing AuthInfo: {:?}", e);
+        let e = parse_res.expect_err("No error in parse_res for BitbucketAuthInfo");
+        eprintln!("error deserializing BitbucketAuthInfo: {:?}", e);
         return None;
     }
-    let mut response_json = parse_res.expect("Uncaught error in parse_res for AuthInfo");
-    save_auth_info_to_db(&mut response_json);
+    let mut response_json = parse_res.expect("Uncaught error in parse_res for BitbucketAuthInfo");
+    save_bitbucket_auth_info_to_db(&mut response_json);
     return Some(response_json);
 }
 
 pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String>{
-	let authinfo_opt =  auth_info();
+	let authinfo_opt =  bitbucket_auth_info();
     if authinfo_opt.is_none() {
         return None;
     }
     let authinfo = authinfo_opt.expect("empty authinfo_opt in refresh_git_auth");
     let authinfo_opt = update_access_token(&authinfo, clone_url, directory).await;
     if authinfo_opt.is_none() {
-        eprintln!("Empty authinfo_opt from update_access_token");
+        eprintln!("Empty authinfo_opt from update_access_token for BitbucketAuthInfo");
         return None;
     }
     let latest_authinfo = authinfo_opt.expect("Empty authinfo_opt");
@@ -67,13 +66,13 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
     return Some(access_token);
 }
 
-pub async fn update_access_token(auth_info: &AuthInfo,
-        clone_url: &str, directory: &str) -> Option<AuthInfo> {
+pub async fn update_access_token(auth_info: &BitbucketAuthInfo, clone_url: &str, directory: &str) -> Option<BitbucketAuthInfo> {
+    let repo_provider = "bitbucket".to_string();
     let now = SystemTime::now();
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
     let timestamp_opt = auth_info.timestamp();
     if timestamp_opt.is_none() {
-        eprintln!("No timestamp in authinfo");
+        eprintln!("No timestamp in BitbucketAuthInfo");
         return None;
     }
     let timestamp = timestamp_opt.expect("Empty timestamp");
@@ -89,12 +88,12 @@ pub async fn update_access_token(auth_info: &AuthInfo,
         .expect("empty auhtinfo_opt from update_access_token");
     println!("New auth info  = {:?}", &new_auth_info);
     let access_token = new_auth_info.access_token().to_string();
-    set_git_remote_url(clone_url, directory, &access_token);
-    save_auth_info_to_db(&mut new_auth_info);
+    set_git_remote_url(clone_url, directory, &access_token, &repo_provider);
+    save_bitbucket_auth_info_to_db(&mut new_auth_info);
     return new_auth_info_opt;
 }
 
-async fn bitbucket_refresh_token(refresh_token: &str) -> Option<AuthInfo> {
+async fn bitbucket_refresh_token(refresh_token: &str) -> Option<BitbucketAuthInfo> {
     let token_url = "https://bitbucket.org/site/oauth2/access_token";
     let client_id = std::env::var("BITBUCKET_CLIENT_ID")
         .expect("BITBUCKET_CLIENT_ID must be set");
@@ -135,30 +134,8 @@ async fn bitbucket_refresh_token(refresh_token: &str) -> Option<AuthInfo> {
     return Some(refresh_token_resbody);
 }
 
-fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str) {
-    let clone_url = git_url.to_string()
-        .replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
-        .replace("bitbucket.org:", "bitbucket.org/");
-    let output = Command::new("git")
-		.arg("remote").arg("set-url").arg("origin")
-		.arg(clone_url)
-		.current_dir(directory)
-		.output()
-		.expect("failed to execute git pull");
-    // Only for debug purposes
-	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("set_git_url stderr = {:?}", v),
-		Err(e) => eprintln!("set_git_url stderr error: {}", e), 
-	};
-	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("set_git_urll stdout = {:?}", v),
-		Err(e) => eprintln!("set_git_url stdout error: {}", e), 
-	};
-	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
-}
-
 pub async fn get_access_token_review(review: &Review) -> Option<String> {
-    let authinfo_opt = auth_info();
+    let authinfo_opt = bitbucket_auth_info();
     if authinfo_opt.is_none() {
         return None;
     }

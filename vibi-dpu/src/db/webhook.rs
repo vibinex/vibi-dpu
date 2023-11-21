@@ -1,9 +1,11 @@
 use sled::IVec;
 use uuid::Uuid;
+use serde::Serialize;
+use std::fmt::Debug;
 
 use crate::db::config::get_db;
-use crate::utils::webhook::Webhook;
-pub fn save_webhook_to_db(webhook: &Webhook) {
+
+pub fn save_webhook_to_db<T: Serialize>(webhook: &T) where T: Serialize + Debug, {
     let db = get_db();
     // Generate unique ID
     let uuid = Uuid::new_v4();

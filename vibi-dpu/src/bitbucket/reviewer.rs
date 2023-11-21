@@ -3,8 +3,9 @@ use serde_json::Value;
 
 use crate::utils::review::Review;
 use crate::utils::user::BitbucketUser;
+use crate::utils::reqwest_client::get_client;
 
-use super::config::{get_client, prepare_headers};
+use super::config::prepare_headers;
 
 pub async fn add_reviewers(user: &BitbucketUser, review: &Review, access_token: &str) {
     let url = prepare_get_prinfo_url(review.repo_owner(), review.repo_name(), review.id());

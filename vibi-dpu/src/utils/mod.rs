@@ -1,7 +1,9 @@
 pub mod repo;
 pub mod owner;
-pub mod auth;
-pub mod webhook;
+pub mod bitbucket_auth_info;
+pub mod github_auth_info;
+pub mod bitbucket_webhook;
+pub mod github_webhook;
 pub mod hunk;
 pub mod review;
 pub mod gitops;
@@ -9,3 +11,5 @@ pub mod user;
 pub mod lineitem;
 pub mod repo_config;
 pub mod pr_info;
+pub mod reqwest_client;
+pub mod setup_info;
