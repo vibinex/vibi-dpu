@@ -425,7 +425,7 @@ async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> 
 					linebreak.to_string(),
 					lidx.to_string(),
 					digest(path),
-					lineitem.commit().to_string())
+					lineitem.commit().trim_matches('"').to_string())
 				);
 				linebreak = lidx + 1;
 			}
