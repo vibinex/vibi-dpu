@@ -73,6 +73,7 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem, repo_provider: &str
             coverage_floatmap.insert(author_id, num_lines);
         }
     }
+    println!("[calculate_coverage] coverage floatmap = {:?}", &coverage_floatmap);
     let mut coverage_map = HashMap::<String, String>::new();
     if total <= 0.0 {
         return coverage_map;
