@@ -63,7 +63,13 @@ pub async fn handle_install_github(installation_code: &str) {
 
 
 async fn process_webhooks(repo_owner: String, repo_name: String, access_token: String) {
-    let webhooks_data = get_webhooks_in_repo(&repo_owner, &repo_name, &access_token).await;
+    let webhooks_data_opt = get_webhooks_in_repo(&repo_owner, &repo_name, &access_token).await;
+    if webhooks_data_opt.is_none() {
+        eprintln!("Unable to get webhooks for repo: {:?}, other params: {:?}, {:?}",
+            repo_name, repo_owner, access_token);
+        return;
+    }
+    let webhooks_data = webhooks_data_opt.expect("Empty webhooks_data_opt");
     let webhook_callback_url = format!("{}/api/github/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
     println!("webhooks_data = {:?}", &webhooks_data);
