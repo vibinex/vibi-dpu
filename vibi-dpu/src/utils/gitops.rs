@@ -224,8 +224,8 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 		let filepath = item.filepath.as_str();
 		let params = vec![
 		"diff".to_string(),
-		format!("{prev_commit}...{curr_commit}"),
-		format!("-- {filepath}"),
+		format!("{}...{}", prev_commit, curr_commit),
+		format!("-- {}", filepath),
 		"-U0".to_string(),
 		];
 		let output_res = Command::new("git").args(&params)
@@ -233,7 +233,7 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 		.output();
 		if output_res.is_err() {
 			let commanderr = output_res.expect_err("No error in output_res");
-			eprintln!("git diff command failed to start : {:?}", commanderr);
+			eprintln!("[generate_diff] git diff command failed to start : {:?}", commanderr);
 			continue;
 		}
 		let result = output_res.expect("Uncaught error in output_res");
@@ -241,11 +241,11 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 		let diffstr_res = str::from_utf8(&diff);
 		if diffstr_res.is_err() {
 			let e = diffstr_res.expect_err("No error in diffstr_res");
-			eprintln!("Unable to deserialize diff: {:?}", e);
+			eprintln!("[generate_diff] Unable to deserialize diff: {:?}", e);
 			continue;
 		}
 		let diffstr = diffstr_res.expect("Uncaught error in diffstr_res");
-		println!("diffstr = {}", &diffstr);
+		println!("[generate_diff] diffstr = {}", &diffstr);
 		diffmap.insert(filepath.to_string(), diffstr.to_string());
 	}
 	return diffmap;
