@@ -33,6 +33,7 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
         eprintln!("[get_blame_user] Unable to get ranges for blame author deserialization: {:?}", &json);
         return None;
     }
+    println!("[get_blame_user] json = {:?}", &json);
     let range_json = range_json_opt.expect("Empty range_json_opt");
     for range in range_json {
         let start_res: Result<i32, _> = range["startingLine"].to_string().parse();
@@ -49,8 +50,10 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
         }
         let blame_start = line_start_res.expect("Uncaught error in line_start_res");
         let blame_end = line_end_res.expect("Uncuaght error in line_end_res");
+        println!("[get_blame_user] blame_start = {:?}, start_range = {:?}, blame_end = {:?}, end_range = {:?}", &blame_start, &start_range, &blame_end, &end_range);
         if blame_start >= start_range && blame_end <= end_range {
             let user_opt = range["commit"]["author"]["user"]["login"].as_str();
+            println!("user_opt = {:?}", &user_opt);
             if user_opt.is_none() {
                 continue;
             }
@@ -62,33 +65,35 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
 }
 
 fn prepare_body(blame: &BlameItem, review: &Review) -> Value {
-    let query = 
+    let query = format!(
         r#"
-        query ($owner: String!, $repo: String!, $path: String!, $expression: String!) {
-            repository(owner: $owner, name: $repo) {
-                object(expression: $expression) {
-                    ... on Blob {
-                        blame(path: $path) {
-                            ranges {
-                                commit {
-                                    oid
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    "#;
-    let variables = json!({
-        "owner": review.repo_owner(),
-        "repo": review.repo_name(),
-        "path": blame.filepath(),
-        "expression": blame.commit(),
-    });
+        {{
+            repository(owner: "{}", name: "{}") {{
+              object(oid: "{}") {{
+                ... on Commit {{
+                  blame(path: "{}") {{
+                    ranges {{
+                      commit {{
+                        author {{
+                          user {{
+                            login
+                          }}
+                        }}
+                      }}
+                      startingLine
+                      endingLine
+                    }}
+                  }}
+                }}
+              }}
+            }}
+          }}
+        "#,
+        review.repo_owner(), review.repo_name(), blame.commit().trim_matches('"'), blame.filepath().trim_matches('"')
+    );
+    println!("[prepare_body] query = {:?}", &query);
     let body = json!({
-        "query": query,
-        "variables": variables,
+        "query": query
     });
     return body;
 }
