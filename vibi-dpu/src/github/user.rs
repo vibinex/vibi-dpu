@@ -14,7 +14,7 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
     let headers = headers_opt.expect("Empty headers_opt");
     let url = format!("{}/graphql", github_base_url());
     let client = get_client();
-    let response_res = client.post(url).headers(headers).body(body).send().await;
+    let response_res = client.post(url).headers(headers).json(&body).send().await;
     if response_res.is_err() {
         let e = response_res.expect_err("Empty error in response_res");
         eprintln!("[get_blame_user] Unable to get blame user for blame: {:?}, error: {:?}", blame, e);
@@ -64,36 +64,34 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
     return None;
 }
 
-fn prepare_body(blame: &BlameItem, review: &Review) -> String {
-    let query = format!(
+fn prepare_body(blame: &BlameItem, review: &Review) -> Value {
+    let query = 
         r#"
-        {{
-            repository(owner: "{}", name: "{}") {{
-              object(oid: "{}") {{
-                ... on Commit {{
-                  blame(path: "{}") {{
-                    ranges {{
-                      age
-                      commit {{
-                        author {{
-                          user {{
-                            login
-                          }}
-                        }}
-                      }}
-                      startingLine
-                      endingLine
-                    }}
-                  }}
-                }}
-              }}
-            }}
-          }}
-        "#,
-        review.repo_owner(), review.repo_name(), blame.commit().trim_matches('"'), blame.filepath().trim_matches('"')
-    );
-    let body = json!({
-        "query": query
+        query ($owner: String!, $repo: String!, $path: String!, $expression: String!) {
+            repository(owner: $owner, name: $repo) {
+                object(expression: $expression) {
+                    ... on Blob {
+                        blame(path: $path) {
+                            ranges {
+                                commit {
+                                    oid
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    "#;
+    let variables = json!({
+        "owner": review.repo_owner(),
+        "repo": review.repo_name(),
+        "path": blame.filepath(),
+        "expression": blame.commit(),
     });
-    return body.to_string();
+    let body = json!({
+        "query": query,
+        "variables": variables,
+    });
+    return body;
 }
