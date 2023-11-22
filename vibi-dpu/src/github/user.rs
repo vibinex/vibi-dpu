@@ -65,33 +65,35 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
 }
 
 fn prepare_body(blame: &BlameItem, review: &Review) -> Value {
-    let query = 
+    let query = format!(
         r#"
-        query ($owner: String!, $repo: String!, $path: String!, $expression: String!) {
-            repository(owner: $owner, name: $repo) {
-                object(expression: $expression) {
-                    ... on Blob {
-                        blame(path: $path) {
-                            ranges {
-                                commit {
-                                    oid
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    "#;
-    let variables = json!({
-        "owner": review.repo_owner(),
-        "repo": review.repo_name(),
-        "path": blame.filepath(),
-        "expression": blame.commit(),
-    });
+        {{
+            repository(owner: "{}", name: "{}") {{
+              object(oid: "{}") {{
+                ... on Commit {{
+                  blame(path: "{}") {{
+                    ranges {{
+                      commit {{
+                        author {{
+                          user {{
+                            login
+                          }}
+                        }}
+                      }}
+                      startingLine
+                      endingLine
+                    }}
+                  }}
+                }}
+              }}
+            }}
+          }}
+        "#,
+        review.repo_owner(), review.repo_name(), blame.commit().trim_matches('"'), blame.filepath().trim_matches('"')
+    );
+    println!("[prepare_body] query = {:?}", &query);
     let body = json!({
-        "query": query,
-        "variables": variables,
+        "query": query
     });
     return body;
 }
