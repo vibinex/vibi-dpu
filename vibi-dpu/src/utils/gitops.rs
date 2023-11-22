@@ -429,7 +429,8 @@ async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> 
 					linebreak.to_string(),
 					lidx.to_string(),
 					digest(path),
-					lineitem.commit().trim_matches('"').to_string())
+					lineitem.commit().trim_matches('"').to_string(),
+					path.to_string())
 				);
 				linebreak = lidx + 1;
 			}
@@ -444,7 +445,9 @@ async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> 
 			linebreak.to_string(),
 			lastidx.to_string(),
 			digest(path),
-			lineitem.commit().to_string()));
+			lineitem.commit().to_string(),
+			path.to_string(),
+		));
 	}
 	return Some(blamevec);
 }

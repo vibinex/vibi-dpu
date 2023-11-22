@@ -89,7 +89,7 @@ fn prepare_body(blame: &BlameItem, review: &Review) -> Value {
             }}
           }}
         "#,
-        review.repo_owner(), review.repo_name(), blame.commit().trim_matches('"'), blame.filepath().trim_matches('"')
+        review.repo_owner(), review.repo_name(), blame.commit().trim_matches('"'), blame.filepath_raw()
     );
     println!("[prepare_body] query = {:?}", &query);
     let body = json!({
