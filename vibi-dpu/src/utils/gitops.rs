@@ -4,12 +4,16 @@ use std::str;
 use serde::Deserialize;
 use serde::Serialize;
 use sha256::digest;
-
-use crate::bitbucket::auth::refresh_git_auth;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
+use tokio::fs;
+use std::io::ErrorKind;
 
 use super::hunk::BlameItem;
 use super::review::Review;
 use super::lineitem::LineItem;
+use crate::db::repo::save_repo_to_db;
+use crate::utils::repo::Repository;
 
 #[derive(Debug, Serialize, Default, Deserialize)]
 pub struct StatItem {
@@ -61,15 +65,10 @@ pub fn commit_exists(commit: &str, directory: &str) -> bool {
 	return true;
 }
 
-pub async fn git_pull(review: &Review) {
+pub async fn git_pull(review: &Review, access_token: &str) {
 	let directory = review.clone_dir();
 	println!("directory = {}", &directory);
-	let access_token_opt = refresh_git_auth(review.clone_url(), review.clone_dir()).await;
-	if access_token_opt.is_none() {
-		eprintln!("no refresh token acquired");
-	}
-	let access_token = access_token_opt.expect("Empty access_token");
-    set_git_url(review.clone_url(), directory, &access_token);
+    set_git_url(review.clone_url(), directory, &access_token, review.provider());
 	let output_res = Command::new("git")
 		.arg("pull")
 		.current_dir(directory)
@@ -90,10 +89,12 @@ pub async fn git_pull(review: &Review) {
 	};
 }
 
-fn set_git_url(git_url: &str, directory: &str, access_token: &str) {
-    let clone_url = git_url.to_string()
-        .replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
-        .replace("bitbucket.org:", "bitbucket.org/");
+fn set_git_url(git_url: &str, directory: &str, access_token: &str, repo_provider: &str) {
+    let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
+	if clone_url_opt.is_none(){
+		return
+	}
+	let clone_url = clone_url_opt.expect("empty clone_url_opt");
     let output_res = Command::new("git")
 		.arg("remote").arg("set-url").arg("origin")
 		.arg(clone_url)
@@ -221,18 +222,18 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 	let clone_dir = review.clone_dir();
 	for item in smallfiles {
 		let filepath = item.filepath.as_str();
-		let params = vec![
-		"diff".to_string(),
-		format!("{prev_commit}...{curr_commit}"),
-		format!("-- {filepath}"),
-		"-U0".to_string(),
-		];
-		let output_res = Command::new("git").args(&params)
-		.current_dir(&clone_dir)
-		.output();
+		let commit_range = format!("{}...{}", prev_commit, curr_commit);
+		println!("[generate_diff] | clone_dir = {:?}, filepath = {:?}", clone_dir, filepath);
+		let output_res = Command::new("git")
+			.arg("diff")
+			.arg("-U0")
+			.arg(&commit_range)
+			.arg(&filepath)
+			.current_dir(clone_dir)
+			.output();
 		if output_res.is_err() {
 			let commanderr = output_res.expect_err("No error in output_res");
-			eprintln!("git diff command failed to start : {:?}", commanderr);
+			eprintln!("[generate_diff] git diff command failed to start : {:?}", commanderr);
 			continue;
 		}
 		let result = output_res.expect("Uncaught error in output_res");
@@ -240,11 +241,11 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 		let diffstr_res = str::from_utf8(&diff);
 		if diffstr_res.is_err() {
 			let e = diffstr_res.expect_err("No error in diffstr_res");
-			eprintln!("Unable to deserialize diff: {:?}", e);
+			eprintln!("[generate_diff] Unable to deserialize diff: {:?}", e);
 			continue;
 		}
 		let diffstr = diffstr_res.expect("Uncaught error in diffstr_res");
-		println!("diffstr = {}", &diffstr);
+		println!("[generate_diff] diffstr = {}", &diffstr);
 		diffmap.insert(filepath.to_string(), diffstr.to_string());
 	}
 	return diffmap;
@@ -495,4 +496,111 @@ fn extract_timestamp(wordvec: &Vec<&str>, mut idx: usize) -> String {
 		}
 	}
 	return timestamp.to_string();
+}
+
+pub fn create_clone_url(git_url: &str, access_token: &str, repo_provider: &str) -> Option<String> {
+	let mut clone_url = None;
+	if repo_provider == "github" {
+		clone_url = Some(git_url.to_string()
+			.replace("git@", format!("https://x-access-token:{access_token}@").as_str())
+			.replace("github.com:", "github.com/"));
+	} else if repo_provider == "bitbucket" {
+		clone_url = Some(git_url.to_string()
+			.replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
+			.replace("bitbucket.org:", "bitbucket.org/"));
+	}
+	return clone_url;
+}
+
+pub fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str, repo_provider: &str) {
+    let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
+    if clone_url_opt.is_none() {
+        eprintln!("Unable to create clone url for repo provider {:?}, empty clone_url_opt", repo_provider);
+        return;
+    }
+    let clone_url = clone_url_opt.expect("empty clone_url_opt");
+    let output = Command::new("git")
+		.arg("remote").arg("set-url").arg("origin")
+		.arg(clone_url)
+		.current_dir(directory)
+		.output()
+		.expect("failed to execute git pull");
+    // Only for debug purposes
+	match str::from_utf8(&output.stderr) {
+		Ok(v) => println!("set_git_url stderr = {:?}", v),
+		Err(e) => eprintln!("set_git_url stderr error: {}", e), 
+	};
+	match str::from_utf8(&output.stdout) {
+		Ok(v) => println!("set_git_urll stdout = {:?}", v),
+		Err(e) => eprintln!("set_git_url stdout error: {}", e), 
+	};
+	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
+}
+
+pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_provider: &str) {
+    let git_url = repo.clone_ssh_url();
+    // call function for provider specific git url formatting
+    let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
+    if clone_url_opt.is_none() {
+        eprintln!("Unable to create clone url for repo provider {:?}, empty clone_url_opt", repo_provider);
+        return;
+    }
+    let clone_url = clone_url_opt.expect("empty clone_url_opt");
+    let random_string: String = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(10)
+        .map(char::from)
+        .collect();
+    let mut directory = format!("/tmp/{}/{}/{}", repo.provider(), 
+        repo.workspace(), random_string);
+    // Check if directory exists
+    let exists_res = fs::metadata(&directory).await;
+    if exists_res.is_err() {
+        let e = exists_res.expect_err("No error in exists_res");
+        println!("executing metadata in {:?}, output: {:?}",
+                &directory, e);
+        if e.kind() != ErrorKind::NotFound {
+            return;
+        }
+    }
+    let remove_dir_opt = fs::remove_dir_all(&directory).await;
+    if remove_dir_opt.is_err() {
+        let e = remove_dir_opt.expect_err("No error in remove_dir_opt");
+        println!("Execute in directory: {:?}, remove_dir_all: {:?}",
+            &directory, e);
+        if e.kind() != ErrorKind::NotFound {
+            return;
+        }
+    }
+    let create_dir_opt = fs::create_dir_all(&directory).await;
+    if create_dir_opt.is_err() {
+        let e = create_dir_opt.expect_err("No error in create_dir_opt");
+        println!("Executing in directory: {:?}, create_dir_all: {:?}",
+            &directory, e);
+        if e.kind() != ErrorKind::NotFound {
+            return;
+        }
+    }
+    println!("directory exists? {}", fs::metadata(&directory).await.is_ok());
+    let mut cmd = std::process::Command::new("git");
+    cmd.arg("clone").arg(clone_url).current_dir(&directory);
+    let output_res = cmd.output();
+    if output_res.is_err() {
+        let e = output_res.expect_err("No error in output_res in git clone");
+        eprintln!("Executing in directory: {:?}, git clone: {:?}",
+            &directory, e);
+        return;
+    }
+    let output = output_res.expect("Uncaught error in output_res");
+	match str::from_utf8(&output.stderr) {
+		Ok(v) => println!("git pull stderr = {:?}", v),
+		Err(e) => {/* error handling */ println!("git clone stderr error {}", e)}, 
+	};
+	match str::from_utf8(&output.stdout) {
+		Ok(v) => println!("git pull stdout = {:?}", v),
+		Err(e) => {/* error handling */ println!("git clone stdout error {}", e)}, 
+	};
+    directory = format!("{}/{}", &directory, repo.name());
+    repo.set_local_dir(&directory);
+    save_repo_to_db(repo);
 }
