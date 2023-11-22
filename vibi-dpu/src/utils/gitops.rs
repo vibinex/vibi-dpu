@@ -362,6 +362,7 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 				"-w",
 				"-e",
 				"--date=unix",
+				"-l",
 				path.as_str(),
 			);
 			let blame_res = Command::new("git").args(paramvec)
@@ -425,7 +426,8 @@ async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> 
 					linebreak.to_string(),
 					lidx.to_string(),
 					digest(path),
-					lineitem.commit().to_string())
+					lineitem.commit().trim_matches('"').to_string(),
+					path.to_string())
 				);
 				linebreak = lidx + 1;
 			}
@@ -440,7 +442,9 @@ async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> 
 			linebreak.to_string(),
 			lastidx.to_string(),
 			digest(path),
-			lineitem.commit().to_string()));
+			lineitem.commit().to_string(),
+			path.to_string(),
+		));
 	}
 	return Some(blamevec);
 }

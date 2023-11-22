@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{utils::{hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}, db::user::{get_workspace_user_from_db}, bitbucket::{user::author_from_commit, reviewer::add_reviewers, self}, core::github};
+use crate::{utils::{hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}, db::user::{get_workspace_user_from_db}, bitbucket::{user::author_from_commit, self}, core::github, github::user::get_blame_user};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
@@ -16,10 +16,6 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
         if coverage_map.is_empty() {
             continue;
         }
-        // TODO: remove this after implementing reviewer auto-assign in GitHub through DPU
-        if review.provider().to_string() == ProviderEnum::Github.to_string() {
-            repo_config.set_auto_assign(false);
-        }
         if repo_config.comment() {
             println!("Inserting comment...");
             // create comment text
@@ -34,24 +30,56 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
             
         }
         if repo_config.auto_assign() {
-            let mut author_set: HashSet<String> = HashSet::new();
-            author_set.insert(prhunk.author().to_string());
-            for blame in prhunk.blamevec() {
-                let blame_author_opt = author_from_commit(blame.commit(),
-                    hunkmap.repo_name(), hunkmap.repo_owner()).await;
-                if blame_author_opt.is_none() {
-                    eprintln!("[process_coverage] Unable to get blame author from bb for commit: {}", &blame.commit());
-                    continue;
-                }
-                let blame_author = blame_author_opt.expect("Empty blame_author_opt");
-                let author_uuid = blame_author.uuid();
-                if author_set.contains(author_uuid) {
-                    continue;
-                }
-                add_reviewers(&blame_author, review, &access_token).await;
-                author_set.insert(author_uuid.to_string());
+            println!("Auto assigning reviewers...");
+            println!("review.provider() = {:?}", review.provider());
+            if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
+                add_bitbucket_reviewers(&prhunk, hunkmap, review, &access_token).await;
+            }
+            if review.provider().to_string() == ProviderEnum::Github.to_string() {
+                add_github_reviewers(prhunk, hunkmap, review, &access_token).await;
             }
         }  
+    }
+}
+
+async fn add_github_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review: &Review, access_token: &str) {
+    let mut reviewers: HashSet<String> = HashSet::new();
+    for blame in prhunk.blamevec() {
+        let blame_author_opt = get_blame_user(blame, review, access_token).await;
+        println!("[add_github_reviewers] blame_author_opt = {:?}", &blame_author_opt);
+        if blame_author_opt.is_none() {
+            continue;
+        }
+        let blame_author = blame_author_opt.expect("Empty blame_author_opt");
+        if reviewers.contains(&blame_author) || prhunk.author().to_string() == blame_author {
+            continue;
+        }
+        reviewers.insert(blame_author);
+    }
+    if reviewers.is_empty() {
+        return;
+    }
+    let reviewers_vec: Vec<String> = reviewers.into_iter().collect();
+    github::reviewer::add_reviewers(&reviewers_vec, review, access_token).await;
+}
+
+async fn add_bitbucket_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review: &Review, access_token: &str) {
+    let mut author_set: HashSet<String> = HashSet::new();
+    author_set.insert(prhunk.author().to_string());
+    for blame in prhunk.blamevec() {
+        let blame_author_opt = author_from_commit(blame.commit(),
+            hunkmap.repo_name(), hunkmap.repo_owner()).await;
+        if blame_author_opt.is_none() {
+            eprintln!("[process_coverage] Unable to get blame author from bb for commit: {}", &blame.commit());
+            continue;
+        }
+        let blame_author = blame_author_opt.expect("Empty blame_author_opt");
+        let author_uuid = blame_author.uuid();
+        if author_set.contains(author_uuid) {
+            continue;
+        }
+        bitbucket::reviewer::add_reviewers(&blame_author, review, &access_token).await;
+        author_set.insert(author_uuid.to_string());
     }
 }
 
