@@ -1,10 +1,10 @@
 steps:
   # Fetch the credentials from the GCP bucket
   - name: 'gcr.io/cloud-builders/gsutil'
-    args: ['cp', 'gs://vibi-test-secrets/pubsub-sa-test.json', 'pubsub-sa.json']
+    args: ['cp', 'gs://vibi-secrets-prod/pubsub-sa.json', 'pubsub-sa.json']
   
   - name: 'gcr.io/cloud-builders/gsutil'
-    args: ['cp', 'gs://vibi-test-secrets/repo-profiler-test.pem', 'repo-profiler.pem']
+    args: ['cp', 'gs://vibi-secrets-prod/repoprofiler_private.pem', 'repo-profiler.pem']
 
 
   # Perform cargo build inside vibi-dpu directory
@@ -38,13 +38,17 @@ steps:
       - '--build-arg'
       - 'GITHUB_BASE_URL=$_GITHUB_BASE_URL'
       - '-t'
-      - 'asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA'
+      - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA'
       - '.'
 
   # Push the Docker image to Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA']
+    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA']
+
+ # Delete the previous compute instance
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['compute', 'instances', 'delete', 'dpu-instance', '--zone=asia-south1-c', '--quiet']
 
   # Deploy the Docker image to a Docker-optimized VM
   - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['compute', 'instances', 'create-with-container', 'dpu-instance', '--container-image=asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA', '--zone=asia-south1-c', '--machine-type=e2-small']
+    args: ['compute', 'instances', 'create-with-container', 'dpu-instance', '--container-image=asia.gcr.io/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA', '--zone=asia-south1-c', '--machine-type=e2-small']
