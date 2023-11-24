@@ -45,9 +45,9 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA']
 
- # Delete the previous compute instance
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['compute', 'instances', 'delete', 'dpu-instance', '--zone=asia-south1-c', '--quiet']
+#  # Delete the previous compute instance
+#   - name: 'gcr.io/cloud-builders/gcloud'
+#     args: ['compute', 'instances', 'delete', 'dpu-instance', '--zone=asia-south1-c', '--quiet']
 
   # Deploy the Docker image to a Docker-optimized VM
   - name: 'gcr.io/cloud-builders/gcloud'
