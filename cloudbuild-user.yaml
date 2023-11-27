@@ -60,7 +60,7 @@ steps:
         apiVersion: apps/v1
         kind: Deployment
         metadata:
-          name: $SHORT_SHA_$_USER_ID
+          name: $SHORT_SHA$_USER_ID
         spec:
           replicas: 1
           selector:
@@ -72,7 +72,7 @@ steps:
                 app: dpu
             spec:
               containers:
-              - name: $SHORT_SHA_$_USER_ID
+              - name: $SHORT_SHA$_USER_ID
                 image: asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA
                 ports:
                 - containerPort: 80
