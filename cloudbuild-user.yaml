@@ -47,7 +47,7 @@ steps:
 
 # Authenticate with the Kubernetes cluster
   - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['container', 'clusters', 'get-credentials', 'dpu-cluster', '--zone', 'asia-south1-a', '--project', '$PROJECT_ID']
+    args: ['container', 'clusters', 'get-credentials', 'dpu-cluster', '--region', 'asia-south1', '--project', '$PROJECT_ID']
 
   # Create a new deployment in the Kubernetes cluster
   - name: 'gcr.io/cloud-builders/kubectl'
