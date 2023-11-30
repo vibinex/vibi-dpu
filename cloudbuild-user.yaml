@@ -1,49 +1,7 @@
 steps:
-  # Fetch the credentials from the GCP bucket
-  - name: 'gcr.io/cloud-builders/gsutil'
-    args: ['cp', 'gs://vibi-secrets-prod/pubsub-sa.json', 'pubsub-sa.json']
-  
-  - name: 'gcr.io/cloud-builders/gsutil'
-    args: ['cp', 'gs://vibi-secrets-prod/repoprofiler_private.pem', 'repo-profiler.pem']
-
-
-  # Perform cargo build inside vibi-dpu directory
-  - name: 'rust:latest'
-    entrypoint: 'cargo'
-    args: ['build']
-    dir: 'vibi-dpu'
-
-  # Build the Docker image with the build arguments
+  # Pull the Docker image from Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '--build-arg'
-      - 'GCP_CREDENTIALS=$_GCP_CREDENTIALS'
-      - '--build-arg'
-      - 'SERVER_URL=$_SERVER_URL'
-      - '--build-arg'
-      - 'INSTALL_ID=$_INSTALL_ID'
-      - '--build-arg'
-      - 'BITBUCKET_CLIENT_ID=$_BITBUCKET_CLIENT_ID'
-      - '--build-arg'
-      - 'BITBUCKET_CLIENT_SECRET=$_BITBUCKET_CLIENT_SECRET'
-      - '--build-arg'
-      - 'BITBUCKET_BASE_URL=$_BITBUCKET_BASE_URL'
-      - '--build-arg'
-      - 'GITHUB_APP_ID=$_GITHUB_APP_ID'
-      - '--build-arg'
-      - 'GITHUB_APP_CLIENT_ID=$_GITHUB_APP_CLIENT_ID'
-      - '--build-arg'
-      - 'GITHUB_APP_CLIENT_SECRET=$_GITHUB_APP_CLIENT_SECRET'
-      - '--build-arg'
-      - 'GITHUB_BASE_URL=$_GITHUB_BASE_URL'
-      - '-t'
-      - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA'
-      - '.'
-
-  # Push the Docker image to Google Container Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA']
+    args: ['pull', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA']
 
 # Authenticate with the Kubernetes cluster
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -53,6 +11,8 @@ steps:
   - name: 'gcr.io/cloud-builders/kubectl'
     args: ['apply', '-f', '-']
     entrypoint: 'bash'
+    env:
+      - 'INSTALL_ID=$_INSTALL_ID'
     args:
       - '-c'
       - |
@@ -76,4 +36,7 @@ steps:
                 image: asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA
                 ports:
                 - containerPort: 80
+                env:
+                - name: INSTALL_ID
+                  value: $INSTALL_ID
         " | kubectl apply -f -
