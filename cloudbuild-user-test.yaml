@@ -16,7 +16,7 @@ steps:
     args:
       - '-c'
       - |
-        echo "
+        echo '
         apiVersion: apps/v1
         kind: Deployment
         metadata:
@@ -39,4 +39,4 @@ steps:
                 env:
                 - name: INSTALL_ID
                   value: ${_INSTALL_ID}
-        " | kubectl apply -f -
+        ' | kubectl apply -f -
