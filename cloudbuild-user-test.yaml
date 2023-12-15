@@ -1,7 +1,7 @@
 steps:
   # Pull the Docker image from Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'asia.gcr.io/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA']
+    args: ['pull', 'asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA']
 
 # Authenticate with the Kubernetes cluster
   - name: 'gcr.io/cloud-builders/gcloud'
