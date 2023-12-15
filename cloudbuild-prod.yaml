@@ -51,4 +51,4 @@ steps:
 
   # Deploy the Docker image to a Docker-optimized VM
   - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['compute', 'instances', 'create-with-container', 'dpu-instance', '--container-image=asia.gcr.io/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA', '--zone=asia-south1-c', '--machine-type=e2-small']
+    args: ['compute', 'instances', 'create-with-container', 'dpu-instance', '--container-image=asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA', '--zone=asia-south1-c', '--machine-type=e2-small']
