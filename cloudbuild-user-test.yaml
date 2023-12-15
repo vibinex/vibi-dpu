@@ -11,12 +11,10 @@ steps:
   - name: 'gcr.io/cloud-builders/kubectl'
     args: ['apply', '-f', '-']
     entrypoint: 'bash'
-    env:
-      - 'INSTALL_ID=$_INSTALL_ID'
     args:
       - '-c'
       - |
-        echo '
+        echo "
         apiVersion: apps/v1
         kind: Deployment
         metadata:
@@ -39,4 +37,4 @@ steps:
                 env:
                 - name: INSTALL_ID
                   value: ${_INSTALL_ID}
-        ' | kubectl apply -f -
+        " | kubectl apply -f -
