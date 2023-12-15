@@ -1,0 +1,42 @@
+steps:
+  # Pull the Docker image from Google Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'asia.gcr.io/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA']
+
+# Authenticate with the Kubernetes cluster
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['container', 'clusters', 'get-credentials', 'dpu-cluster', '--region', 'asia-south1', '--project', '$PROJECT_ID']
+
+  # Create a new deployment in the Kubernetes cluster
+  - name: 'gcr.io/cloud-builders/kubectl'
+    args: ['apply', '-f', '-']
+    entrypoint: 'bash'
+    env:
+      - 'INSTALL_ID=$_INSTALL_ID'
+    args:
+      - '-c'
+      - |
+        echo "
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: $SHORT_SHA$_USER_ID
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: dpu
+          template:
+            metadata:
+              labels:
+                app: dpu
+            spec:
+              containers:
+              - name: $SHORT_SHA$_USER_ID
+                image: asia.gcr.io/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA
+                ports:
+                - containerPort: 80
+                env:
+                - name: INSTALL_ID
+                  value: ${_INSTALL_ID}
+        " | kubectl apply -f -
