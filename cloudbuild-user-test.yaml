@@ -13,8 +13,8 @@ steps:
     entrypoint: 'bash'
     env:
       - '_INSTALL_ID=$_INSTALL_ID'
-      - '_SHORT_SHA_STR=$(printf "%s" "$SHORT_SHA")'
-      - '_USER_ID_STR=$(printf "%s" "$_USER_ID")'
+      - '_SHORT_SHA_STR=$SHORT_SHA'
+      - '_USER_ID_STR=$_USER_ID'
     args:
       - '-c'
       - |
