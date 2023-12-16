@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: $_NAME
-        image: asia.gcr.io/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA
+        image: asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$_SHORT_SHA
         ports:
         - containerPort: 80
         env:
