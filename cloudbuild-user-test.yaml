@@ -9,7 +9,7 @@ steps:
 
   # Create a new deployment in the Kubernetes cluster
   - name: 'gcr.io/cloud-builders/kubectl'
-    args: ['apply', '-f', 'user-deployment-test.yaml']
+    args: ['apply', '-f', 'user-deployment-test.yaml', '--project', '$PROJECT_ID', '--region', 'asia-south1', '--cluster', 'dpu-cluster']
     env:
     - '_INSTALL_ID=$_INSTALL_ID'
     - '_NAME=$SHORT_SHA$_USER_ID'
