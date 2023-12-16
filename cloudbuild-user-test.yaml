@@ -13,7 +13,7 @@ steps:
     entrypoint: 'bash'
     env:
       - '_INSTALL_ID=$_INSTALL_ID'
-      - '_NAME=$SHORT_SHA_$_USER_ID'
+      - '_NAME=$SHORT_SHA$_USER_ID'
     args:
       - '-c'
       - |
