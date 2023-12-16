@@ -13,8 +13,8 @@ steps:
     entrypoint: 'bash'
     env:
       - '_INSTALL_ID=$_INSTALL_ID'
-      - 'SHORT_SHA_STR=$(printf "%s" "$SHORT_SHA")'
-      - 'USER_ID_STR=$(printf "%s" "$_USER_ID")'
+      - '_SHORT_SHA_STR=$(printf "%s" "$SHORT_SHA")'
+      - '_USER_ID_STR=$(printf "%s" "$_USER_ID")'
     args:
       - '-c'
       - |
@@ -22,7 +22,7 @@ steps:
         apiVersion: apps/v1
         kind: Deployment
         metadata:
-          name: $SHORT_SHA_STR$USER_ID_STR
+          name: $_SHORT_SHA_STR$_USER_ID_STR
         spec:
           replicas: 1
           selector:
@@ -34,7 +34,7 @@ steps:
                 app: dpu
             spec:
               containers:
-              - name: $SHORT_SHA_STR$USER_ID_STR
+              - name: $_SHORT_SHA_STR$_USER_ID_STR
                 image: asia.gcr.io/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA
                 ports:
                 - containerPort: 80
