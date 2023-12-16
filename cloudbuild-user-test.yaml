@@ -12,7 +12,7 @@ steps:
     args: ['apply', '-f', '-']
     entrypoint: 'bash'
     env:
-      - 'INSTALL_ID=$_INSTALL_ID'
+      - '_INSTALL_ID=$_INSTALL_ID'
     args:
       - '-c'
       - |
@@ -38,5 +38,5 @@ steps:
                 - containerPort: 80
                 env:
                 - name: INSTALL_ID
-                  value: $INSTALL_ID
+                  value: $_INSTALL_ID
         " | kubectl apply -f -
