@@ -4,13 +4,13 @@ steps:
     args: ['pull', 'asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA']
 
 # Authenticate with the Kubernetes cluster
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['container', 'clusters', 'get-credentials', 'dpu-cluster', '--region', 'asia-south1', '--project', '$PROJECT_ID']
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['container', 'clusters', 'get-credentials', 'dpu-cluster', '--region', 'asia-south1', '--project', '$PROJECT_ID', '--config', 'gcloud-config.yaml']
 
-  # Create a new deployment in the Kubernetes cluster
-  - name: 'gcr.io/cloud-builders/kubectl'
-    args: ['apply', '-f', 'user-deployment-test.yaml', '--project', '$PROJECT_ID', '--region', 'asia-south1', '--cluster', 'dpu-cluster']
-    env:
+# Create a new deployment in the Kubernetes cluster
+- name: 'gcr.io/cloud-builders/kubectl'
+  args: ['apply', '-f', 'user-deployment-test.yaml']
+  env:
     - '_INSTALL_ID=$_INSTALL_ID'
     - '_NAME=$SHORT_SHA$_USER_ID'
     - '_SHORT_SHA=$SHORT_SHA'
