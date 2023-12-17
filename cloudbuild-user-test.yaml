@@ -12,5 +12,5 @@ steps:
     env:
     - 'NAME=$SHORT_SHA-$_USER_ID'
     - 'PROJECT_ID=$PROJECT_ID'
-    - 'SHORT_SHA=$_SHORT_SHA'
+    - 'SHORT_SHA=$SHORT_SHA'
     - 'INSTALL_ID=$_INSTALL_ID'
