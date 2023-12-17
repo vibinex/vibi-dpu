@@ -6,11 +6,14 @@ steps:
 # Authenticate with the Kubernetes cluster
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['container', 'clusters', 'get-credentials', 'dpu-cluster', '--region', 'asia-south1', '--project', '$PROJECT_ID', '--configuration', 'gcloud-config.yaml']
+    env:
+        - 'KUBECONFIG=/workspace/kubeconfig.yaml'
 
-# Create a new deployment in the Kubernetes cluster
+  # Create a new deployment in the Kubernetes cluster
   - name: 'gcr.io/cloud-builders/kubectl'
     args: ['apply', '-f', 'user-deployment-test.yaml']
     env:
       - '_INSTALL_ID=$_INSTALL_ID'
       - '_NAME=$SHORT_SHA$_USER_ID'
       - '_SHORT_SHA=$SHORT_SHA'
+    dir: '/workspace'  # Set the working directory to /workspace
