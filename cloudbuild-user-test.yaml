@@ -2,30 +2,14 @@ steps:
   # Pull the Docker image from Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA']
-
-# Authenticate with the Kubernetes cluster
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args: 
-      - 'container'
-      - 'clusters'
-      - 'get-credentials'
-      - 'dpu-cluster'
-      - '--region'
-      - 'asia-south1'
-      - '--project'
-      - '$PROJECT_ID'
-      
-    entrypoint: 'bash'
-    dir: '/workspace'
-    env:
-      - 'KUBECONFIG=/workspace/kubeconfig.yaml'
-    waitFor: ['-']
-
-  # Create a new deployment in the Kubernetes cluster
-  - name: 'gcr.io/cloud-builders/kubectl'
-    args: ['apply', '-f', 'user-deployment-test.yaml']
-    env:
-      - '_INSTALL_ID=$_INSTALL_ID'
-      - '_NAME=$SHORT_SHA$_USER_ID'
-      - '_SHORT_SHA=$SHORT_SHA'
-    dir: '/workspace'  # Set the working directory to /workspace
+  # deploy container image to GKE
+  - name: "gcr.io/cloud-builders/gke-deploy"
+    args:
+    - run
+    - --filename=user-deployment-test.yaml
+    - --location=asia-south1
+    - --cluster=dpu-cluster
+    substitutions:
+    - _NAME=${SHORT_SHA}-${_USER_ID}
+    - _INSTALL_ID=${_INSTALL_ID}
+    - _SHORT_SHA=${SHORT_SHA}
