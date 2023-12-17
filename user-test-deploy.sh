@@ -1,7 +1,16 @@
 #!/bin/bash
+set -e
+
+# Ensure variables are set
+if [ -z "$PROJECT_ID" ] || [ -z "$SHORT_SHA" ] || [ -z "$_USER_ID" ] || [ -z "$_INSTALL_ID" ]; then
+  echo "Error: Environment variables not set."
+  exit 1
+fi
+
 # Concatenate variables to create deployment and container names
 DEPLOYMENT_NAME="dpu-deployment-${SHORT_SHA}-${_USER_ID}"
 CONTAINER_NAME="dpu-container-${SHORT_SHA}-${_USER_ID}"
+
 # Generate the deployment configuration file
 cat <<EOF > generated-dpu-deployment.yaml
 apiVersion: apps/v1
