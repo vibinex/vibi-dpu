@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: $_NAME
+  name: $NAME
 spec:
   replicas: 1
   selector:
@@ -13,10 +13,10 @@ spec:
         app: dpu
     spec:
       containers:
-      - name: $_NAME
-        image: asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$_SHORT_SHA
+      - name: $NAME
+        image: asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA
         ports:
         - containerPort: 80
         env:
         - name: INSTALL_ID
-          value: $_INSTALL_ID
+          value: $INSTALL_ID

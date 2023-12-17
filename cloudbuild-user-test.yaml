@@ -9,7 +9,9 @@ steps:
     - --filename=user-deployment-test.yaml
     - --location=asia-south1
     - --cluster=dpu-cluster
+    - --appName=$SHORT_SHA-$_USER_ID
     env:
-    - '_NAME=$SHORT_SHA-$_USER_ID'
-    - '_INSTALL_ID=$_INSTALL_ID'
-    - '_SHORT_SHA=$SHORT_SHA'
+    - 'NAME=$SHORT_SHA-$_USER_ID'
+    - 'PROJECT_ID=$PROJECT_ID'
+    - 'SHORT_SHA=$_SHORT_SHA'
+    - 'INSTALL_ID=$_INSTALL_ID'
