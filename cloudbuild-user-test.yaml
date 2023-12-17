@@ -5,7 +5,7 @@ steps:
   - name: 'bash'
     args:
       - '-c'
-      - './user-test-deploy.sh'
+      - 'ls -l'
   # deploy container image to GKE
   - name: "gcr.io/cloud-builders/gke-deploy"
     args:
