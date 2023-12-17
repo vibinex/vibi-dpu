@@ -2,10 +2,10 @@ steps:
   # Pull the Docker image from Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'asia-south1-docker.pkg.dev/$PROJECT_ID/dpu-test/dpu-test:$SHORT_SHA']
-  - name: 'bash'
+  - name: '/bin/bash'
     args:
       - '-c'
-      - 'ls -l'
+      - './user-test-deploy.sh'
   # deploy container image to GKE
   - name: "gcr.io/cloud-builders/gke-deploy"
     args:
