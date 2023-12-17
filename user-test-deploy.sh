@@ -27,3 +27,7 @@ spec:
         - name: INSTALL_ID
           value: $_INSTALL_ID
 EOF
+
+# Display the generated YAML for debugging
+echo "Generated YAML:"
+cat generated-dpu-deployment.yaml
