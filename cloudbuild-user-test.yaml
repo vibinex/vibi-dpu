@@ -9,7 +9,7 @@ steps:
     - --filename=user-deployment-test.yaml
     - --location=asia-south1
     - --cluster=dpu-cluster
-    substitutions:
-    - _NAME=${SHORT_SHA}-${_USER_ID}
-    - _INSTALL_ID=${_INSTALL_ID}
-    - _SHORT_SHA=${SHORT_SHA}
+    env:
+    - '_NAME=$SHORT_SHA-$_USER_ID'
+    - '_INSTALL_ID=$_INSTALL_ID'
+    - '_SHORT_SHA=$SHORT_SHA'
