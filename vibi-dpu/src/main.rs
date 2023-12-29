@@ -1,5 +1,4 @@
 use std::env;
-
 mod pubsub;
 mod db;
 mod core;
