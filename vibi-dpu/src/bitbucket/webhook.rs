@@ -11,7 +11,7 @@ use super::config::prepare_auth_headers;
 pub async fn get_webhooks_in_repo(workspace_slug: &str, repo_slug: &str, access_token: &str) -> Vec<Webhook> {
     let url = format!("{}/repositories/{}/{}/hooks", bitbucket_base_url(), workspace_slug, repo_slug);
     println!("Getting webhooks from {}", url);
-    let response_json = get_api_values(&url, access_token, None).await;
+    let response_json = get_api_values(&url, access_token).await;
     let mut webhooks = Vec::new();
     for webhook_json in response_json {
         let active = matches!(webhook_json["active"].to_string().trim_matches('"'), "true" | "false");

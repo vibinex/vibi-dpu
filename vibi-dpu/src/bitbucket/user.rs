@@ -6,7 +6,7 @@ use super::config::{bitbucket_base_url, get_api_values, get_api_response};
 pub async fn get_and_save_workspace_users(workspace_id: &str, access_token: &str) {
     let base_url = bitbucket_base_url();
     let members_url = format!("{}/workspaces/{}/members", &base_url, workspace_id);
-    let response_json = get_api_values(&members_url, access_token, None).await;
+    let response_json = get_api_values(&members_url, access_token).await;
     for user_json in response_json {
         let user_val = user_json.get("user").expect("Empty reviewers_opt");
         let user: BitbucketUser = serde_json::from_value(user_val.to_owned())
@@ -25,7 +25,7 @@ pub async fn author_from_commit(commit: &str, repo_name: &str, repo_owner: &str)
     }
     let authinfo = authinfo_opt.expect("empty authinfo_opt in get_commit_bb");
     let access_token = authinfo.access_token();
-    let response_opt = get_api_response(&commits_url, None, access_token, &None).await;
+    let response_opt = get_api_response(&commits_url, None, access_token).await;
     if response_opt.is_none() {
         return None;
     }
