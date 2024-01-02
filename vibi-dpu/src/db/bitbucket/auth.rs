@@ -10,7 +10,7 @@ pub fn save_bitbucket_auth_info_to_db(auth_info: &mut BitbucketAuthInfo) {
     let now = SystemTime::now();
     let since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");  
     auth_info.set_timestamp(since_epoch.as_secs());
-    println!("auth info = {:?}", &auth_info);
+    log::debug!("[save_bitbucket_auth_info_to_db] auth info = {:?}", &auth_info);
     let json = serde_json::to_string(&auth_info).expect("Failed to serialize auth info");
     // Convert JSON string to bytes
     let bytes = json.as_bytes(); 
@@ -22,10 +22,10 @@ pub fn save_bitbucket_auth_info_to_db(auth_info: &mut BitbucketAuthInfo) {
     let insert_res = db.insert("bitbucket_auth_info", ivec);
     if insert_res.is_err() {
         let e = insert_res.expect_err("No error in insert_res");
-        eprintln!("Failed to upsert bitbucket auth info into sled DB: {e}");
+        log::error!("[save_bitbucket_auth_info_to_db] Failed to upsert bitbucket auth info into sled DB: {e}");
         return;
     }
-    println!("BitbucketAuthInfo succesfully upserted: {:?}", auth_info);
+    log::debug!("[save_bitbucket_auth_info_to_db] BitbucketAuthInfo succesfully upserted: {:?}", auth_info);
 }
 
 pub fn bitbucket_auth_info() -> Option<BitbucketAuthInfo> {
@@ -34,19 +34,19 @@ pub fn bitbucket_auth_info() -> Option<BitbucketAuthInfo> {
 	let authinfo_res = db.get(IVec::from(authinfo_key.as_bytes()));
     if authinfo_res.is_err() {
         let e = authinfo_res.expect_err("No error in authinfo_res");
-        eprintln!("Unable to get bb authinfo from db: {:?}", e);
+        log::error!("[bitbucket_auth_info] Unable to get bb authinfo from db: {:?}", e);
         return None;
     }
     let authinfo_opt = authinfo_res.expect("Uncaught error in authinfo_res");
     if authinfo_opt.is_none() {
-        eprintln!("No bitbucket authinfo in db");
+        log::error!("[bitbucket_auth_info] No bitbucket authinfo in db");
         return None;
     }
     let authinfo_ivec = authinfo_opt.expect("Empty authinfo_opt");
     let authinfo_parse = serde_json::from_slice(&authinfo_ivec);
     if authinfo_parse.is_err() {
         let e = authinfo_parse.expect_err("No error in authinfo_parse");
-        eprintln!("Unable to deserialize bitbucket authinfo_parse: {:?}", e);
+        log::error!("[bitbucket_auth_info] Unable to deserialize bitbucket authinfo_parse: {:?}", e);
         return None;
     }
 	let bitbucket_auth_info: BitbucketAuthInfo =  authinfo_parse.expect("Uncaught error in authinfo_parse");

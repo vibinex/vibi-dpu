@@ -22,33 +22,33 @@ pub async fn update_pr_info_in_db(workspace_slug: &str, repo_slug: &str, pr_info
 
     if update_result.is_err() {
         let e = update_result.expect_err("No error in updating pr_info");
-        eprintln!("Failed to update PR info in the database: {:?}", e);
+        log::error!("[update_pr_info_in_db] Failed to update PR info in the database: {:?}", e);
         return;
     }
 
-    println!("PR info updated successfully in the database. {:?} {:?}", key, pr_info);
+    log::debug!("[update_pr_info_in_db] PR info updated successfully in the database. {:?} {:?}", key, pr_info);
 }
 
 pub async fn bitbucket_process_and_update_pr_if_different(webhook_data: &Value, workspace_slug: &str, repo_slug: &str, pr_number: &str, repo_provider: &str) -> bool {
-    println!("[bitbucket_process_and_update_pr_if_different] {:?}, {:?}, {:?}, {:?}", workspace_slug, repo_slug, pr_number, repo_provider);
+    log::debug!("[bitbucket_process_and_update_pr_if_different] {:?}, {:?}, {:?}, {:?}", workspace_slug, repo_slug, pr_number, repo_provider);
     let pr_info_parsed_opt = parse_bitbucket_webhook_data(webhook_data);
     if pr_info_parsed_opt.is_none() {
-        eprintln!("[bitbucket_process_and_update_pr_if_different] Unable to parse webhook data");
+        log::error!("[bitbucket_process_and_update_pr_if_different] Unable to parse webhook data");
         return false;
     }
     let pr_info_parsed = pr_info_parsed_opt.expect("Empty pr_info_parsed_opt");
     // Retrieve the existing pr_head_commit from the database
-    print!("[process_and_update_pr_if_different|get_pr_info_from_db] workspace_slug: {}, repo_slug: {},  pr_number: {}, pr_info_parsed: {:?}", &workspace_slug, &repo_slug,  &pr_number, &pr_info_parsed); // todo: remove
+    log::debug!("[process_and_update_pr_if_different|get_pr_info_from_db] workspace_slug: {}, repo_slug: {},  pr_number: {}, pr_info_parsed: {:?}", &workspace_slug, &repo_slug,  &pr_number, &pr_info_parsed); // todo: remove
     let pr_info_db_opt = get_pr_info_from_db(workspace_slug, repo_slug, pr_number, repo_provider, &pr_info_parsed).await;
     if pr_info_db_opt.is_none() {
-        eprintln!("[bitbucket_process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
+        log::error!("[bitbucket_process_and_update_pr_if_different] No pr_info in db, parsed: {:?}", pr_info_parsed);
         return true; // new pr
     }
     let pr_info_db = pr_info_db_opt.expect("Empty pr_info_db_opt");
     if pr_info_db.pr_head_commit().to_string().eq_ignore_ascii_case(pr_info_parsed.pr_head_commit()){
         return false; // commits are the same
     } else {
-        println!("[process_and_update_pr_if_different|update_pr_info_in_db] workspace_slug: {}, repo_slug: {}, pr_info_parsed: {:?}, pr_number: {}", &workspace_slug, &repo_slug, &pr_info_parsed, &pr_number);
+        log::debug!("[process_and_update_pr_if_different|update_pr_info_in_db] workspace_slug: {}, repo_slug: {}, pr_info_parsed: {:?}, pr_number: {}", &workspace_slug, &repo_slug, &pr_info_parsed, &pr_number);
         update_pr_info_in_db(&workspace_slug, &repo_slug, &pr_info_parsed, &pr_number, repo_provider).await;
         return true; // commits are different, and PR info should be updated
     }
