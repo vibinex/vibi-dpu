@@ -8,7 +8,7 @@ pub async fn add_comment(comment_text: &str, review: &Review, access_token: &str
     let client = get_client();
     let headers_opt = prepare_headers(&access_token);
     if headers_opt.is_none() {
-        eprintln!("Unable to prepare_headers_comment, empty headers_opt");
+        log::error!("[github/add_comment] Unable to prepare_headers_comment, empty headers_opt");
         return;
     }
     let headers = headers_opt.expect("Empty headers_opt");
@@ -16,7 +16,7 @@ pub async fn add_comment(comment_text: &str, review: &Review, access_token: &str
         headers(headers).json(&comment_payload).send().await;
     if response_res.is_err() {
         let e = response_res.expect_err("No error in response_res");
-        eprintln!("[github/add_comment] Error in post request for adding comment - {:?}", e);
+        log::error!("[github/add_comment] Error in post request for adding comment - {:?}", e);
         return;
     }
     let response = response_res.expect("Error in getting response");
@@ -31,7 +31,7 @@ fn prepare_add_comment_url(review: &Review) -> String {
         review.repo_name(),
         review.id()
     );
-    println!("comment url = {}", &url);
+    log::debug!("[prepare_add_comment_url] comment url = {}", &url);
     return url;
 }
 
