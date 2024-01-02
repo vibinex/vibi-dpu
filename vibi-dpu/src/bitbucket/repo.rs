@@ -12,7 +12,7 @@ pub async fn get_workspace_repos(workspace: &str, access_token: &str) -> Option<
         let is_private_res = repo_json["is_private"].as_bool();
         let mut is_private = true;
         if is_private_res.is_none() {
-            eprintln!("Error in deserializing is_private_res: {:?}", &repo_json);
+            log::error!("[get_workspace_repos] Error in deserializing is_private_res: {:?}", &repo_json);
         }
         is_private = is_private_res.expect("Uncaught error in is_private_res");
         let val = Repository::new(

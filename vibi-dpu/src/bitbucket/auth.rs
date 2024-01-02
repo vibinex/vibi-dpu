@@ -26,7 +26,7 @@ pub async fn get_access_token_from_bitbucket(code: &str) -> Option<BitbucketAuth
         .await;
     if post_res.is_err() {
         let e = post_res.expect_err("No error in post_res");
-        eprintln!("error in calling api : {:?}", e);
+        log::error!("[get_access_token_from_bitbucket] error in calling api : {:?}", e);
         return None;
     }
     let res = post_res.expect("Uncaught error in post_res");
