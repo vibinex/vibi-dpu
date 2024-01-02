@@ -12,12 +12,12 @@ use crate::{
 					generate_diff, 
 					process_diffmap, 
 					generate_blame},
-			reqwest_client::get_client, user::Provider}, 
+			reqwest_client::get_client}, 
 	db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, 
 		repo::get_clone_url_clone_dir, 
 		review::save_review_to_db,
 		repo_config::save_repo_config_to_db},
-	core::{coverage::process_coverage, review}};
+	core::coverage::process_coverage};
 use crate::utils::user::ProviderEnum;
 use crate::bitbucket;
 use crate::github;
@@ -25,18 +25,18 @@ use crate::github;
 pub async fn process_review(message_data: &Vec<u8>) {
 	let review_opt = parse_review(message_data);
 	if review_opt.is_none() {
-		eprintln!("Unable to deserialize review message and repo config");
+		log::error!("[process_review] Unable to deserialize review message and repo config");
 		return;
 	}
 	let (review, repo_config) = review_opt.expect("parse_opt is empty");
-	println!("deserialized repo_config, review = {:?}, {:?}", &repo_config, &review);
+	log::error!("[process_review] deserialized repo_config, review = {:?}, {:?}", &repo_config, &review);
 	if hunk_already_exists(&review) {
 		return;
 	}
-	println!("Processing PR : {}", &review.id());
+	log::info!("[process_review] Processing PR : {}", &review.id());
 	let access_token_opt = get_access_token(&review).await;
 	if access_token_opt.is_none(){
-		eprintln!("[process_review] empty access_token_opt");
+		log::error!("[process_review] empty access_token_opt");
 		return;
 	}
 	let access_token = access_token_opt.expect("empty access_token_opt");
@@ -49,7 +49,7 @@ async fn get_access_token (review: &Review) -> Option<String> {
 	if review.provider().to_string() == ProviderEnum::Bitbucket.to_string().to_lowercase() {
 		let access_token_opt = bitbucket::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
 		if access_token_opt.is_none() {
-			eprintln!("no refresh token acquired");
+			log::error!("[get_access_token] no refresh token acquired");
 			return None;
 		}
 		access_token = access_token_opt.expect("Empty access_token_opt");
@@ -57,23 +57,23 @@ async fn get_access_token (review: &Review) -> Option<String> {
 	else if review.provider().to_string() == ProviderEnum::Github.to_string().to_lowercase(){
 		let access_token_opt = github::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
 		if access_token_opt.is_none() {
-			eprintln!("no refresh token acquired");
+			log::error!("[get_access_token] no refresh token acquired");
 			return None;
 		}
 		access_token = access_token_opt.expect("Empty access_token");
 	} else {
-		eprintln!("[git pull] | repo provider is not github or bitbucket");
+		log::error!("[git pull] | repo provider is not github or bitbucket");
 		return None;
 	}
 	return Some(access_token);
 }
 async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review, repo_config: &RepoConfig, access_token: &str) {
 	if hunkmap_opt.is_none() {
-		eprintln!("Empty hunkmap in send_hunkmap");
+		log::error!("[send_hunkmap] Empty hunkmap in send_hunkmap");
 		return;
 	}
 	let hunkmap = hunkmap_opt.to_owned().expect("empty hunkmap_opt");
-	println!("HunkMap = {:?}", &hunkmap);
+	log::debug!("HunkMap = {:?}", &hunkmap);
 	store_hunkmap_to_db(&hunkmap, review);
 	publish_hunkmap(&hunkmap);
 	let hunkmap_async = hunkmap.clone();
@@ -85,29 +85,29 @@ async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review, repo_confi
 fn hunk_already_exists(review: &Review) -> bool {
 	let hunk_opt = get_hunk_from_db(&review);
 	if hunk_opt.is_none() {
-		eprintln!("No hunk from get_hunk_from_db");
+		log::error!("[hunk_already_exists] No hunk from get_hunk_from_db");
 		return false;
 	}
 	let hunkmap = hunk_opt.expect("empty hunk from get_hunk_from_db");
 	publish_hunkmap(&hunkmap);
-	println!("Hunk already in db!");
+	log::debug!("[hunk_already_exists] Hunk already in db!");
 	return true;
 }
 async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 	let mut prvec = Vec::<PrHunkItem>::new();
 	let fileopt = get_excluded_files(&review);
-	println!("fileopt = {:?}", &fileopt);
+	log::debug!("[process_review_changes] fileopt = {:?}", &fileopt);
 	if fileopt.is_none() {
-		eprintln!("No files to review for PR {}", review.id());
+		log::error!("[process_review_changes] No files to review for PR {}", review.id());
 		return None;
 	}
 	let (_, smallfiles) = fileopt.expect("fileopt is empty");
 	let diffmap = generate_diff(&review, &smallfiles);
-	println!("[process_review_changes] diffmap = {:?}", &diffmap);
+	log::debug!("[process_review_changes] diffmap = {:?}", &diffmap);
 	let linemap = process_diffmap(&diffmap);
-	println!("[process_review_changes] linemap = {:?}", &linemap);
+	log::debug!("[process_review_changes] linemap = {:?}", &linemap);
 	let blamevec = generate_blame(&review, &linemap).await;
-	println!("[process_review_changes] blamevec = {:?}", &blamevec);
+	log::debug!("[process_review_changes] blamevec = {:?}", &blamevec);
 	let hmapitem = PrHunkItem::new(
 		review.id().to_string(),
 		review.author().to_string(),
@@ -126,7 +126,7 @@ async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 async fn commit_check(review: &Review, access_token: &str) {
 	if !commit_exists(&review.base_head_commit(), &review.clone_dir()) 
 		|| !commit_exists(&review.pr_head_commit(), &review.clone_dir()) {
-		println!("Pulling repository {} for commit history", &review.repo_name());
+		log::info!("[commit_check] Pulling repository {} for commit history", &review.repo_name());
 		git_pull(review, access_token).await;
 	}
 }
@@ -135,11 +135,11 @@ fn parse_review(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)> {
 	let data_res = serde_json::from_slice::<Value>(&message_data);
 	if data_res.is_err() {
 		let e = data_res.expect_err("No error in data_res");
-		eprintln!("Incoming message does not contain valid reviews: {:?}", e);
+		log::error!("[parse_review] Incoming message does not contain valid reviews: {:?}", e);
 		return None;
 	}
 	let deserialized_data = data_res.expect("Uncaught error in deserializing message_data");
-	println!("deserialized_data == {:?}", &deserialized_data["eventPayload"]["repository"]);
+	log::debug!("[parse_review] deserialized_data == {:?}", &deserialized_data["eventPayload"]["repository"]);
 	let repo_provider = deserialized_data["repositoryProvider"].to_string().trim_matches('"').to_string();
 
 	let review_opt = if repo_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
@@ -151,7 +151,7 @@ fn parse_review(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)> {
 	};
 
 	if review_opt.is_none() {
-		println!("[Parse_review] | empty review object");
+		log::error!("[parse_review] | empty review object");
 		return None;
 	}
 	let review = review_opt.expect("Empty review_opt");
@@ -159,12 +159,12 @@ fn parse_review(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)> {
 	let repo_config_res = serde_json::from_value(deserialized_data["repoConfig"].clone());
 	if repo_config_res.is_err() {
 		let e = repo_config_res.expect_err("No error in repo_config_res");
-		eprintln!("Unable to deserialze repo_config_res: {:?}", e);
+		log::error!("[parse_review] Unable to deserialze repo_config_res: {:?}", e);
 		let default_config = RepoConfig::default();
 		return Some((review, default_config));
 	}
 	let repo_config = repo_config_res.expect("Uncaught error in repo_config_res");
-	println!("repo_config = {:?}", &repo_config);
+	log::debug!("[parse_review] repo_config = {:?}", &repo_config);
 	save_repo_config_to_db(&repo_config, &review.repo_name(), &review.repo_owner(), &review.provider());
 	return Some((review, repo_config));
 }
@@ -176,30 +176,30 @@ fn publish_hunkmap(hunkmap: &HunkMap) {
 	tokio::spawn(async move {
 		let url = format!("{}/api/hunks",
 			env::var("SERVER_URL").expect("SERVER_URL must be set"));
-		println!("url for hunkmap publishing  {}", &url);
+		log::debug!("[publish_hunkmap] url for hunkmap publishing  {}", &url);
 		match client
 		.post(url)
 		.json(&hunkmap_json)
 		.send()
 		.await {
 			Ok(_) => {
-				println!("[publish_hunkmap] Hunkmap published successfully for: {} !", &key_clone);
+				log::info!("[publish_hunkmap] Hunkmap published successfully for: {} !", &key_clone);
 			},
 			Err(e) => {
-				eprintln!("[publish_hunkmap] Failed to publish hunkmap: {} for: {}", e, &key_clone);
+				log::error!("[publish_hunkmap] Failed to publish hunkmap: {} for: {}", e, &key_clone);
 			}
 		};
 	});
 }
 
 fn create_and_save_bitbucket_review_object(deserialized_data: &Value) -> Option<Review> {
-	println!("[create_and_save_bitbucket_review_object] deserialised_data {}", deserialized_data);
+	log::debug!("[create_and_save_bitbucket_review_object] deserialised_data {}", deserialized_data);
 	let workspace_name = deserialized_data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
 	let repo_name = deserialized_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
 	let repo_provider = ProviderEnum::Bitbucket.to_string().to_lowercase();
 	let clone_opt = get_clone_url_clone_dir(&repo_provider, &workspace_name, &repo_name);
 	if clone_opt.is_none() {
-		eprintln!("[create_and_save_bitbucket_review_object] Unable to get clone url and directory for bitbucket review");
+		log::error!("[create_and_save_bitbucket_review_object] Unable to get clone url and directory for bitbucket review");
 		return None;
 	}
 	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");
@@ -217,19 +217,19 @@ fn create_and_save_bitbucket_review_object(deserialized_data: &Value) -> Option<
 		clone_url,
 		deserialized_data["eventPayload"]["pullrequest"]["author"]["uuid"].to_string().replace("\"", ""),
 	);
-	println!("bitbucket review object= {:?}", &review);
+	log::debug!("[create_and_save_bitbucket_review_object] bitbucket review object= {:?}", &review);
 	save_review_to_db(&review);
 	return Some(review);
 }
 
 fn create_and_save_github_review_object(deserialized_data: &Value) -> Option<Review> {
-	println!("[create_and_save_github_review_object] deserialised_data {}", deserialized_data);
+	log::debug!("[create_and_save_github_review_object] deserialised_data {}", deserialized_data);
 	let repo_owner = deserialized_data["eventPayload"]["repository"]["owner"]["login"].to_string().trim_matches('"').to_string();
 	let repo_name = deserialized_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
 	let repo_provider = ProviderEnum::Github.to_string().to_lowercase();
 	let clone_opt = get_clone_url_clone_dir(&repo_provider, &repo_owner, &repo_name);
 	if clone_opt.is_none() {
-		eprintln!("[create_and_save_github_review_object] Unable to get clone url and directory for bitbucket review");
+		log::error!("[create_and_save_github_review_object] Unable to get clone url and directory for bitbucket review");
 		return None;
 	}
 	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");
@@ -247,7 +247,7 @@ fn create_and_save_github_review_object(deserialized_data: &Value) -> Option<Rev
 		clone_url,
 		deserialized_data["eventPayload"]["pull_request"]["user"]["id"].to_string().replace("\"", ""),
 	);
-	println!("github review object = {:?}", &review);
+	log::debug!("[create_and_save_github_review_object] github review object = {:?}", &review);
 	save_review_to_db(&review);
 	return Some(review);
 }
