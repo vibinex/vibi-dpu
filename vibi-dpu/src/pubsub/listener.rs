@@ -162,8 +162,8 @@ pub fn deserialized_data(message_data: &Vec<u8>) -> Option<Value> {
         return None;
     }
     let deserialized_data = msg_data_res.expect("Uncaught error in deserializing message_data");
-    println!(
-        "deserialized_data == {:?}",
+    log::debug!(
+        "[deserialized_data] deserialized_data == {:?}",
         &deserialized_data["eventPayload"]["repository"]
     );
     Some(deserialized_data)

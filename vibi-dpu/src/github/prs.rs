@@ -11,7 +11,7 @@ use super::config::{github_base_url, prepare_headers};
 pub async fn list_prs_github(repo_owner: &str, repo_name: &str, access_token: &str, state: &str) -> Option<Vec<String>> {
     let headers_opt = prepare_headers(access_token);
     if headers_opt.is_none() {
-        eprintln!("[list_prs_github] Unable to prepare auth headers for repository: {}", repo_name);
+        log::error!("[list_prs_github] Unable to prepare auth headers for repository: {}", repo_name);
         return None;
     }
     let headers = headers_opt.expect("Headers should be present");
@@ -38,13 +38,13 @@ async fn get_list_prs_github(headers: &HeaderMap, params: &HashMap<String, Strin
 
     if response_result.is_err() {
         let e = response_result.expect_err("No error in sending request");
-        eprintln!("[get_list_prs_github] Failed to send the request: {:?}", e);
+        log::error!("[get_list_prs_github] Failed to send the request: {:?}", e);
         return None;
     }
 
     let response = response_result.expect("Uncaught error in parsing response");
     if !response.status().is_success() {
-        eprintln!(
+        log::error!(
             "[get_list_prs_github] Request failed with status: {:?}",
             response.status()
         );
@@ -54,7 +54,7 @@ async fn get_list_prs_github(headers: &HeaderMap, params: &HashMap<String, Strin
     let parse_result = response.json::<Value>().await;
     if parse_result.is_err() {
         let e = parse_result.expect_err("No error in parsing");
-        eprintln!(
+        log::error!(
             "[get_list_prs_github] Failed to parse JSON: {:?}",
             e
         );
@@ -77,7 +77,7 @@ pub async fn get_pr_info_github(repo_owner: &str, repo_name: &str, access_token:
         "{}/repos/{}/{}/pulls/{}",
         &base_url, repo_owner, repo_name, pr_number
     );
-    println!("[get_pr_info_github] URL: {:?}", &url);
+    log::debug!("[get_pr_info_github] URL: {:?}", &url);
     let client = get_client();
     let response_result = client
         .get(&url)
@@ -89,20 +89,20 @@ pub async fn get_pr_info_github(repo_owner: &str, repo_name: &str, access_token:
 
     if response_result.is_err() {
         let e = response_result.expect_err("No error in getting PR response");
-        eprintln!("Error getting PR info: {:?}", e);
+        log::error!("[get_pr_info_github] Error getting PR info: {:?}", e);
         return None;
     }
 
     let response = response_result.expect("Uncaught error in response");
     if !response.status().is_success() {
-        eprintln!("Failed to get PR info, response: {:?}", response.text().await);
+        log::error!("[get_pr_info_github] Failed to get PR info, response: {:?}", response.text().await);
         return None;
     }
 
     let parse_result = response.json::<Value>().await;
     if parse_result.is_err() {
         let e = parse_result.expect_err("No error in parsing");
-        eprintln!("Error parsing PR data: {:?}", e);
+        log::error!("[get_pr_info_github] Error parsing PR data: {:?}", e);
         return None;
     }
 
@@ -115,7 +115,7 @@ pub async fn get_pr_info_github(repo_owner: &str, repo_name: &str, access_token:
         pr_branch: pr_data["head"]["ref"].as_str()?.to_string(),
     };
 
-    println!("[get_pr_info_github] PR info: {:?}", &pr_info);
+    log::debug!("[get_pr_info_github] PR info: {:?}", &pr_info);
     Some(pr_info)
 }
 
@@ -125,6 +125,6 @@ pub async fn get_and_store_pr_info(repo_owner: &str, repo_name: &str, access_tok
         // If PR information is available, store it in the database
         update_pr_info_in_db(repo_owner, repo_name, &pr_info, pr_number, repo_provider).await;
     } else {
-        eprintln!("No PR info available for PR number: {:?} repository: {:?} repo_owner{:?}", pr_number, repo_name, repo_owner);
+        log::error!("[get_and_store_pr_info] No PR info available for PR number: {:?} repository: {:?} repo_owner{:?}", pr_number, repo_name, repo_owner);
     }
 }

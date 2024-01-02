@@ -28,7 +28,7 @@ fn generate_jwt(github_app_id: &str) -> Option<String> {
     
     if pem_data_res.is_err() {
         let pem_data_err = pem_data_res.expect_err("No error in reading pem file");
-        println!("Error reading pem file: {:?}", pem_data_err);
+        log::error!("[generate_jwt] Error reading pem file: {:?}", pem_data_err);
         return None;
     }
     let pem_data = pem_data_res.expect("Error reading pem file");
@@ -41,14 +41,14 @@ fn generate_jwt(github_app_id: &str) -> Option<String> {
 
     let encoding_key = EncodingKey::from_rsa_pem(&pem_data);
     if encoding_key.is_err() {
-        println!("Error creating encoding key");
+        log::error!("[generate_jwt] Error creating encoding key");
         return None;
     }
 
     let token_res = encode(&Header::new(Algorithm::RS256), &my_claims, &encoding_key.unwrap());
     if token_res.is_err() {
         let token_err = token_res.expect_err("No error in fetching token");
-        println!("Error encoding JWT: {:?}", token_err);
+        log::error!("[generate_jwt] Error encoding JWT: {:?}", token_err);
         return None;
     };
     let token = token_res.expect("Error encoding JWT");
@@ -69,23 +69,23 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo>
         .await;
         if response.is_err() {
             let e = response.expect_err("No error in response");
-            eprintln!("error in calling github api : {:?}", e);
+            log::error!("[fetch_access_token] error in calling github api : {:?}", e);
             return None;
         }
         let response_access_token = response.expect("Uncaught error in reponse");
         if !response_access_token.status().is_success() {
-            println!(
-                "Failed to exchange code for access token. Status code: {}, Response content: {:?}",
+            log::error!(
+                "[fetch_access_token] Failed to exchange code for access token. Status code: {}, Response content: {:?}",
                 response_access_token.status(),
                 response_access_token.text().await
             );
             return None;
         }
-        println!("[fetch_access_token] response access token = {:?}", &response_access_token);
+        log::debug!("[fetch_access_token] response access token = {:?}", &response_access_token);
         let parse_res = response_access_token.json::<GithubAuthInfo>().await ;
         if parse_res.is_err() {
             let e = parse_res.expect_err("No error in parse_res for AuthInfo");
-            eprintln!("error deserializing GithubAuthInfo: {:?}", e);
+            log::info!("[fetch_access_token] error deserializing GithubAuthInfo: {:?}", e);
             return None;
         }
         let mut response_json = parse_res.expect("Uncaught error in parse_res for AuthInfo");
@@ -98,7 +98,7 @@ pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, di
     let repo_provider = "github".to_string();
 	let app_installation_id_opt = auth_info.installation_id().to_owned();
     if app_installation_id_opt.is_none() {
-        eprintln!("[update_access_token] app_installation_id empty");
+        log::error!("[update_access_token] app_installation_id empty");
         return None;
     }
     let app_installation_id = app_installation_id_opt.expect("Empty app_installation_id_opt");
@@ -107,21 +107,21 @@ pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, di
     let expires_at_dt_res = DateTime::parse_from_rfc3339(expires_at);
     if expires_at_dt_res.is_err() {
         let e = expires_at_dt_res.expect_err("No error in expires_at_dt_res");
-        eprintln!("[update_access_token] Unable to parse expires_at to datetime: {:?}", e);
+        log::error!("[update_access_token] Unable to parse expires_at to datetime: {:?}", e);
         return None;
     }
     let expires_at_dt = expires_at_dt_res.expect("Uncaught error in expires_at_dt_res");
     let expires_at_ts = expires_at_dt.timestamp();
     if expires_at_ts > now_ts {  
-        eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
+        log::error!("[update_access_token] Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
         return Some(auth_info.to_owned());
     }
     // auth info has expired
-    println!("github auth info expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
+    log::debug!("[update_access_token] github auth info expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
     let new_auth_info_opt = fetch_access_token(app_installation_id.as_str()).await;
     let mut new_auth_info = new_auth_info_opt.clone()
         .expect("empty auhtinfo_opt from update_access_token");
-    println!("New github auth info  = {:?}", &new_auth_info);
+    log::debug!("[update_access_token] New github auth info  = {:?}", &new_auth_info);
     let access_token = new_auth_info.token().to_string();
     set_git_remote_url(clone_url, directory, &access_token, &repo_provider);
     save_github_auth_info_to_db(&mut new_auth_info);
@@ -137,7 +137,7 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
     let authinfo = authinfo_opt.expect("empty authinfo_opt in refresh_git_auth");
     let authinfo_opt = update_access_token(&authinfo, clone_url, directory).await;
     if authinfo_opt.is_none() {
-        eprintln!("Empty authinfo_opt from update_access_token for github auth info");
+        log::error!("[refresh_git_auth] Empty authinfo_opt from update_access_token for github auth info");
         return None;
     }
     let latest_authinfo = authinfo_opt.expect("Empty authinfo_opt");
