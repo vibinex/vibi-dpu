@@ -10,15 +10,6 @@ pub struct BitbucketAuthInfo {
 }
 
 impl BitbucketAuthInfo {
-	// Constructor
-	pub fn new(access_token: String, refresh_token: String, expires_in: u64, timestamp: Option<u64>) -> Self {
-		Self {
-			access_token,
-			refresh_token,
-			expires_in,
-			timestamp,
-		}
-	}
 
 	// Public getter methods
 	pub fn access_token(&self) -> &String {
