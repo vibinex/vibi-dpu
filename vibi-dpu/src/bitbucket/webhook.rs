@@ -10,7 +10,7 @@ use super::config::prepare_auth_headers;
 
 pub async fn get_webhooks_in_repo(workspace_slug: &str, repo_slug: &str, access_token: &str) -> Vec<Webhook> {
     let url = format!("{}/repositories/{}/{}/hooks", bitbucket_base_url(), workspace_slug, repo_slug);
-    println!("Getting webhooks from {}", url);
+    log::info!("[get_webhooks_in_repo] Getting webhooks from {}", url);
     let response_json = get_api_values(&url, access_token).await;
     let mut webhooks = Vec::new();
     for webhook_json in response_json {
@@ -61,19 +61,19 @@ pub async fn add_webhook(workspace_slug: &str, repo_slug: &str, access_token: &s
 async fn process_add_webhook_response(response: Result<Response, Error>){
     if response.is_err() {
         let err = response.expect_err("No error in response");
-        eprintln!("Error in api call: {:?}", err);
+        log::error!("[process_add_webhook_response] Error in api call: {:?}", err);
         return;
     }
     let res = response.expect("Uncaught error in response");
     if !res.status().is_success() {
-        eprintln!("Failed to add webhook. Status code: {}, Text: {:?}",
+        log::error!("[process_add_webhook_response] Failed to add webhook. Status code: {}, Text: {:?}",
             res.status(), res.text().await);
         return;
     }
     let webhook_res = res.json::<WebhookResponse>().await;
     if webhook_res.is_err() {
         let err = webhook_res.expect_err("No error in webhook response");
-        eprintln!("Failed to parse webhook_res: {:?}", err);
+        log::error!("[process_add_webhook_response] Failed to parse webhook_res: {:?}", err);
         return;
     }
     let webhook = webhook_res.expect("Uncaught error in webhook response");

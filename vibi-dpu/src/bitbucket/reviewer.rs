@@ -12,7 +12,7 @@ pub async fn add_reviewers(user: &BitbucketUser, review: &Review, access_token: 
     let pr_info = get_pr_info(&url, access_token).await;
     let reviewers_opt = get_updated_reviewers_vec(pr_info, user).await;
     if reviewers_opt.is_none() {
-        eprintln!("[add_reviewers] Unable to add reviewers for review: {}", review.id());
+        log::error!("[add_reviewers] Unable to add reviewers for review: {}", review.id());
         return;
     }
     let (reviewers, pr_info_json) = reviewers_opt.expect("Empty reviewers_opt");
@@ -23,17 +23,17 @@ pub async fn add_reviewers(user: &BitbucketUser, review: &Review, access_token: 
 async fn get_updated_reviewers_vec(pr_opt: Option<Response>, user_from_db: &BitbucketUser) -> Option<(Vec<BitbucketUser>, Value)> {
     let reviewers_opt = parse_reviewers_from_prinfo(pr_opt).await;
     if reviewers_opt.is_none() {
-        eprintln!("Unable to parse and add reviewers");
+        log::error!("[get_updated_reviewers_vec Unable to parse and add reviewers");
         return None;
     }
     let (mut reviewers, get_response_json) = reviewers_opt.expect("Empty reviewers_opt");
-    println!("reviewers = {:?}", reviewers);
-    println!("user_from_db = {:?}", &user_from_db);
+    log::debug!("[get_updated_reviewers_vec] reviewers = {:?}", reviewers);
+    log::debug!("[get_updated_reviewers_vec] user_from_db = {:?}", &user_from_db);
     if !reviewers.contains(user_from_db) {
         // Add the user to reviewers
         reviewers.push(user_from_db.clone());
     }
-    println!("Updated reviewers = {:?}", reviewers);
+    log::debug!("[get_updated_reviewers_vec] Updated reviewers = {:?}", reviewers);
     return Some((reviewers, get_response_json));
 }
 
@@ -42,14 +42,14 @@ fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, pr_info_json: &Value
     let reviewers_obj_res = serde_json::to_value(updated_reviewers);
     if reviewers_obj_res.is_err() {
         let e = reviewers_obj_res.expect_err("No error in reviewers_obj_res");
-        eprintln!("Unable to serialize users: {:?}", e);
+        log::error!("[prepare_put_body] Unable to serialize users: {:?}", e);
         return None;
     }
     let reviewers_obj = reviewers_obj_res.expect("Uncaught error in reviewers_obj_res");
     let mut response_json = pr_info_json.to_owned();
     let obj_opt = response_json.as_object_mut();
     if obj_opt.is_none() {
-        eprintln!("Unable to get mutable reviewer response obj");
+        log::error!("[prepare_put_body] Unable to get mutable reviewer response obj");
         return None;
     }
     // Update obj
@@ -61,28 +61,28 @@ fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, pr_info_json: &Value
 
 async fn parse_reviewers_from_prinfo(pr_opt: Option<Response>) -> Option<(Vec<BitbucketUser>, Value)> {
     if pr_opt.is_none() {
-        eprintln!("Empty get response for pr_info");
+        log::error!("[parse_reviewers_from_prinfo] Empty get response for pr_info");
         return None;
     }
     let pr_info_response = pr_opt.expect("Error in getting response");
-    println!("get API status: {}", pr_info_response.status());
+    log::debug!("[parse_reviewers_from_prinfo] get API status: {}", pr_info_response.status());
     let pr_info_json = pr_info_response.json::<Value>().await;
     if pr_info_json.is_err() {
         let e = pr_info_json.expect_err("No error in pr_info_json");
-        eprintln!("Unable to deserialize response_json: {:?}", e);
+        log::error!("[parse_reviewers_from_prinfo] Unable to deserialize response_json: {:?}", e);
         return None;
     }
     let pr_info = pr_info_json.expect("Uncaught error in pr_info_json");
     let reviewers_opt = pr_info.get("reviewers");
     if reviewers_opt.is_none() {
-        eprintln!("No reviewers found in response: {:?}", &pr_info);
+        log::error!("[parse_reviewers_from_prinfo] No reviewers found in response: {:?}", &pr_info);
         return None;
     }
     let reviewers_value = reviewers_opt.expect("Empty reviewers_opt").to_owned();
     let reviewers_res = serde_json::from_value(reviewers_value);
     if reviewers_res.is_err() {
         let e = reviewers_res.expect_err("No error in reviewers_res");
-        eprintln!("Failed to serialize reviewers: {:?}", e);
+        log::error!("[parse_reviewers_from_prinfo] Failed to serialize reviewers: {:?}", e);
         return None;
     }
     let reviewers: Vec<BitbucketUser> = reviewers_res.expect("Uncaught error in response_res");
@@ -91,7 +91,7 @@ async fn parse_reviewers_from_prinfo(pr_opt: Option<Response>) -> Option<(Vec<Bi
 
 async fn put_reviewers(url: &str, access_token: &str, put_body_opt: &Option<Value>) {
     if put_body_opt.is_none() {
-        eprintln!("Empty put request body, not adding reviewers");
+        log::error!("[put_reviewers] Empty put request body, not adding reviewers");
         return;
     }
     let put_body = put_body_opt.to_owned().expect("Empty put_body_opt");
@@ -106,11 +106,11 @@ async fn put_reviewers(url: &str, access_token: &str, put_body_opt: &Option<Valu
         .send().await;
 
     // Handle the response_res as necessary
-    println!("response_res = {:?}", &response_res);
+    log::debug!("[put_reviewers] response_res = {:?}", &response_res);
     // for debugging
     match response_res {
-        Ok(v) => println!("response v = {:?}", v.text().await),
-        Err(e) => println!("response err = {:?}", e),
+        Ok(v) => log::debug!("[put_reviewers] response v = {:?}", v.text().await),
+        Err(e) => log::debug!("[put_reviewers] response err = {:?}", e),
     };
 }
 
@@ -118,14 +118,14 @@ async fn get_pr_info(url: &str, access_token: &str) -> Option<Response> {
     let client = get_client();
     let headers_opt = prepare_headers(&access_token);
     if headers_opt.is_none() {
-        eprintln!("Unable to prepare_headers, empty headers_opt");
+        log::error!("[get_pr_info] Unable to prepare_headers, empty headers_opt");
         return None;
     }
     let headers = headers_opt.expect("Empty headers_opt");
     let get_res = client.get(url).headers(headers).send().await;
     if get_res.is_err() {
         let e = get_res.expect_err("No error in response_res");
-        eprintln!("Error in get request for adding reviewer - {:?}", e);
+        log::error!("[get_pr_info] Error in get request for adding reviewer - {:?}", e);
         return None;
     }
     let get_response = get_res.expect("Uncaught error in get_res");
@@ -140,6 +140,6 @@ fn prepare_get_prinfo_url(repo_owner: &str, repo_name: &str, review_id: &str) ->
         repo_name,
         review_id
     );
-    println!("add reviews url = {}", &url);
+    log::debug!("[get_pr_info] add reviews url = {}", &url);
     return url;
 }
