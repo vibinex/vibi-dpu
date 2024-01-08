@@ -11,8 +11,8 @@ pub fn save_review_to_db(review: &Review) {
     let insert_res = db.insert(IVec::from(review_key.as_bytes()), json);
     if insert_res.is_err() {
         let e = insert_res.expect_err("No error in insert_res");
-        eprintln!("Failed to upsert review into sled DB: {e}");
+        log::error!("[save_review_to_db] Failed to upsert review into sled DB: {e}");
         return;
     }
-    println!("Review succesfully upserted: {:?}", review);
+    log::debug!("[save_review_to_db] Review succesfully upserted: {:?}", review);
 }
