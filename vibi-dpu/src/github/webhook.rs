@@ -11,15 +11,15 @@ use super::config::prepare_headers;
 
 pub async fn get_webhooks_in_repo(repo_owner: &str, repo_name: &str, access_token: &str) -> Option<Vec<Webhook>> {
     let url = format!("{}/repos/{}/{}/hooks", github_base_url(), repo_owner, repo_name);
-    println!("Getting webhooks from {}", url);
+    log::info!("[get_webhooks_in_repo] Getting webhooks from {}", url);
     let response_opt = get_api_paginated(&url, access_token, None).await;
     if response_opt.is_none() {
-        eprintln!("[get_webhooks_in_repo] Unable to call get api and get all webhooks");
+        log::error!("[get_webhooks_in_repo] Unable to call get api and get all webhooks");
         return None;
     }
     let webhook_val = response_opt.expect("Empty repos_opt");
     let webhooks = deserialize_webhooks(webhook_val);
-    println!("Fetched {:?} repositories from GitHub", &webhooks);
+    log::info!("[get_webhooks_in_repo] Fetched {:?} repositories from GitHub", &webhooks);
     return Some(webhooks);
 }
 
@@ -28,7 +28,7 @@ fn deserialize_webhooks(webhook_val: Vec<Value>) -> Vec<Webhook> {
     for response_json in webhook_val {
         let webhook_json_opt = response_json.as_array();
         if webhook_json_opt.is_none() {
-            eprintln!("[deserialize_webhooks] Unable to deserialize webhook value: {:?}", &response_json);
+            log::error!("[deserialize_webhooks] Unable to deserialize webhook value: {:?}", &response_json);
             continue;
         }
         let webhook_page_json = webhook_json_opt.expect("Empty repo_json_opt").to_owned();
@@ -88,12 +88,12 @@ pub async fn add_webhook(repo_owner: &str, repo_name: &str, access_token: &str) 
 async fn process_add_webhook_response(response: Result<Response, Error>){
     if response.is_err() {
         let err = response.expect_err("No error in response");
-        eprintln!("Error in api call: {:?}", err);
+        log::error!("[process_add_webhook_response] Error in api call: {:?}", err);
         return;
     }
     let res = response.expect("Uncaught error in response");
     if !res.status().is_success() {
-        eprintln!("Failed to add webhook. Status code: {}, Text: {:?}",
+        log::error!("[process_add_webhook_response] Failed to add webhook. Status code: {}, Text: {:?}",
             res.status(), res.text().await);
         return;
     }
