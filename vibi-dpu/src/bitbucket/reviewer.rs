@@ -23,7 +23,7 @@ pub async fn add_reviewers(user: &BitbucketUser, review: &Review, access_token: 
 async fn get_updated_reviewers_vec(pr_opt: Option<Response>, user_from_db: &BitbucketUser) -> Option<(Vec<BitbucketUser>, Value)> {
     let reviewers_opt = parse_reviewers_from_prinfo(pr_opt).await;
     if reviewers_opt.is_none() {
-            log::error!("[get_updated_reviewers_vec Unable to parse and add reviewers");
+        log::error!("[get_updated_reviewers_vec Unable to parse and add reviewers");
         return None;
     }
     let (mut reviewers, get_response_json) = reviewers_opt.expect("Empty reviewers_opt");
