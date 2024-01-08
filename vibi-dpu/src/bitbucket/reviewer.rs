@@ -61,7 +61,7 @@ fn prepare_put_body(updated_reviewers: &Vec<BitbucketUser>, pr_info_json: &Value
 
 async fn parse_reviewers_from_prinfo(pr_opt: Option<Response>) -> Option<(Vec<BitbucketUser>, Value)> {
     if pr_opt.is_none() {
-            log::error!("[parse_reviewers_from_prinfo] Empty get response for pr_info");
+        log::error!("[parse_reviewers_from_prinfo] Empty get response for pr_info");
         return None;
     }
     let pr_info_response = pr_opt.expect("Error in getting response");
@@ -75,7 +75,7 @@ async fn parse_reviewers_from_prinfo(pr_opt: Option<Response>) -> Option<(Vec<Bi
     let pr_info = pr_info_json.expect("Uncaught error in pr_info_json");
     let reviewers_opt = pr_info.get("reviewers");
     if reviewers_opt.is_none() {
-            log::error!("[parse_reviewers_from_prinfo] No reviewers found in response: {:?}", &pr_info);
+        log::error!("[parse_reviewers_from_prinfo] No reviewers found in response: {:?}", &pr_info);
         return None;
     }
     let reviewers_value = reviewers_opt.expect("Empty reviewers_opt").to_owned();
