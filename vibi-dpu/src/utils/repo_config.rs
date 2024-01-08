@@ -16,10 +16,6 @@ impl RepoConfig {
         self.auto_assign
     }
 
-    pub fn set_auto_assign(&mut self, auto_assign: bool) {
-        self.auto_assign = auto_assign;
-    }
-
     // Function to create a default RepoConfig
     pub fn default() -> Self {
         RepoConfig {

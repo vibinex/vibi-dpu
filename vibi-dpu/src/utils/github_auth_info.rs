@@ -9,14 +9,6 @@ pub struct GithubAuthInfo {
 }
 
 impl GithubAuthInfo {
-    // Constructor
-    pub fn new(token: String, expires_at: String, installation_id: Option<String>) -> Self {
-        Self {
-            token,
-            expires_at,
-            installation_id,
-        }
-    }
 
     // Public getter methods
     pub fn token(&self) -> &String {

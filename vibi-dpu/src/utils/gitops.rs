@@ -30,44 +30,44 @@ pub fn commit_exists(commit: &str, directory: &str) -> bool {
 		.output();
 	if output_res.is_err() {
 		let e = output_res.expect_err("No error in output_res");
-		eprintln!("Failed to start git rev-list: {:?}", e);
+		log::error!("[commit_exists] Failed to start git rev-list: {:?}", e);
 		return false;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
 	if !output.status.success() {
-		eprintln!("git rev-list, exit code: {:?}",
+		log::error!("[commit_exists] git rev-list, exit code: {:?}",
 			output.status.code());
 		// for debugging
 		match str::from_utf8(&output.stderr) {
-			Ok(v) => println!("git rev-list stderr = {:?}", v),
-			Err(e) => {/* error handling */ println!("git rev-list stderr error {}", e)}, 
+			Ok(v) => log::error!("[commit_exists] git rev-list stderr = {:?}", v),
+			Err(e) => {/* error handling */ log::error!("[commit_exists] git rev-list stderr error {}", e)}, 
 		};
 		return false;
 	}
-	println!("Execute git rev-list, exit code: {:?}", output.status.code());
+	log::debug!("[commit_exists] Execute git rev-list, exit code: {:?}", output.status.code());
 	if output.status.code() == Some(128) {
 		// for debugging
 		match str::from_utf8(&output.stderr) {
-			Ok(v) => eprintln!("git rev-list stderr = {:?}", v),
-			Err(e) => {/* error handling */ eprintln!("git rev-list stderr error {}", e)}, 
+			Ok(v) => log::error!("[commit_exists] git rev-list stderr = {:?}", v),
+			Err(e) => {/* error handling */ log::error!("[commit_exists] git rev-list stderr error {}", e)}, 
 		};
 		return false;
 	}
 	// for debugging
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => eprintln!("git rev-list stderr = {:?}", v),
-		Err(e) => {/* error handling */ eprintln!("git rev-list stderr error {}", e)}, 
+		Ok(v) => log::debug!("[commit_exists] git rev-list stderr = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[commit_exists] git rev-list stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("git rev-list stdout = {:?}", v),
-		Err(e) => {/* error handling */ eprintln!("git rev-list stdout error {}", e)}, 
+		Ok(v) => log::debug!("[commit_exists] git rev-list stdout = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[commit_exists] git rev-list stdout error {}", e)}, 
 	};
 	return true;
 }
 
 pub async fn git_pull(review: &Review, access_token: &str) {
 	let directory = review.clone_dir();
-	println!("directory = {}", &directory);
+	log::debug!("[git_pull] directory = {}", &directory);
     set_git_url(review.clone_url(), directory, &access_token, review.provider());
 	let output_res = Command::new("git")
 		.arg("pull")
@@ -75,17 +75,17 @@ pub async fn git_pull(review: &Review, access_token: &str) {
 		.output();
 	if output_res.is_err() {
 		let e = output_res.expect_err("No error in output_res");
-		eprintln!("failed to execute git pull: {:?}", e);
+		log::error!("[git_pull] failed to execute git pull: {:?}", e);
 		return;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("git pull stderr = {:?}", v),
-		Err(e) => {/* error handling */ println!("git pull stderr error {}", e)}, 
+		Ok(v) => log::debug!("[git_pull] git pull stderr = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[git_pull] git pull stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("git pull stdout = {:?}", v),
-		Err(e) => {/* error handling */ println!("git pull stdout error {}", e)}, 
+		Ok(v) => log::debug!("[git_pull] git pull stdout = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[git_pull] git pull stdout error {}", e)}, 
 	};
 }
 
@@ -102,30 +102,31 @@ fn set_git_url(git_url: &str, directory: &str, access_token: &str, repo_provider
 		.output();
 	if output_res.is_err() {
 		let e = output_res.expect_err("No error in output_res");
-		eprintln!("failed to execute set_git_url: {:?}", e);
+		log::error!("[set_git_url] failed to execute set_git_url: {:?}", e);
 		return;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
 	if !output.status.success() {
-		eprintln!("set_git_url failed with exit code: {}", output.status);
+		log::error!("[set_git_url] set_git_url failed with exit code: {}", output.status);
 		return;
 	}
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("set_git_url stderr = {:?}", v),
-		Err(e) => {/* error handling */ eprintln!("set_git_url stderr error {}", e)}, 
+		Ok(v) => log::debug!("[set_git_url] set_git_url stderr = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[set_git_url] stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("set_git_url stdout = {:?}", v),
-		Err(e) => {/* error handling */ eprintln!("set_git_url stdout error {}", e)}, 
+		Ok(v) => log::error!("[set_git_url] stdout = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[set_git_url] stdout error {}", e)}, 
 	};
-	println!("set_git_url output = {:?}, {:?}", &output.stdout, &output.stderr);
+	log::debug!("[set_git_url] set_git_url output = {:?}, {:?}", &output.stdout, &output.stderr);
 }
 
 pub fn get_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatItem>)> {
 	let prev_commit = review.base_head_commit();
 	let next_commit = review.pr_head_commit();
 	let clone_dir = review.clone_dir();
-	println!("prev_commit = {}, next commit = {}, clone_dir = {}", prev_commit, next_commit, clone_dir);
+	log::debug!("[get_excluded_files] prev_commit = {}, next commit = {}, clone_dir = {}",
+		prev_commit, next_commit, clone_dir);
 	let commit_range = format!("{}...{}", prev_commit, next_commit);
 	let git_res = Command::new("git")
 		.args(&["diff", &commit_range, "--numstat"])
@@ -133,7 +134,7 @@ pub fn get_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatIte
 		.output();
 	if git_res.is_err() {
 		let commanderr = git_res.expect_err("No error in git command");
-		eprintln!("git diff stat command failed to start : {:?}", commanderr);
+		log::error!("[get_excluded_files] git diff stat command failed to start : {:?}", commanderr);
 		return None;
 	}
 	let resultstat = git_res.expect("Uncaught error in git_res");
@@ -142,11 +143,11 @@ pub fn get_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatIte
 	let stat_res = str::from_utf8(&stat);
 	if stat_res.is_err() {
 		let staterr = stat_res.expect_err("No error in git command");
-		eprintln!("git diff stat command failed to start : {:?}", staterr);
+		log::error!("[get_excluded_files] git diff stat command failed to start : {:?}", staterr);
 		return None;
 	}
 	let statstr = stat_res.expect("Uncaught error in stat_res");
-	println!("statstr = {}", statstr);
+	log::debug!("[get_excluded_files] statstr = {}", statstr);
 	return process_statoutput(statstr);
 }
 
@@ -171,20 +172,19 @@ fn process_statoutput(statstr: &str) -> Option<(Vec<StatItem>, Vec<StatItem>)>{
 }
 
 fn generate_statitem(statitems: &Vec<&str>) -> StatItem {
-	let mut additions = 0;
 	let statitem = StatItem {
 		filepath: statitems[2].to_string(),
 		additions: match statitems[0].to_string().parse() {
 			Ok(adds) => {adds}
 			Err(e) => {
-				eprintln!("Unable to parse additions: {:?}", e);
+				log::error!("[generate_statitem] Unable to parse additions: {:?}", e);
 				0 // default value
 			}
 		},
 		deletions: match statitems[1].to_string().parse() {
 			Ok(dels) => {dels}
 			Err(e) => {
-				eprintln!("Unable to parse deletions: {:?}", e);
+				log::error!("[generate_statitem] Unable to parse deletions: {:?}", e);
 				0 // default value
 			}
 		},
@@ -223,7 +223,7 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 	for item in smallfiles {
 		let filepath = item.filepath.as_str();
 		let commit_range = format!("{}...{}", prev_commit, curr_commit);
-		println!("[generate_diff] | clone_dir = {:?}, filepath = {:?}", clone_dir, filepath);
+		log::debug!("[generate_diff] | clone_dir = {:?}, filepath = {:?}", clone_dir, filepath);
 		let output_res = Command::new("git")
 			.arg("diff")
 			.arg("-U0")
@@ -233,7 +233,7 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 			.output();
 		if output_res.is_err() {
 			let commanderr = output_res.expect_err("No error in output_res");
-			eprintln!("[generate_diff] git diff command failed to start : {:?}", commanderr);
+			log::error!("[generate_diff] git diff command failed to start : {:?}", commanderr);
 			continue;
 		}
 		let result = output_res.expect("Uncaught error in output_res");
@@ -241,11 +241,11 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 		let diffstr_res = str::from_utf8(&diff);
 		if diffstr_res.is_err() {
 			let e = diffstr_res.expect_err("No error in diffstr_res");
-			eprintln!("[generate_diff] Unable to deserialize diff: {:?}", e);
+			log::error!("[generate_diff] Unable to deserialize diff: {:?}", e);
 			continue;
 		}
 		let diffstr = diffstr_res.expect("Uncaught error in diffstr_res");
-		println!("[generate_diff] diffstr = {}", &diffstr);
+		log::debug!("[generate_diff] diffstr = {}", &diffstr);
 		diffmap.insert(filepath.to_string(), diffstr.to_string());
 	}
 	return diffmap;
@@ -266,7 +266,7 @@ fn process_diff(filepath: &str, diff: &str, linemap: &mut HashMap<String, Vec<St
 			(limiterpos[idx]+delimitter.len())..limiterpos[idx+1]
 		);
 		if line_res.is_none() {
-			eprintln!("Unable to format diff line");
+			log::error!("[process_diff] Unable to format diff line");
 			continue;
 		}
 		let line = line_res.expect("Empty line_res");
@@ -284,7 +284,7 @@ fn process_diff(filepath: &str, diff: &str, linemap: &mut HashMap<String, Vec<St
 				let delidx_res = delsplit[0].parse::<i32>();
 				let deldiff_res = delsplit[1].parse::<i32>();
 				if delidx_res.is_err() || deldiff_res.is_err() {
-					eprintln!("Unable to parse delidx_res or deldiff_res: {:?} {:?}",
+					log::error!("[process_diff] Unable to parse delidx_res or deldiff_res: {:?} {:?}",
 						delidx_res, deldiff_res);
 					continue;
 				}
@@ -295,7 +295,7 @@ fn process_diff(filepath: &str, diff: &str, linemap: &mut HashMap<String, Vec<St
 			else {
 				let delidx_res = deletionstr.parse::<i32>();
 				if delidx_res.is_err() {
-					eprintln!("Unable to parse delidx_res {:?}",
+					log::error!("[process_diff] Unable to parse delidx_res {:?}",
 						delidx_res);
 					continue;
 				}
@@ -310,7 +310,7 @@ fn process_diff(filepath: &str, diff: &str, linemap: &mut HashMap<String, Vec<St
 		if linemap.contains_key(filepath) {
 			let linemap_mut_res = linemap.get_mut(filepath);//.unwrap().push(deletionstr);
 			if linemap_mut_res.is_none() {
-				eprintln!("Unable to get mutable ref for linemap: {:?}", linemap);
+				log::error!("[process_diff] Unable to get mutable ref for linemap: {:?}", linemap);
 				continue;
 			}
 			let linemap_mut = linemap_mut_res.expect("Empty linemap_mut_res");
@@ -370,12 +370,12 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 				.output();
 			if blame_res.is_err() {
 				let e = blame_res.expect_err("No error in blame_res");
-				eprintln!("git blame command failed to start : {e}");
+				log::error!("[generate_blame] git blame command failed to start : {e}");
 				continue;
 			}
 			let blame_output = blame_res.expect("Uncaught error in blame_res");
 			if !blame_output.status.success() {
-                eprintln!("git blame command failed with exit code {:?} and error: {:?}",
+                log::error!("[generate_blame] git blame command failed with exit code {:?} and error: {:?}",
 					blame_output.status.code(), String::from_utf8_lossy(&blame_output.stderr));
                 continue;
             }
@@ -383,10 +383,10 @@ pub async fn generate_blame(review: &Review, linemap: &HashMap<String, Vec<Strin
 			let parse_res = str::from_utf8(&blame);
 			if parse_res.is_err() {
 				let e = parse_res.expect_err("No error in parse_res");
-				eprintln!("Unable to deserialize blame: {e}");
+				log::error!("[generate_blame] Unable to deserialize blame: {e}");
 			}
 			let blamestr = parse_res.expect("Uncaught error in parse_res");
-			println!("blamestr = {}", blamestr);
+			log::debug!("[generate_blame] blamestr = {}", blamestr);
 			let blamelines: Vec<&str> = blamestr.lines().collect();
 			if blamelines.len() == 0 {
 				continue;
@@ -406,7 +406,7 @@ async fn process_blameitem(path: &str, linenum: &str, blamelines: Vec<&str>) -> 
 	let mut blamevec = Vec::<BlameItem>::new();
 	if linenumint_res.is_err() {
 		let e = linenumint_res.expect_err("No error found in linenumint_res");
-		eprintln!("Unable to parse linenum : {:?}", e);
+		log::error!("[generate_blame] Unable to parse linenum : {:?}", e);
 		return None;
 	}
 	let linenumint = linenumint_res.expect("Uncaught error in linenumint_res");
@@ -519,7 +519,8 @@ pub fn create_clone_url(git_url: &str, access_token: &str, repo_provider: &str) 
 pub fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str, repo_provider: &str) {
     let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
     if clone_url_opt.is_none() {
-        eprintln!("Unable to create clone url for repo provider {:?}, empty clone_url_opt", repo_provider);
+        log::error!("[set_git_remote_url] Unable to create clone url for repo provider {:?}, empty clone_url_opt",
+			repo_provider);
         return;
     }
     let clone_url = clone_url_opt.expect("empty clone_url_opt");
@@ -531,14 +532,14 @@ pub fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str, re
 		.expect("failed to execute git pull");
     // Only for debug purposes
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("set_git_url stderr = {:?}", v),
-		Err(e) => eprintln!("set_git_url stderr error: {}", e), 
+		Ok(v) => log::debug!("[set_git_remote_url] stderr = {:?}", v),
+		Err(e) => log::error!("[set_git_remote_url] stderr error: {}", e), 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("set_git_urll stdout = {:?}", v),
-		Err(e) => eprintln!("set_git_url stdout error: {}", e), 
+		Ok(v) => log::debug!("[set_git_remote_url] stdout = {:?}", v),
+		Err(e) => log::error!("[set_git_remote_url] stdout error: {}", e), 
 	};
-	println!("git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
+	log::debug!("[set_git_remote_url] git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
 }
 
 pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_provider: &str) {
@@ -546,7 +547,8 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
     // call function for provider specific git url formatting
     let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
     if clone_url_opt.is_none() {
-        eprintln!("Unable to create clone url for repo provider {:?}, empty clone_url_opt", repo_provider);
+        log::error!("[clone_git_repo] Unable to create clone url for repo provider {:?}, empty clone_url_opt",
+			repo_provider);
         return;
     }
     let clone_url = clone_url_opt.expect("empty clone_url_opt");
@@ -561,7 +563,7 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
     let exists_res = fs::metadata(&directory).await;
     if exists_res.is_err() {
         let e = exists_res.expect_err("No error in exists_res");
-        println!("executing metadata in {:?}, output: {:?}",
+        log::debug!("[clone_git_repo] executing metadata in {:?}, output: {:?}",
                 &directory, e);
         if e.kind() != ErrorKind::NotFound {
             return;
@@ -570,7 +572,7 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
     let remove_dir_opt = fs::remove_dir_all(&directory).await;
     if remove_dir_opt.is_err() {
         let e = remove_dir_opt.expect_err("No error in remove_dir_opt");
-        println!("Execute in directory: {:?}, remove_dir_all: {:?}",
+        log::debug!("[clone_git_repo] Execute in directory: {:?}, remove_dir_all: {:?}",
             &directory, e);
         if e.kind() != ErrorKind::NotFound {
             return;
@@ -579,30 +581,30 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
     let create_dir_opt = fs::create_dir_all(&directory).await;
     if create_dir_opt.is_err() {
         let e = create_dir_opt.expect_err("No error in create_dir_opt");
-        println!("Executing in directory: {:?}, create_dir_all: {:?}",
+        log::debug!("[clone_git_repo] Executing in directory: {:?}, create_dir_all: {:?}",
             &directory, e);
         if e.kind() != ErrorKind::NotFound {
             return;
         }
     }
-    println!("directory exists? {}", fs::metadata(&directory).await.is_ok());
+    log::debug!("[clone_git_repo] directory exists? {}", fs::metadata(&directory).await.is_ok());
     let mut cmd = std::process::Command::new("git");
     cmd.arg("clone").arg(clone_url).current_dir(&directory);
     let output_res = cmd.output();
     if output_res.is_err() {
         let e = output_res.expect_err("No error in output_res in git clone");
-        eprintln!("Executing in directory: {:?}, git clone: {:?}",
+        log::error!("[clone_git_repo] Executing in directory: {:?}, git clone: {:?}",
             &directory, e);
         return;
     }
     let output = output_res.expect("Uncaught error in output_res");
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => println!("git pull stderr = {:?}", v),
-		Err(e) => {/* error handling */ println!("git clone stderr error {}", e)}, 
+		Ok(v) => log::debug!("[clone_git_repo] stderr = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[clone_git_repo] git clone stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => println!("git pull stdout = {:?}", v),
-		Err(e) => {/* error handling */ println!("git clone stdout error {}", e)}, 
+		Ok(v) => log::debug!("[clone_git_repo] stdout = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[clone_git_repo] git clone stdout error {}", e)}, 
 	};
     directory = format!("{}/{}", &directory, repo.name());
     repo.set_local_dir(&directory);
