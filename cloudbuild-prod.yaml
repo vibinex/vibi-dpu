@@ -4,7 +4,7 @@ steps:
     args: ['cp', 'gs://vibi-secrets-prod/pubsub-sa.json', 'pubsub-sa.json']
   
   - name: 'gcr.io/cloud-builders/gsutil'
-    args: ['cp', 'gs://vibi-secrets-prod/repoprofiler_private.pem', 'repo-profiler.pem']
+    args: ['cp', 'gs://vibi-secrets-prod/vibinex-dpu.2024-01-11.private-key.pem', 'repo-profiler.pem']
 
 
   # Perform cargo build inside vibi-dpu directory
