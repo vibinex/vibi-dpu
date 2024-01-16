@@ -39,8 +39,13 @@ steps:
       - 'GITHUB_BASE_URL=$_GITHUB_BASE_URL'
       - '-t'
       - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA'
+      - '-t'
+      - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest'
       - '.'
 
   # Push the Docker image to Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest']
