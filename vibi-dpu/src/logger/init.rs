@@ -6,11 +6,11 @@ use std::time::Duration;
 use crate::logger::cleanup::cleanup_old_logs;
 
 pub fn init_logger() -> bool {
-    let log_file_path = "/tmp/logs"; // TODO - decide optimal directory
+    let log_dir = "/tmp/logs"; // TODO - decide optimal directory
     // Set up env_logger to log messages to stdout
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     // Create a directory for log files (change the path as needed)
-    let create_dir_res = std::fs::create_dir_all(log_file_path);
+    let create_dir_res = std::fs::create_dir_all(log_dir);
     if create_dir_res.is_err() {
         let e = create_dir_res.expect_err("Empty error in create_dir_res");
         log::error!("[init_logger] Unable to create logs dir: {:?}", e);
