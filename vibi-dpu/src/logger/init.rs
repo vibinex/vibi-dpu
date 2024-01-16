@@ -18,7 +18,7 @@ pub fn init_logger() -> bool {
     }
 
     // Set up fern to log messages to files with hourly rotation
-    let log_file_path = format!("logs/{}.log", Utc::now().format("%Y-%m-%d_%H-%M-%S"));
+    let log_file_path = format!("/tmp/logs/{}.log", Utc::now().format("%Y-%m-%d_%H-%M-%S"));
     let file_config_res = log_file(&log_file_path);
     if file_config_res.is_err() {
         let e = file_config_res.expect_err("Empty error in file_config_res");
