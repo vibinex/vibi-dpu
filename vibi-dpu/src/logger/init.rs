@@ -1,14 +1,12 @@
-use env_logger::Env;
 use chrono::Utc;
 use fern::log_file;
+use log::LevelFilter;
 use std::time::Duration;
 
 use crate::logger::cleanup::cleanup_old_logs;
 
 pub fn init_logger() -> bool {
-    let log_dir = "/tmp/logs"; // TODO - decide optimal directory
-    // Set up env_logger to log messages to stdout
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    let log_dir = "/var/log/dpu";
     // Create a directory for log files (change the path as needed)
     let create_dir_res = std::fs::create_dir_all(log_dir);
     if create_dir_res.is_err() {
@@ -18,12 +16,11 @@ pub fn init_logger() -> bool {
     }
 
     // Set up fern to log messages to files with hourly rotation
-    let log_file_path = format!("/tmp/logs/{}.log", Utc::now().format("%Y-%m-%d_%H-%M-%S"));
+    let log_file_path = format!("{}/{}.log", &log_dir, Utc::now().format("%Y-%m-%d_%H-%M-%S"));
     let file_config_res = log_file(&log_file_path);
     if file_config_res.is_err() {
         let e = file_config_res.expect_err("Empty error in file_config_res");
         log::error!("[init_logger] Unable to create log file: {:?}", e);
-        // TODO - log error message
         return false;
     }
     let file_config = file_config_res.expect("Uncaught error in file_config_res");
@@ -37,6 +34,7 @@ pub fn init_logger() -> bool {
                 message
             ))
         })
+        .level(LevelFilter::Debug)
         .chain(std::io::stdout())
         .chain(file_config)
         .apply();
@@ -51,7 +49,7 @@ pub fn init_logger() -> bool {
         loop {
             // Perform log cleanup
             cleanup_old_logs(
-                &log_file_path, Duration::from_secs(retention_days * 24 * 60 * 60));
+                &log_dir, Duration::from_secs(retention_days * 24 * 60 * 60));
             // Sleep for retention_days before the next cleanup
             tokio::time::sleep(Duration::from_secs(retention_days * 24 * 60 * 60)).await;
         }
