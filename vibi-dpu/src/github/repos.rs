@@ -17,6 +17,19 @@ pub async fn get_github_app_installed_repos(access_token: &str) -> Option<Vec<Re
     return Some(repositories)
 }
 
+pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Repository>> {
+    let repos_url = format!("{}/user/repos", github_base_url());
+    let repos_opt = get_api_paginated(&repos_url, access_token, None).await;
+    if repos_opt.is_none() {
+        log::error!("[get_github_app_installed_repos] Unable to call get api and get all repos");
+        return None;
+    }
+    let repos_val = repos_opt.expect("Empty repos_opt");
+    let repositories = deserialize_repos(repos_val);
+    log::debug!("[get_github_app_installed_repos] Fetched {:?} repositories from GitHub", &repositories);
+    return Some(repositories)
+}
+
 fn deserialize_repos(repos_val: Vec<Value>) -> Vec<Repository> {
     let mut all_repos = Vec::new();
     for response_json in repos_val {
