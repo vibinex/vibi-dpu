@@ -52,10 +52,16 @@ pub async fn process_review(message_data: &Vec<u8>) {
 		access_token = access_token_opt;
 	}
 
-	let access_token = access_token.expect("empty access_token_opt");
-	commit_check(&review, &access_token).await;
+	let final_access_token_opt = access_token;
+	if final_access_token_opt.is_none() {
+		log::error!("[process review] no final access token opt");
+		return;
+	}
+	let final_access_token = final_access_token_opt.expect("Empty final access token opt");
+	
+	commit_check(&review, &final_access_token).await;
 	let hunkmap_opt = process_review_changes(&review).await;
-	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token).await;
+	send_hunkmap(&hunkmap_opt, &review, &repo_config, &final_access_token).await;
 }
 
 async fn get_access_token (review: &Review) -> Option<String> {
