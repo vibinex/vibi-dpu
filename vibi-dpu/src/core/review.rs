@@ -57,6 +57,7 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	let hunkmap_opt = process_review_changes(&review).await;
 	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token).await;
 }
+
 async fn get_access_token (review: &Review) -> Option<String> {
 	let access_token: String;
 	if review.provider().to_string() == ProviderEnum::Bitbucket.to_string().to_lowercase() {
