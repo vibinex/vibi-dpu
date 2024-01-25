@@ -34,12 +34,25 @@ pub async fn process_review(message_data: &Vec<u8>) {
 		return;
 	}
 	log::info!("[process_review] Processing PR : {}", &review.id());
-	let access_token_opt = get_access_token(&review).await;
-	if access_token_opt.is_none(){
-		log::error!("[process_review] empty access_token_opt");
-		return;
+	let pat_env_var = "GITHUB_PAT";
+    let provider_env_var = "PROVIDER";
+	let mut access_token: Option<String> = None;
+    if let (Ok(pat), Ok(provider)) = (env::var(pat_env_var), env::var(provider_env_var)) {
+        log::info!("[main] Personal Access Token: [REDACTED]");
+        log::info!("[main] Provider: {}", provider);
+        if provider == "GITHUB" { 
+			access_token = Some(pat);
+		}
+	} else {
+		let access_token_opt = get_access_token(&review).await;
+		if access_token_opt.is_none(){
+			log::error!("[process_review] empty access_token_opt");
+			return;
+		}
+		access_token = access_token_opt;
 	}
-	let access_token = access_token_opt.expect("empty access_token_opt");
+
+	let access_token = access_token.expect("empty access_token_opt");
 	commit_check(&review, &access_token).await;
 	let hunkmap_opt = process_review_changes(&review).await;
 	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token).await;
