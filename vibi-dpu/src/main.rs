@@ -24,7 +24,7 @@ async fn main() {
     let pat_env_var = "GITHUB_PAT";
     let provider_env_var = "PROVIDER";
     if let (Ok(pat), Ok(provider)) = (env::var(pat_env_var), env::var(provider_env_var)) {
-        log::info!("[main] Personal Access Token: {}", pat);
+        log::info!("[main] Personal Access Token: [REDACTED]");
         log::info!("[main] Provider: {}", provider);
         if provider == "GITHUB" {
             task::spawn(async move {

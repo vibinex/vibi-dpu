@@ -121,7 +121,7 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
     let mut pubreqs: Vec<SetupInfo> = Vec::new();
     let repos_opt = get_user_accessed_github_repos(&access_token).await;
     if repos_opt.is_none(){
-        log::error!("[setup_self_host_user_repos_github] No repositories found for GitHub app");
+        log::error!("[setup_self_host_user_repos_github] No repositories found for the user");
         return;
     }
     let repos = repos_opt.expect("Empty repos option");
