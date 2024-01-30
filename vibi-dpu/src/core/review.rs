@@ -36,7 +36,7 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	log::info!("[process_review] Processing PR : {}", &review.id());
 
 	let github_pat_res: Result<String, env::VarError> = env::var("GITHUB_PAT");
-    let provider_res = env::var("PROVIDER");
+	let provider_res = env::var("PROVIDER");
 	let mut access_token: Option<String> = None;
 	
 	if github_pat_res.is_err() {
