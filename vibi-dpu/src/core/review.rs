@@ -34,23 +34,36 @@ pub async fn process_review(message_data: &Vec<u8>) {
 		return;
 	}
 	log::info!("[process_review] Processing PR : {}", &review.id());
-	let pat_env_var = "GITHUB_PAT";
-    let provider_env_var = "PROVIDER";
+
+	let github_pat_res: Result<String, env::VarError> = env::var("GITHUB_PAT");
+    let provider_res = env::var("PROVIDER");
 	let mut access_token: Option<String> = None;
-    if let (Ok(pat), Ok(provider)) = (env::var(pat_env_var), env::var(provider_env_var)) {
-        log::info!("[main] Personal Access Token: [REDACTED]");
-        log::info!("[main] Provider: {}", provider);
-        if provider == "GITHUB" { 
-			access_token = Some(pat);
-		}
-	} else {
-		let access_token_opt = get_access_token(&review).await;
-		if access_token_opt.is_none(){
-			log::error!("[process_review] empty access_token_opt");
-			return;
-		}
-		access_token = access_token_opt;
-	}
+	
+	if github_pat_res.is_err() {
+        log::info!("[main] GITHUB PAT env var must be set");
+    } else {
+        let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
+        log::info!("[main] GITHUB PAT: [REDACTED]");
+
+        if provider_res.is_err() {
+            log::info!("[main] PROVIDER env var must be set");
+        } else {
+            let provider = provider_res.expect("Empty PROVIDER env var");
+            log::info!("[main] PROVIDER: {}", provider);
+            if provider.eq_ignore_ascii_case("GITHUB") {
+                access_token = Some(github_pat);
+            }
+        }
+    }
+
+    if access_token.is_none() {
+        let access_token_opt = get_access_token(&review).await;
+        if access_token_opt.is_none() {
+            log::error!("[process_review] empty access_token_opt");
+            return;
+        }
+        access_token = access_token_opt;
+    }
 
 	let final_access_token_opt = access_token;
 	if final_access_token_opt.is_none() {
@@ -58,7 +71,7 @@ pub async fn process_review(message_data: &Vec<u8>) {
 		return;
 	}
 	let final_access_token = final_access_token_opt.expect("Empty final access token opt");
-	
+
 	commit_check(&review, &final_access_token).await;
 	let hunkmap_opt = process_review_changes(&review).await;
 	send_hunkmap(&hunkmap_opt, &review, &repo_config, &final_access_token).await;
