@@ -40,30 +40,30 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	let mut access_token: Option<String> = None;
 	
 	if github_pat_res.is_err() {
-        log::info!("[main] GITHUB PAT env var must be set");
-    } else {
-        let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
-        log::info!("[main] GITHUB PAT: [REDACTED]");
+		log::info!("[main] GITHUB PAT env var must be set");
+	} else {
+		let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
+		log::info!("[main] GITHUB PAT: [REDACTED]");
 
-        if provider_res.is_err() {
-            log::info!("[main] PROVIDER env var must be set");
-        } else {
-            let provider = provider_res.expect("Empty PROVIDER env var");
-            log::info!("[main] PROVIDER: {}", provider);
-            if provider.eq_ignore_ascii_case("GITHUB") {
-                access_token = Some(github_pat);
-            }
-        }
-    }
+		if provider_res.is_err() {
+			log::info!("[main] PROVIDER env var must be set");
+		} else {
+			let provider = provider_res.expect("Empty PROVIDER env var");
+			log::info!("[main] PROVIDER: {}", provider);
+			if provider.eq_ignore_ascii_case("GITHUB") {
+				access_token = Some(github_pat);
+			}
+		}
+	}
 
-    if access_token.is_none() {
-        let access_token_opt = get_access_token(&review).await;
-        if access_token_opt.is_none() {
-            log::error!("[process_review] empty access_token_opt");
-            return;
-        }
-        access_token = access_token_opt;
-    }
+	if access_token.is_none() {
+		let access_token_opt = get_access_token(&review).await;
+		if access_token_opt.is_none() {
+			log::error!("[process_review] empty access_token_opt");
+			return;
+		}
+		access_token = access_token_opt;
+	}
 
 	let final_access_token_opt = access_token;
 	if final_access_token_opt.is_none() {
