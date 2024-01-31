@@ -4,6 +4,7 @@ use std::str;
 use tokio::task;
 
 use crate::github::auth::fetch_access_token; use crate::github::prs::{list_prs_github, get_and_store_pr_info};
+use crate::github::repos::get_user_accessed_github_repos;
 // Import shared utilities
 use crate::utils::setup_info::SetupInfo;
 use crate::github::repos::get_github_app_installed_repos;
@@ -112,4 +113,55 @@ async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access
         });
     }
     
+}
+
+pub async fn setup_self_host_user_repos_github(access_token: &str) {
+    let repo_provider = env::var("PROVIDER").expect("provider must be set");
+
+    let repos_opt = get_user_accessed_github_repos(&access_token).await;
+    if repos_opt.is_none() {
+        log::error!("[setup_self_host_user_repos_github] No repositories found for the user");
+        return;
+    }
+    let repos = repos_opt.expect("Empty repos option");
+    log::debug!("[setup_self_host_user_repos_github] Got repos: {:?}", repos);
+
+    // Create a mapping between repo_owner and associated repo_names
+    let mut repo_owner_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+
+    for repo in repos {
+        let token_copy = access_token.clone();
+        let mut repo_copy = repo.clone();
+        clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
+        let repo_name = repo.name();
+        let repo_owner = repo.owner();
+        repo_owner_map
+            .entry(repo_owner.to_string())
+            .or_insert_with(Vec::new)
+            .push(repo_name.to_string());
+        log::debug!(
+            "[setup_self_host_user_repos_github] Repo url git = {:?}",
+            &repo.clone_ssh_url()
+        );
+        log::debug!("[setup_self_host_user_repos_github] Repo name = {:?}", repo_name);
+        process_webhooks(repo_owner.to_string(), repo_name.to_string(), access_token.to_string())
+            .await;
+
+        let repo_name_async = repo_name.clone();
+        let repo_owner_async = repo_owner.clone();
+        let access_token_async = access_token.to_string().clone();
+        task::spawn(async move {
+            process_prs(&repo_owner_async, &repo_name_async, &access_token_async).await;
+        });
+    }
+
+    // Send a separate pubsub publish request for each unique repo_owner
+    for (repo_owner, repo_names) in repo_owner_map {
+        let pubreq = SetupInfo {
+            provider: "github".to_owned(),
+            owner: repo_owner,
+            repos: repo_names,
+        };
+        send_setup_info(&vec![pubreq]).await;
+    }
 }

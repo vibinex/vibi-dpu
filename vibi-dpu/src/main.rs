@@ -6,6 +6,7 @@ mod bitbucket;
 mod github;
 mod utils;
 mod logger;
+use tokio::task;
 
 #[tokio::main]
 async fn main() {
@@ -19,6 +20,30 @@ async fn main() {
     if !logs_init_status {
         log::error!("[main] Unable to file logger");
     }
+
+    let github_pat_res = env::var("GITHUB_PAT");
+    let provider_res = env::var("PROVIDER");
+    if github_pat_res.is_err() {
+        log::info!("[main] GITHUB PAT env var must be set");
+    } else {
+        let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
+        log::info!("[main] GITHUB PAT: [REDACTED]");
+
+        if provider_res.is_err() {
+            log::info!("[main] PROVIDER env var must be set");
+        } else {
+            let provider = provider_res.expect("Empty PROVIDER env var");
+            log::info!("[main] PROVIDER: {}", provider);
+
+            if provider.eq_ignore_ascii_case("GITHUB") {
+                task::spawn(async move {
+                    core::github::setup::setup_self_host_user_repos_github(&github_pat).await;
+                    log::info!("[main] Github repos self host setup processed");
+                });
+            }
+        }
+    }
+ 
     log::info!("[main] env vars = {}, {}", &gcp_credentials, &topic_name);
     pubsub::listener::listen_messages(
         &gcp_credentials, 
