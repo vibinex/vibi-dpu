@@ -51,7 +51,7 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
         let blame_start = line_start_res.expect("Uncaught error in line_start_res");
         let blame_end = line_end_res.expect("Uncuaght error in line_end_res");
         log::debug!("[get_blame_user] blame_start = {:?}, start_range = {:?}, blame_end = {:?}, end_range = {:?}", &blame_start, &start_range, &blame_end, &end_range);
-        if blame_start >= start_range && blame_end <= end_range {
+        if blame_start <= start_range && blame_end >= end_range {
             let user_opt = range["commit"]["author"]["user"]["login"].as_str();
             log::debug!("user_opt = {:?}", &user_opt);
             if user_opt.is_none() {
