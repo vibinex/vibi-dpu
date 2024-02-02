@@ -89,7 +89,7 @@ fn prepare_body(blame: &BlameItem, review: &Review) -> Value {
             }}
           }}
         "#,
-        review.repo_owner(), review.repo_name(), blame.commit().trim_matches('"'), blame.filepath_raw()
+        review.repo_owner(), review.repo_name(), review.base_head_commit(), blame.filepath_raw()
     );
     log::debug!("[prepare_body] query = {:?}", &query);
     let body = json!({
