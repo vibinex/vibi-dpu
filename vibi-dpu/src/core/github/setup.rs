@@ -124,7 +124,7 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
         return;
     }
     let repos = repos_opt.expect("Empty repos option");
-    log::debug!("[setup_self_host_user_repos_github] Got repos: {:?}", repos);
+    // log::debug!("[setup_self_host_user_repos_github] Got repos: {:?}", repos);
 
     // Create a mapping between repo_owner and associated repo_names
     let mut repo_owner_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
@@ -162,6 +162,7 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
             owner: repo_owner,
             repos: repo_names,
         };
+        log::debug!("[setup_self_host_user_repos_github] setup info = {:?}", pubreq);
         send_setup_info(&vec![pubreq]).await;
     }
 }
