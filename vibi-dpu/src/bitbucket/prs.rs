@@ -10,7 +10,7 @@ use super::config::{bitbucket_base_url, prepare_auth_headers};
 pub async fn list_prs_bitbucket(repo_owner: &str,repo_name: &str,access_token: &str,state: &str,) -> Option<Vec<String>> {
     let headers_opt = prepare_auth_headers(access_token);
     if headers_opt.is_none() {
-        eprintln!("[list_prs_bitbucket] Unable to prepare auth headers: {}", repo_name);
+        log::error!("[list_prs_bitbucket] Unable to prepare auth headers: {}", repo_name);
         return None;
     }
     let headers = headers_opt.expect("Empty headers_opt");
@@ -34,13 +34,13 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
         .await;
     if response_result.is_err() {
         let e = response_result.expect_err("No error in sending request");
-        eprintln!("[get_list_prs] Failed to send the request {:?}", e);
+        log::error!("[get_list_prs] Failed to send the request {:?}", e);
         return None;
     }
 
     let response = response_result.expect("Uncaught error in parsing response");
     if !response.status().is_success() {
-        eprintln!(
+        log::error!(
             "[get_list_prs] Request failed with status: {:?}",
             response.status()
         );
@@ -50,7 +50,7 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
     let parse_result = response.json::<Value>().await;
     if parse_result.is_err() {
         let parse_result_err = parse_result.expect_err("No error in parsing");
-        eprintln!(
+        log::error!(
             "[get_list_prs] Failed to parse JSON: {:?}",
             parse_result_err
         );
@@ -60,7 +60,7 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
     let pr_list_parse_res = serde_json::from_value(prs_data["values"].clone());
     if pr_list_parse_res.is_err() {
         let e = pr_list_parse_res.expect_err("Empty error in pr_list_parse_res");
-        eprintln!("[get_list_prs] Unable to parse get_list_prs: {:?}", e);
+        log::error!("[get_list_prs] Unable to parse get_list_prs: {:?}", e);
         return None;
     }
     let pr_list_parsed: Vec<Value> =
@@ -70,7 +70,7 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
         pr_list.push(pr["id"].to_string().trim_matches('"').to_string());
     }
     if pr_list.is_empty() {
-        eprintln!(
+        log::error!(
             "[get_list_prs] pr_list is empty for parsed value: {:?}",
             &pr_list_parsed
         );
@@ -85,8 +85,8 @@ pub async fn get_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str
         "{}/repositories/{}/{}/pullrequests/{}",
         &base_url, workspace_slug, repo_slug, pr_number
     );
-    println!("[get_pr_info] url: {:?}", &url);
-    println!("[get_pr_info] access token: {:?}", access_token);
+    log::debug!("[get_pr_info] url: {:?}", &url);
+    log::debug!("[get_pr_info] access token: {:?}", access_token);
     let client = get_client();
     let response_result = client
         .get(&url)
@@ -97,12 +97,12 @@ pub async fn get_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str
 
     if response_result.is_err() {
         let res_err = response_result.expect_err("No error in getting Pr response");
-        println!("Error getting PR info: {:?}", res_err);
+        log::error!("[get_pr_info] Error getting PR info: {:?}", res_err);
         return None;
     }
     let response = response_result.expect("Uncaught error in response");
     if !response.status().is_success() {
-        println!("Failed to get PR info, response: {:?}", response);
+        log::error!("[get_pr_info] Failed to get PR info, response: {:?}", response);
         return None;
     }
     let pr_data: Value = response.json().await.expect("Error parsing PR data");
@@ -112,7 +112,7 @@ pub async fn get_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str
         state: pr_data["state"].to_string().trim_matches('"').to_string(),
         pr_branch: pr_data["source"]["branch"]["name"].to_string().trim_matches('"').to_string(),
     };
-    println!("[get_pr_info] pr_info: {:?}", &pr_info);
+    log::debug!("[get_pr_info] pr_info: {:?}", &pr_info);
     Some(pr_info)
 }
 
@@ -122,8 +122,8 @@ pub async fn get_and_store_pr_info(workspace_slug: &str, repo_slug: &str, access
         // If PR information is available, store it in the database
         update_pr_info_in_db(workspace_slug, repo_slug, &pr_info, pr_number, repo_provider).await;
     } else {
-        eprintln!(
-            "No PR info available for PR number: {:?} repository: {:?} repo_owner{:?}",
+        log::error!(
+            "[get_and_store_pr_info] No PR info available for PR number: {:?} repository: {:?} repo_owner{:?}",
             pr_number, repo_slug, workspace_slug
         );
     }

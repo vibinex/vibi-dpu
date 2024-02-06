@@ -26,7 +26,7 @@ struct InstallCallback {
 async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<u8>) {
     let msgtype_opt = attributes.get("msgtype");
     if msgtype_opt.is_none() {
-        eprintln!("msgtype attribute not found in message : {:?}", attributes);
+        log::error!("[process_message] msgtype attribute not found in message, attr: {:?}", attributes);
         return;
     }
     let msgtype = msgtype_opt.expect("Empty msgtype");
@@ -39,26 +39,26 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             let deserialized_data_opt = deserialized_data(&data_bytes_async);
             let deserialised_msg_data = deserialized_data_opt.expect("Failed to deserialize data");
             
-            println!("[webhook_callback | deserialised_msg data] {} ", deserialised_msg_data);
+            log::debug!("[process_message] [webhook_callback | deserialised_msg data] {} ", deserialised_msg_data);
             let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data).await;
             if is_reviewable {
                 task::spawn(async move {
                     process_review(&data_bytes_async).await;
-                    println!("Processed webhook callback message");
+                    log::info!("[process_message] Webhook callback message processed!");
                 });
             }
         }
         _ => {
-            eprintln!("Message type not found for message : {:?}", attributes);
+            log::error!("[process_message] Message type not found for message : {:?}", attributes);
         }
     };
 }
 
 async fn process_install_callback(data_bytes: &[u8]) {
-    println!("Processing install callback message");
+    log::info!("[process_install_callback] Processing installation callback message");
     let msg_data_res = serde_json::from_slice::<InstallCallback>(data_bytes);
     if msg_data_res.is_err() {
-        eprintln!("Error deserializing install callback: {:?}", msg_data_res);
+        log::error!("[process_install_callback] Error deserializing install callback: {:?}", msg_data_res);
         return;
     }
     let data = msg_data_res.expect("msg_data not found");
@@ -66,14 +66,14 @@ async fn process_install_callback(data_bytes: &[u8]) {
         let code_async = data.installation_code.clone();
         task::spawn(async move {
             handle_install_github(&code_async).await;
-            println!("Processed install callback message");
+            log::info!("[process_install_callback] Github installation callback processed");
         });
     }
     if data.repository_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
         let code_async = data.installation_code.clone();
         task::spawn(async move {
             handle_install_bitbucket(&code_async).await;
-            println!("Processed install callback message");
+            log::info!("[process_install_callback] Bitbucket installation callback processed");
         });
     }
 }
@@ -103,7 +103,7 @@ async fn setup_subscription(keypath: &str, topicname: &str) -> Subscription {
                 .await
                 .expect("Unable to create topic");
         } else {
-            eprintln!("Error getting topic: {:?}", e);
+            log::error!("[setup_subscription] Error getting topic: {:?}", e);
         }
     }
     let sub_config = SubscriptionConfig {
@@ -122,7 +122,7 @@ async fn setup_subscription(keypath: &str, topicname: &str) -> Subscription {
             .await
             .expect("Unable to create subscription for listening to messages");
     }
-    println!("sub = {:?}", &subscription);
+    log::debug!("[setup_subscription] sub = {:?}", &subscription);
     subscription
 }
 
@@ -135,7 +135,7 @@ pub async fn listen_messages(keypath: &str, topicname: &str) {
         .await
         .expect("Unable to subscribe to messages");
     while let Some(message) = stream.next().await {
-        println!("Listening for messages...");
+        log::info!("[listen_messages] Listening for messages...");
         let attrmap: HashMap<String, String> =
             message.message.attributes.clone().into_iter().collect();
         let message_hash = digest(&*message.message.data);
@@ -158,19 +158,19 @@ pub fn deserialized_data(message_data: &Vec<u8>) -> Option<Value> {
     let msg_data_res = serde_json::from_slice::<Value>(message_data);
     if msg_data_res.is_err() {
         let e = msg_data_res.expect_err("No error in data_res");
-        eprintln!("Incoming message does not contain valid reviews: {:?}", e);
+        log::error!("[deserialized_data] Incoming message does not contain valid reviews: {:?}", e);
         return None;
     }
     let deserialized_data = msg_data_res.expect("Uncaught error in deserializing message_data");
-    println!(
-        "deserialized_data == {:?}",
+    log::debug!(
+        "[deserialized_data] deserialized_data == {:?}",
         &deserialized_data["eventPayload"]["repository"]
     );
     Some(deserialized_data)
 }
 
 async fn process_and_update_pr_if_different(deserialised_msg_data: &Value) -> bool {
-    println!("[process_webhook_callback] {}", deserialised_msg_data);
+    log::debug!("[process_webhook_callback] {}", deserialised_msg_data);
     let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
     let mut is_reviewable = false;
     if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
@@ -179,13 +179,13 @@ async fn process_and_update_pr_if_different(deserialised_msg_data: &Value) -> bo
         let pr_number = deserialised_msg_data["eventPayload"]["pull_request"]["number"].to_string().trim_matches('"').to_string();
         let event_type = deserialised_msg_data["eventType"].to_string().trim_matches('"').to_string();
 
-        println!("[process_webhook_callback] {}, {}, {}, {}", event_type, repo_owner, repo_name, pr_number);
+        log::debug!("[process_webhook_callback] {}, {}, {}, {}", event_type, repo_owner, repo_name, pr_number);
         if event_type == "pull_request_review" {
-			println!("[process_webhook_callback] Github PR review event");
+			log::info!("[process_webhook_callback] Github PR review event");
 			is_reviewable = github_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &repo_owner, &repo_name, &pr_number, &repo_provider).await;
         }
         if event_type == "pull_request" {
-            println!("[process_webhook_callback] Github PR opened");
+            log::info!("[process_webhook_callback] Github PR opened");
             is_reviewable = github_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &repo_owner, &repo_name, &pr_number, &repo_provider).await;
         }
     }

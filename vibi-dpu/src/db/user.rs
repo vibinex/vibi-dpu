@@ -11,17 +11,17 @@ pub fn set_workspace_user_in_db(user: &WorkspaceUser) {
     let value_res = serde_json::to_vec(&user);
     if value_res.is_err() {
         let e = value_res.expect_err("No error in value_res");
-        eprintln!("Error in deserializing workspace user: {:?}, key: {}", e, &user_key);
+        log::error!("[set_workspace_user_in_db] Error in deserializing workspace user: {:?}, key: {}", e, &user_key);
         return;
     }
     let value = value_res.expect("Uncaught error in value_res");
     let insert_res = db.insert(user_key.clone(), value);
     if insert_res.is_err() {
         let e = insert_res.expect_err("No error in insert_res");
-        eprintln!("Failed to upsert user into sled DB: {:?}, key: {}", e, &user_key);
+        log::error!("[set_workspace_user_in_db] Failed to upsert user into sled DB: {:?}, key: {}", e, &user_key);
         return;
     }
-    println!("Wrokspace User succesfully upserted: {:?} at key: {}", user, &user_key);
+    log::debug!("[set_workspace_user_in_db] Workspace User succesfully upserted: {:?} at key: {}", user, &user_key);
 }
 
 pub fn get_workspace_user_from_db(user_key: &str) -> Option<WorkspaceUser> {
@@ -29,7 +29,7 @@ pub fn get_workspace_user_from_db(user_key: &str) -> Option<WorkspaceUser> {
     let get_res = db.get(IVec::from(user_key.to_string().as_bytes()));
     if get_res.is_err() {
         let e = get_res.expect("No error in get_res get_workspace_user_from_db");
-        eprintln!("Unable to get workspace_user_from_db: {:?}", e);
+        log::error!("[get_workspace_user_from_db] Unable to get workspace_user_from_db: {:?}", e);
         return None;
     }
 	let user_opt = get_res.expect("Uncaught error in get_res workspace_user_from_db");
@@ -40,11 +40,11 @@ pub fn get_workspace_user_from_db(user_key: &str) -> Option<WorkspaceUser> {
     let user_res = serde_json::from_slice(&user_ivec);
     if user_res.is_err() {
         let e = user_res.expect_err("No error in user_res");
-        eprintln!("Unable to deserialize workspace_user_from_db: {:?}", e);
+        log::error!("[get_workspace_user_from_db] Unable to deserialize workspace_user_from_db: {:?}", e);
         return None;
     }
     let user: WorkspaceUser = user_res.expect("Uncaught error in user_res");
-    println!("workspace user from db = {:?}", &user);
+    log::debug!("[get_workspace_user_from_db] workspace user from db = {:?}", &user);
     return Some(user);
 }
 

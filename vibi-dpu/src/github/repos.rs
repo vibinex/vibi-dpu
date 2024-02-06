@@ -8,12 +8,25 @@ pub async fn get_github_app_installed_repos(access_token: &str) -> Option<Vec<Re
     let repos_url = format!("{}/installation/repositories", github_base_url());
     let repos_opt = get_api_paginated(&repos_url, access_token, None).await;
     if repos_opt.is_none() {
-        eprintln!("[get_github_app_installed_repos] Unable to call get api and get all repos");
+        log::error!("[get_github_app_installed_repos] Unable to call get api and get all repos");
         return None;
     }
     let repos_val = repos_opt.expect("Empty repos_opt");
     let repositories = deserialize_repos(repos_val);
-    println!("Fetched {:?} repositories from GitHub", &repositories);
+    log::debug!("[get_github_app_installed_repos] Fetched {:?} repositories from GitHub", &repositories);
+    return Some(repositories)
+}
+
+pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Repository>> {
+    let repos_url = format!("{}/user/repos", github_base_url());
+    let repos_opt = get_api_paginated(&repos_url, access_token, None).await;
+    if repos_opt.is_none() {
+        log::error!("[get_user_accessed_github_repos] Unable to call get api and get all repos");
+        return None;
+    }
+    let repos_val = repos_opt.expect("Empty repos_opt");
+    let repositories = deserialize_repos(repos_val);
+    log::debug!("[get_user_accessed_github_repos] Fetched {:?} repositories from GitHub", &repositories);
     return Some(repositories)
 }
 
@@ -22,7 +35,7 @@ fn deserialize_repos(repos_val: Vec<Value>) -> Vec<Repository> {
     for response_json in repos_val {
         let repo_json_opt = response_json["repositories"].as_array();
         if repo_json_opt.is_none() {
-            eprintln!("[deserialize_repos] Unable to deserialize repo value: {:?}", &response_json);
+            log::error!("[deserialize_repos] Unable to deserialize repo value: {:?}", &response_json);
             continue;
         }
         let repos_page_json = repo_json_opt.expect("Empty repo_json_opt").to_owned();

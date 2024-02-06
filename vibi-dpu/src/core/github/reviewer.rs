@@ -22,9 +22,9 @@ pub async fn add_reviewers(reviewers: &Vec<String>, review: &Review, access_toke
     let response_res = client.post(url).headers(headers).body(body).send().await;
     if response_res.is_err() {
         let e = response_res.expect_err("No error in response_res");
-        eprintln!("[add_reviewers] Unable to add reviewers: {:?}, {:?}", e, &reviewers);
+        log::error!("[add_reviewers] Unable to add reviewers: {:?}, {:?}", e, &reviewers);
         return;
     }
     let response = response_res.expect("Uncaught error in response_res");
-    println!("Added reviewers, response: {:?}", response.text().await);
+    log::debug!("[add_reviewers] Added reviewers, response: {:?}", response.text().await);
 }

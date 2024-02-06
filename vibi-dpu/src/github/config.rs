@@ -1,7 +1,6 @@
 use std::{env, collections::HashMap};
 use reqwest::{Response, header::{HeaderMap, HeaderValue, AUTHORIZATION, ACCEPT, USER_AGENT}, header};
 use serde_json::Value;
-use serde::{Deserialize, Serialize};
 
 use crate::utils::reqwest_client::get_client;
 
@@ -22,7 +21,7 @@ pub async fn get_api_paginated(url: &str, access_token: &str, params: Option<Has
         }
         let response_opt = get_api_response(&get_url, None, &access_token, &params).await;
         if response_opt.is_none() {
-            eprintln!("[get_api_paginated] Unable to call get api and get initial response for: 
+            log::error!("[get_api_paginated] Unable to call get api and get initial response for: 
                 {:?}, {:?}, {:?}", url, access_token, params);
             return None
         }
@@ -30,7 +29,7 @@ pub async fn get_api_paginated(url: &str, access_token: &str, params: Option<Has
         let next_url = extract_next_url(&response);
         let deserialized_opt = deserialize_response(response).await;
         if deserialized_opt.is_none() {
-            eprintln!("[get_api_paginated] deserialization failed for: 
+            log::error!("[get_api_paginated] deserialization failed for: 
                 {:?}, {:?}, {:?}", url, access_token, params);
             return None
         }
@@ -45,7 +44,7 @@ pub async fn get_api_paginated(url: &str, access_token: &str, params: Option<Has
 async fn get_api_response(url: &str, headers_opt: Option<reqwest::header::HeaderMap>, access_token: &str,  params: &Option<HashMap<&str, &str>>) -> Option<Response> {
     let get_headers_opt = get_headers(&headers_opt, access_token);
     if get_headers_opt.is_none() {
-        eprintln!("[get_api_response] Unable to prepare headers, headers_opt: {:?}", &headers_opt);
+        log::error!("[get_api_response] Unable to prepare headers, headers_opt: {:?}", &headers_opt);
         return None;
     }
     let headers = get_headers_opt.expect("Uncaught error in get_headers_opt");
@@ -58,13 +57,13 @@ async fn get_api_response(url: &str, headers_opt: Option<reqwest::header::Header
 
     if get_response.is_err() {
         let e = get_response.expect_err("No error in get_response");
-        eprintln!("[get_api_response] Error sending GET request without params
+        log::error!("[get_api_response] Error sending GET request without params
              to {}, error: {}", url, e);
         return None;
     }
     let response = get_response.expect("Uncaught error in get_res");
     if !response.status().is_success() {
-        eprintln!("[get_api_response] Failed to call Github API {}, status: {}",
+        log::error!("[get_api_response] Failed to call Github API {}, status: {}",
             url, response.status());
         return None;
     }
@@ -75,7 +74,7 @@ async fn deserialize_response(response: Response) -> Option<Value> {
     let res_val = response.json::<Value>().await;
     if res_val.is_err() {
         let e = res_val.expect_err("Empty error in res_val");
-        eprintln!("[deserialize_response] Unable to deserialize response, error: {:?}", e);
+        log::error!("[deserialize_response] Unable to deserialize response, error: {:?}", e);
         return None;
     }
     let deserialized = res_val.expect("Uncaught error in res_val");
@@ -87,7 +86,7 @@ fn get_headers(headers_opt: &Option<reqwest::header::HeaderMap>, access_token: &
     if headers_opt.is_none() {
         let headers_opt_new = prepare_headers(access_token);
         if headers_opt_new.is_none() {
-            eprintln!("[get_headers] Unable to prepare_headers, empty headers_opt");
+            log::error!("[get_headers] Unable to prepare_headers, empty headers_opt");
             return None;
         }
         headers = headers_opt_new.expect("Empty headers_opt");
@@ -127,7 +126,7 @@ pub fn prepare_headers(access_token: &str) -> Option<HeaderMap> {
 
     if auth_header_res.is_err() {
         let e = auth_header_res.expect_err("Empty error in auth_header_res");
-        eprintln!("Invalid auth header: {:?}", e);
+        log::error!("[prepare_headers] Invalid auth header: {:?}", e);
         return None;
     }
     let header_authval = auth_header_res.expect("Uncaught error in auth_header_res");
@@ -136,7 +135,7 @@ pub fn prepare_headers(access_token: &str) -> Option<HeaderMap> {
     let accept_header_res = HeaderValue::from_str(accept_value);
     if accept_header_res.is_err() {
         let e = accept_header_res.expect_err("Empty error in accept_header_res: {:?}");
-        eprintln!("Could not parse Accept header value {}", e);
+        log::error!("[prepare_headers] Could not parse Accept header value {}", e);
         return None;
     }
     let accept_header = accept_header_res.expect("Error parsing Accept header value");
@@ -146,7 +145,7 @@ pub fn prepare_headers(access_token: &str) -> Option<HeaderMap> {
     let user_agent_header_res = HeaderValue::from_str("Vibinex code review Test App");
     if user_agent_header_res.is_err() {
         let e = user_agent_header_res.expect_err("Empty error in user_agent_hesder_res: {:?}");
-        eprintln!("Could not parse User Agent header value");
+        log::error!("[prepare_headers] Could not parse User Agent header value: {:?}", e);
         return None;
     }
     let user_agent_header = user_agent_header_res.expect("Error parsing User Agent header value");

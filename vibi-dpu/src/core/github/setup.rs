@@ -4,6 +4,7 @@ use std::str;
 use tokio::task;
 
 use crate::github::auth::fetch_access_token; use crate::github::prs::{list_prs_github, get_and_store_pr_info};
+use crate::github::repos::get_user_accessed_github_repos;
 // Import shared utilities
 use crate::utils::setup_info::SetupInfo;
 use crate::github::repos::get_github_app_installed_repos;
@@ -15,10 +16,10 @@ use crate::core::utils::send_setup_info;
 pub async fn handle_install_github(installation_code: &str) {
     let repo_provider = "github";
     let auth_info_opt = fetch_access_token(installation_code).await;
-    println!("[handle_install_github] auth_info = {:?}", &auth_info_opt);
+    log::debug!("[handle_install_github] auth_info = {:?}", &auth_info_opt);
     
     if auth_info_opt.is_none() {
-        eprintln!("Unable to get authinfo from fetch_access_token in Github setup");
+        log::error!("[handle_install_github] Unable to get authinfo from fetch_access_token in Github setup");
         return;
     }
     let auth_info = auth_info_opt.expect("Empty authinfo_opt");
@@ -27,11 +28,11 @@ pub async fn handle_install_github(installation_code: &str) {
     let mut pubreqs: Vec<SetupInfo> = Vec::new();
     let repos_opt = get_github_app_installed_repos(&access_token).await;
     if repos_opt.is_none(){
-        eprintln!("No repositories found for GitHub app");
+        log::error!("[handle_install_github] No repositories found for GitHub app");
         return;
     }
     let repos = repos_opt.expect("Empty repos option");
-    println!("Got repos: {:?}", repos);
+    log::debug!("[handle_install_github] Got repos: {:?}", repos);
     let repo_owner = repos[0].owner().clone();
     let mut repo_names: Vec<String> = Vec::new();
 
@@ -41,8 +42,8 @@ pub async fn handle_install_github(installation_code: &str) {
         clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
         let repo_name = repo.name();
         repo_names.push(repo_name.clone());
-        println!("Repo url git = {:?}", &repo.clone_ssh_url());
-        println!("Repo name = {:?}", repo_name);
+        log::debug!("[handle_install_github] Repo url git = {:?}", &repo.clone_ssh_url());
+        log::debug!("[handle_install_github] Repo name = {:?}", repo_name);
         let repo_owner = repo.owner();
         process_webhooks(repo_owner.to_string(), repo_name.to_string(), access_token.to_string()).await;
         let repo_name_async = repo_name.clone();
@@ -65,19 +66,19 @@ pub async fn handle_install_github(installation_code: &str) {
 async fn process_webhooks(repo_owner: String, repo_name: String, access_token: String) {
     let webhooks_data_opt = get_webhooks_in_repo(&repo_owner, &repo_name, &access_token).await;
     if webhooks_data_opt.is_none() {
-        eprintln!("Unable to get webhooks for repo: {:?}, other params: {:?}, {:?}",
+        log::error!("[process_webhooks] Unable to get webhooks for repo: {:?}, other params: {:?}, {:?}",
             repo_name, repo_owner, access_token);
         return;
     }
     let webhooks_data = webhooks_data_opt.expect("Empty webhooks_data_opt");
     let webhook_callback_url = format!("{}/api/github/callbacks/webhook", 
         env::var("SERVER_URL").expect("SERVER_URL must be set"));
-    println!("webhooks_data = {:?}", &webhooks_data);
+    log::debug!("[process_webhooks] webhooks_data = {:?}", &webhooks_data);
     let matching_webhook = webhooks_data.into_iter()
         .find(|w| w.url().to_string() == webhook_callback_url);
-    println!("matching_webhook = {:?}", &matching_webhook);
+    log::debug!("[process_webhooks] matching_webhook = {:?}", &matching_webhook);
     if matching_webhook.is_none() {
-        println!("Adding new webhook...");
+        log::info!("[process_webhooks] Adding new webhook...");
         let repo_name_async = repo_name.clone();
         let workspace_slug_async = repo_owner.clone();
         let access_token_async = access_token.clone();
@@ -90,14 +91,14 @@ async fn process_webhooks(repo_owner: String, repo_name: String, access_token: S
         return;
     }
     let webhook = matching_webhook.expect("no matching webhook");
-    println!("Webhook already exists: {:?}", &webhook);
+    log::info!("[process_webhooks] Webhook already exists: {:?}", &webhook);
     save_webhook_to_db(&webhook);
 }
 
 async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access_token_async: &String) {
     let pr_list_opt = list_prs_github(&repo_owner_async, &repo_name_async, &access_token_async, "OPEN").await;
     if pr_list_opt.is_none() {
-        println!("No open pull requests found for processing.");
+        log::info!("[process_prs] No open pull requests found for processing.");
         return;
     }
     let pr_list = pr_list_opt.expect("Empty pr_list_opt");
@@ -112,4 +113,55 @@ async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access
         });
     }
     
+}
+
+pub async fn setup_self_host_user_repos_github(access_token: &str) {
+    let repo_provider = env::var("PROVIDER").expect("provider must be set");
+
+    let repos_opt = get_user_accessed_github_repos(&access_token).await;
+    if repos_opt.is_none() {
+        log::error!("[setup_self_host_user_repos_github] No repositories found for the user");
+        return;
+    }
+    let repos = repos_opt.expect("Empty repos option");
+    log::debug!("[setup_self_host_user_repos_github] Got repos: {:?}", repos);
+
+    // Create a mapping between repo_owner and associated repo_names
+    let mut repo_owner_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+
+    for repo in repos {
+        let token_copy = access_token.clone();
+        let mut repo_copy = repo.clone();
+        clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
+        let repo_name = repo.name();
+        let repo_owner = repo.owner();
+        repo_owner_map
+            .entry(repo_owner.to_string())
+            .or_insert_with(Vec::new)
+            .push(repo_name.to_string());
+        log::debug!(
+            "[setup_self_host_user_repos_github] Repo url git = {:?}",
+            &repo.clone_ssh_url()
+        );
+        log::debug!("[setup_self_host_user_repos_github] Repo name = {:?}", repo_name);
+        process_webhooks(repo_owner.to_string(), repo_name.to_string(), access_token.to_string())
+            .await;
+
+        let repo_name_async = repo_name.clone();
+        let repo_owner_async = repo_owner.clone();
+        let access_token_async = access_token.to_string().clone();
+        task::spawn(async move {
+            process_prs(&repo_owner_async, &repo_name_async, &access_token_async).await;
+        });
+    }
+
+    // Send a separate pubsub publish request for each unique repo_owner
+    for (repo_owner, repo_names) in repo_owner_map {
+        let pubreq = SetupInfo {
+            provider: "github".to_owned(),
+            owner: repo_owner,
+            repos: repo_names,
+        };
+        send_setup_info(&vec![pubreq]).await;
+    }
 }

@@ -8,7 +8,7 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
     let body = prepare_body(blame, review);
     let headers_opt = prepare_headers(access_token);
     if headers_opt.is_none() {
-        eprintln!("Unable to prepare headers for blame: {:?}", blame);
+        log::error!("[get_blame_user] Unable to prepare headers for blame: {:?}", blame);
         return None;
     }
     let headers = headers_opt.expect("Empty headers_opt");
@@ -17,23 +17,23 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
     let response_res = client.post(url).headers(headers).json(&body).send().await;
     if response_res.is_err() {
         let e = response_res.expect_err("Empty error in response_res");
-        eprintln!("[get_blame_user] Unable to get blame user for blame: {:?}, error: {:?}", blame, e);
+        log::error!("[get_blame_user] Unable to get blame user for blame: {:?}, error: {:?}", blame, e);
         return None;
     }
     let response = response_res.expect("Uncaught error in response_res");
     let json_res = response.json::<Value>().await;
     if json_res.is_err() {
         let e = json_res.expect_err("Empty error in json_res");
-        eprintln!("[get_blame_user] Unable to deserialize response, error: {:?}, blame: {:?}", e, blame);
+        log::error!("[get_blame_user] Unable to deserialize response, error: {:?}, blame: {:?}", e, blame);
         return None;
     }
     let json = json_res.expect("Uncaught error in json_res");
     let range_json_opt = json["data"]["repository"]["object"]["blame"]["ranges"].as_array();
     if range_json_opt.is_none() {
-        eprintln!("[get_blame_user] Unable to get ranges for blame author deserialization: {:?}", &json);
+        log::error!("[get_blame_user] Unable to get ranges for blame author deserialization: {:?}", &json);
         return None;
     }
-    println!("[get_blame_user] json = {:?}", &json);
+    log::debug!("[get_blame_user] json = {:?}", &json);
     let range_json = range_json_opt.expect("Empty range_json_opt");
     for range in range_json {
         let start_res: Result<i32, _> = range["startingLine"].to_string().parse();
@@ -50,10 +50,10 @@ pub async fn get_blame_user(blame: &BlameItem, review: &Review, access_token: &s
         }
         let blame_start = line_start_res.expect("Uncaught error in line_start_res");
         let blame_end = line_end_res.expect("Uncuaght error in line_end_res");
-        println!("[get_blame_user] blame_start = {:?}, start_range = {:?}, blame_end = {:?}, end_range = {:?}", &blame_start, &start_range, &blame_end, &end_range);
+        log::debug!("[get_blame_user] blame_start = {:?}, start_range = {:?}, blame_end = {:?}, end_range = {:?}", &blame_start, &start_range, &blame_end, &end_range);
         if blame_start >= start_range && blame_end <= end_range {
             let user_opt = range["commit"]["author"]["user"]["login"].as_str();
-            println!("user_opt = {:?}", &user_opt);
+            log::debug!("user_opt = {:?}", &user_opt);
             if user_opt.is_none() {
                 continue;
             }
@@ -91,7 +91,7 @@ fn prepare_body(blame: &BlameItem, review: &Review) -> Value {
         "#,
         review.repo_owner(), review.repo_name(), blame.commit().trim_matches('"'), blame.filepath_raw()
     );
-    println!("[prepare_body] query = {:?}", &query);
+    log::debug!("[prepare_body] query = {:?}", &query);
     let body = json!({
         "query": query
     });

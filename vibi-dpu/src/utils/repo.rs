@@ -45,24 +45,12 @@ impl Repository {
         &self.name
     }
 
-    pub fn uuid(&self) -> &String {
-        &self.uuid
-    }
-
     pub fn owner(&self) -> &String {
         &self.owner
     }
 
-    pub fn is_private(&self) -> bool {
-        self.is_private
-    }
-
     pub fn clone_ssh_url(&self) -> &String {
         &self.clone_ssh_url
-    }
-
-    pub fn project(&self) -> &Option<String> {
-        &self.project
     }
 
     pub fn workspace(&self) -> &String {

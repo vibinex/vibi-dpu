@@ -83,45 +83,4 @@ impl Review {
     pub fn author(&self) -> &String {
         &self.author
     }
-
-    // Public setter methods
-    pub fn set_base_head_commit(&mut self, base_head_commit: String) {
-        self.base_head_commit = base_head_commit;
-    }
-
-    pub fn set_pr_head_commit(&mut self, pr_head_commit: String) {
-        self.pr_head_commit = pr_head_commit;
-    }
-
-    pub fn set_id(&mut self, id: String) {
-        self.id = id;
-    }
-
-    pub fn set_repo_name(&mut self, repo_name: String) {
-        self.repo_name = repo_name;
-    }
-
-    pub fn set_repo_owner(&mut self, repo_owner: String) {
-        self.repo_owner = repo_owner;
-    }
-
-    pub fn set_provider(&mut self, provider: String) {
-        self.provider = provider;
-    }
-
-    pub fn set_db_key(&mut self, db_key: String) {
-        self.db_key = db_key;
-    }
-
-    pub fn set_clone_dir(&mut self, clone_dir: String) {
-        self.clone_dir = clone_dir;
-    }
-
-    pub fn set_clone_url(&mut self, clone_url: String) {
-        self.clone_url = clone_url;
-    }
-
-    pub fn set_author(&mut self, author: String) {
-        self.author = author;
-    }
 }

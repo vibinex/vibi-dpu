@@ -1,24 +1,23 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{utils::{hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}, db::user::{get_workspace_user_from_db}, bitbucket::{user::author_from_commit, self}, core::github, github::user::get_blame_user};
+use crate::{utils::{hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}, db::user::get_workspace_user_from_db, bitbucket::{user::author_from_commit, self}, core::github, github::user::get_blame_user};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
 pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &mut RepoConfig, access_token: &str) {
     for prhunk in hunkmap.prhunkvec() {
         // calculate number of hunks for each userid
-        let coverage_map = calculate_coverage(&hunkmap.repo_owner(),
+        let coverage_map = calculate_coverage(
             prhunk, &review.provider());
         let coverage_cond = !coverage_map.is_empty();
-        println!("coverage_map = {:?}", &coverage_map);
-        println!("!coverage_map.is_empty() = {:?}", &coverage_cond);
-        println!("repo_config.comment() = {:?}", repo_config.comment());
-        println!("repo_config.auto_assign() = {:?}", repo_config.auto_assign());
+        log::debug!("[process_coverage] !coverage_map.is_empty() = {:?}", &coverage_cond);
+        log::debug!("[process_coverage] repo_config.comment() = {:?}", repo_config.comment());
+        log::debug!("[process_coverage] repo_config.auto_assign() = {:?}", repo_config.auto_assign());
         if coverage_map.is_empty() {
             continue;
         }
         if repo_config.comment() {
-            println!("Inserting comment...");
+            log::info!("[process_coverage] Inserting comment...");
             // create comment text
             let comment = comment_text(coverage_map, repo_config.auto_assign());
             // add comment
@@ -31,23 +30,23 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
             
         }
         if repo_config.auto_assign() {
-            println!("Auto assigning reviewers...");
-            println!("review.provider() = {:?}", review.provider());
+            log::info!("[process_coverage] Auto assigning reviewers...");
+            log::debug!("[process_coverage] review.provider() = {:?}", review.provider());
             if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
                 add_bitbucket_reviewers(&prhunk, hunkmap, review, &access_token).await;
             }
             if review.provider().to_string() == ProviderEnum::Github.to_string() {
-                add_github_reviewers(prhunk, hunkmap, review, &access_token).await;
+                add_github_reviewers(prhunk, review, &access_token).await;
             }
         }  
     }
 }
 
-async fn add_github_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review: &Review, access_token: &str) {
+async fn add_github_reviewers(prhunk: &PrHunkItem, review: &Review, access_token: &str) {
     let mut reviewers: HashSet<String> = HashSet::new();
     for blame in prhunk.blamevec() {
         let blame_author_opt = get_blame_user(blame, review, access_token).await;
-        println!("[add_github_reviewers] blame_author_opt = {:?}", &blame_author_opt);
+        log::debug!("[add_github_reviewers] blame_author_opt = {:?}", &blame_author_opt);
         if blame_author_opt.is_none() {
             continue;
         }
@@ -73,7 +72,7 @@ async fn add_bitbucket_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review:
         let blame_author_opt = author_from_commit(blame.commit(),
             hunkmap.repo_name(), hunkmap.repo_owner()).await;
         if blame_author_opt.is_none() {
-            eprintln!("[process_coverage] Unable to get blame author from bb for commit: {}", &blame.commit());
+            log::error!("[process_coverage] Unable to get blame author from bb for commit: {}", &blame.commit());
             continue;
         }
         let blame_author = blame_author_opt.expect("Empty blame_author_opt");
@@ -86,7 +85,7 @@ async fn add_bitbucket_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review:
     }
 }
 
-fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem, repo_provider: &str) -> HashMap<String, String>{
+fn calculate_coverage(prhunk: &PrHunkItem, repo_provider: &str) -> HashMap<String, String>{
     let mut coverage_floatmap = HashMap::<String, f32>::new();
     let mut total = 0.0;
     for blame in prhunk.blamevec() {
@@ -116,7 +115,7 @@ fn calculate_coverage(repo_owner: &str, prhunk: &PrHunkItem, repo_provider: &str
         if repo_provider.to_string() == ProviderEnum::Bitbucket.to_string() {
             let user = get_workspace_user_from_db(blame_author);
             if user.is_none() {
-                eprintln!("No user name found for {}", blame_author);
+                log::error!("[calculate_coverage] No user name found for {}", blame_author);
                 coverage_map.insert(blame_author.to_string(), formatted_value);
                 continue;
             }

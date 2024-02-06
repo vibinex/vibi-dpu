@@ -5,7 +5,6 @@ use crate::db::bitbucket::auth::{save_bitbucket_auth_info_to_db, bitbucket_auth_
 use crate::utils::gitops::set_git_remote_url;
 use crate::utils::reqwest_client::get_client;
 use crate::utils::bitbucket_auth_info::BitbucketAuthInfo;
-use crate::utils::review::Review;
 
 pub async fn get_access_token_from_bitbucket(code: &str) -> Option<BitbucketAuthInfo> {
     let client = get_client();
@@ -19,7 +18,7 @@ pub async fn get_access_token_from_bitbucket(code: &str) -> Option<BitbucketAuth
     params.insert("code", code.to_owned());
     params.insert("grant_type", "authorization_code".to_owned());
     params.insert("redirect_uri", redirect_uri);
-    println!("params = {:?}", &params);
+    log::debug!("[get_access_token_from_bitbucket] params = {:?}", &params);
     let post_res = client
         .post("https://bitbucket.org/site/oauth2/access_token")
         .form(&params)
@@ -27,13 +26,13 @@ pub async fn get_access_token_from_bitbucket(code: &str) -> Option<BitbucketAuth
         .await;
     if post_res.is_err() {
         let e = post_res.expect_err("No error in post_res");
-        eprintln!("error in calling api : {:?}", e);
+        log::error!("[get_access_token_from_bitbucket] error in calling api : {:?}", e);
         return None;
     }
     let res = post_res.expect("Uncaught error in post_res");
     if !res.status().is_success() {
-        println!(
-            "Failed to exchange code for access token. Status code: {}, Response content: {:?}",
+        log::error!(
+            "[get_access_token_from_bitbucket] Failed to exchange code for access token. Status code: {}, Response content: {:?}",
             res.status(),
             res.text().await
         );
@@ -42,7 +41,7 @@ pub async fn get_access_token_from_bitbucket(code: &str) -> Option<BitbucketAuth
     let parse_res = res.json::<BitbucketAuthInfo>().await ;
     if parse_res.is_err() {
         let e = parse_res.expect_err("No error in parse_res for BitbucketAuthInfo");
-        eprintln!("error deserializing BitbucketAuthInfo: {:?}", e);
+        log::error!("[get_access_token_from_bitbucket] error deserializing BitbucketAuthInfo: {:?}", e);
         return None;
     }
     let mut response_json = parse_res.expect("Uncaught error in parse_res for BitbucketAuthInfo");
@@ -58,7 +57,7 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
     let authinfo = authinfo_opt.expect("empty authinfo_opt in refresh_git_auth");
     let authinfo_opt = update_access_token(&authinfo, clone_url, directory).await;
     if authinfo_opt.is_none() {
-        eprintln!("Empty authinfo_opt from update_access_token for BitbucketAuthInfo");
+        log::error!("[get_access_token_from_bitbucket] Empty authinfo_opt from update_access_token for BitbucketAuthInfo");
         return None;
     }
     let latest_authinfo = authinfo_opt.expect("Empty authinfo_opt");
@@ -72,21 +71,21 @@ pub async fn update_access_token(auth_info: &BitbucketAuthInfo, clone_url: &str,
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
     let timestamp_opt = auth_info.timestamp();
     if timestamp_opt.is_none() {
-        eprintln!("No timestamp in BitbucketAuthInfo");
+        log::error!("[update_access_token] No timestamp in BitbucketAuthInfo");
         return None;
     }
     let timestamp = timestamp_opt.expect("Empty timestamp");
     let expires_at = timestamp + auth_info.expires_in();
     if expires_at > now_secs {  
-        eprintln!("Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
+        log::error!("[update_access_token] Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
         return Some(auth_info.to_owned());
     }
     // auth info has expired
-    println!("auth info expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
+    log::debug!("[update_access_token] auth info expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
     let new_auth_info_opt = bitbucket_refresh_token(auth_info.refresh_token()).await;
     let mut new_auth_info = new_auth_info_opt.clone()
         .expect("empty auhtinfo_opt from update_access_token");
-    println!("New auth info  = {:?}", &new_auth_info);
+    log::debug!("[update_access_token] New auth info  = {:?}", &new_auth_info);
     let access_token = new_auth_info.access_token().to_string();
     set_git_remote_url(clone_url, directory, &access_token, &repo_provider);
     save_bitbucket_auth_info_to_db(&mut new_auth_info);
@@ -115,39 +114,21 @@ async fn bitbucket_refresh_token(refresh_token: &str) -> Option<BitbucketAuthInf
         .await;
     if post_res.is_err() {
         let e = post_res.expect_err("No error in post_err for refres token");
-        eprintln!("Unable to get refresh token: {}", e);
+        log::error!("[update_access_token] Unable to get refresh token: {}", e);
         return None;
     }
     let response = post_res.expect("Uncaught error in post_res");
     if !response.status().is_success() {
-        eprintln!("Failed to get refresh token, status: {} body: {:?}", 
+            log::error!("[update_access_token Failed to get refresh token, status: {} body: {:?}", 
             response.status(), response.text().await);
         return None;
     }
     let parse_res =  response.json().await;
     if parse_res.is_err() {
         let e = parse_res.expect_err("No error in parse_res refresh_token");
-        eprintln!("Unable to deserialize refresh token response: {}", e);
+        log::error!("[update_access_token] Unable to deserialize refresh token response: {}", e);
         return None;
     }
     let refresh_token_resbody = parse_res.expect("Uncaught error in parse_res");
     return Some(refresh_token_resbody);
-}
-
-pub async fn get_access_token_review(review: &Review) -> Option<String> {
-    let authinfo_opt = bitbucket_auth_info();
-    if authinfo_opt.is_none() {
-        return None;
-    }
-    let auth_info = authinfo_opt.expect("Uncaught error in authinfo_opt");
-    let mut access_token = auth_info.access_token().clone();
-    let clone_url = review.clone_url();
-    let directory = review.clone_dir();
-    let new_auth_opt = update_access_token(&auth_info, &clone_url, &directory).await;
-    if new_auth_opt.is_none() {
-        return None;
-    }
-    let new_auth = new_auth_opt.expect("empty new_auth_opt");
-    access_token = new_auth.access_token().to_string();
-    return Some(access_token);
 }

@@ -10,7 +10,7 @@ pub fn save_workspace_to_db(workspace: &Workspace) {
     if parse_json.is_err() {
         let e = parse_json
             .expect_err("No error in parse_json for workspace");
-        eprintln!("Failed to serialize workspace: {:?}", e);
+        log::error!("[save_workspace_to_db] Failed to serialize workspace: {:?}", e);
         return;
     }
     let json = parse_json.expect("Uncaught error in parse_json workspace");
@@ -21,8 +21,8 @@ pub fn save_workspace_to_db(workspace: &Workspace) {
     let insert_res = db.insert(format!("owners:{}", uuid), ivec);
     if insert_res.is_err() {
         let e = insert_res.expect_err("No error in insert_res");
-        eprintln!("Failed to upsert workspace into sled DB: {e}");
+        log::error!("[save_workspace_to_db] Failed to upsert workspace into sled DB: {e}");
         return;
     }
-    println!("Workspace succesfully upserted: {:?}", workspace);  
+    log::debug!("[save_workspace_to_db] Workspace succesfully upserted: {:?}", workspace);  
 }

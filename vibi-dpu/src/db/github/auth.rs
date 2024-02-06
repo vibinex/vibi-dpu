@@ -5,7 +5,7 @@ use crate::utils::github_auth_info::GithubAuthInfo;
 
 pub fn save_github_auth_info_to_db(auth_info: &mut GithubAuthInfo) {
     let db = get_db();
-    println!("auth info = {:?}", &auth_info);
+    log::debug!("[save_github_auth_info_to_db] auth info = {:?}", &auth_info);
     let json = serde_json::to_string(&auth_info).expect("Failed to serialize auth info");
     // Convert JSON string to bytes
     let bytes = json.as_bytes(); 
@@ -17,10 +17,10 @@ pub fn save_github_auth_info_to_db(auth_info: &mut GithubAuthInfo) {
     let insert_res = db.insert("github_auth_info", ivec);
     if insert_res.is_err() {
         let e = insert_res.expect_err("No error in insert_res");
-        eprintln!("Failed to upsert github auth info into sled DB: {e}");
+        log::error!("[save_github_auth_info_to_db] Failed to upsert github auth info into sled DB: {e}");
         return;
     }
-    println!("GithubAuthInfo succesfully upserted: {:?}", auth_info);
+    log::debug!("[save_github_auth_info_to_db] GithubAuthInfo succesfully upserted: {:?}", auth_info);
 }
 
 pub fn github_auth_info() -> Option<GithubAuthInfo> {
@@ -29,19 +29,19 @@ pub fn github_auth_info() -> Option<GithubAuthInfo> {
 	let authinfo_res = db.get(IVec::from(authinfo_key.as_bytes()));
     if authinfo_res.is_err() {
         let e = authinfo_res.expect_err("No error in authinfo_res");
-        eprintln!("Unable to get github authinfo from db: {:?}", e);
+        log::error!("[github_auth_info] Unable to get github authinfo from db: {:?}", e);
         return None;
     }
     let authinfo_opt = authinfo_res.expect("Uncaught error in authinfo_res");
     if authinfo_opt.is_none() {
-        eprintln!("No github authinfo in db");
+        log::error!("[github_auth_info] No github authinfo in db");
         return None;
     }
     let authinfo_ivec = authinfo_opt.expect("Empty authinfo_opt");
     let authinfo_parse = serde_json::from_slice(&authinfo_ivec);
     if authinfo_parse.is_err() {
         let e = authinfo_parse.expect_err("No error in authinfo_parse");
-        eprintln!("Unable to deserialize github authinfo_parse: {:?}", e);
+        log::error!("[github_auth_info] Unable to deserialize github authinfo_parse: {:?}", e);
         return None;
     }
 	let github_auth_info: GithubAuthInfo =  authinfo_parse.expect("Uncaught error in authinfo_parse");

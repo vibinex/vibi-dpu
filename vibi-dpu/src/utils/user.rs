@@ -2,7 +2,7 @@ use std::fmt;
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
-use serde::de::{self, Deserializer};
+use serde::de::Deserializer;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum ProviderEnum {
@@ -25,70 +25,12 @@ pub struct Provider {
     provider_type: ProviderEnum,
 }
 
-impl Provider {
-    // Constructor
-    pub fn new(id: String, provider_type: ProviderEnum) -> Self {
-        Self { id, provider_type }
-    }
-
-    // Public getter methods
-    pub fn id(&self) -> &String {
-        &self.id
-    }
-
-    pub fn provider_type(&self) -> &ProviderEnum {
-        &self.provider_type
-    }
-
-    // Public setter methods
-    pub fn set_id(&mut self, id: String) {
-        self.id = id;
-    }
-
-    pub fn set_provider_type(&mut self, provider_type: ProviderEnum) {
-        self.provider_type = provider_type;
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
     provider: Provider,
     name: String,
     workspace: String,
     aliases: Option<Vec<String>>,
-}
-
-impl User {
-    // Constructor
-    pub fn new(provider: Provider, name: String, workspace: String, aliases: Option<Vec<String>>) -> Self {
-        Self {
-            provider,
-            name,
-            workspace,
-            aliases,
-        }
-    }
-
-    // Public getter methods
-    pub fn provider(&self) -> &Provider {
-        &self.provider
-    }
-
-    pub fn name(&self) -> &String {
-        &self.name
-    }
-
-    pub fn workspace(&self) -> &String {
-        &self.workspace
-    }
-
-    pub fn aliases(&self) -> &Option<Vec<String>> {
-        &self.aliases
-    }
-
-    pub fn set_aliases(&mut self, aliases: Option<Vec<String>>) {
-        self.aliases = aliases;
-    }
 }
 
 
@@ -127,10 +69,6 @@ impl BitbucketUser {
     pub fn display_name(&self) -> &String {
         &self.display_name
     }
-
-    pub fn nickname(&self) -> &String {
-        &self.nickname
-    }
 }
 
 #[derive(Deserialize)]
@@ -163,10 +101,6 @@ impl WorkspaceUser {
 
     pub fn display_name(&self) -> &String {
         &self.display_name
-    }
-
-    pub fn users(&self) -> &HashSet<BitbucketUser> {
-        &self.users
     }
 
     pub fn users_mut(&mut self) -> &mut HashSet<BitbucketUser> {
