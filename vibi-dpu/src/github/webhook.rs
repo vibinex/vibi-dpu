@@ -19,7 +19,6 @@ pub async fn get_webhooks_in_repo(repo_owner: &str, repo_name: &str, access_toke
     }
     let webhook_val = response_opt.expect("Empty repos_opt");
     let webhooks = deserialize_webhooks(webhook_val);
-    log::info!("[get_webhooks_in_repo] Fetched {:?} repositories from GitHub", &webhooks);
     return Some(webhooks);
 }
 
