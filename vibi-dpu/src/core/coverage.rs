@@ -129,7 +129,7 @@ fn calculate_coverage(prhunk: &PrHunkItem, repo_provider: &str) -> HashMap<Strin
 
 fn comment_text(coverage_map: HashMap<String, String>, auto_assign: bool) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
-    comment += "| Contributor Name/Alias  | Code Coverage |\n";  // Added a newline at the end
+    comment += "| Contributor Name/Alias  | Relevance |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
 
     for (key, value) in coverage_map.iter() {
@@ -140,8 +140,9 @@ fn comment_text(coverage_map: HashMap<String, String>, auto_assign: bool) -> Str
         comment += "Auto assigning to all relevant reviewers";
     }
     comment += "\n\n";
-    comment += "Code coverage is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
-    comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/settings)\n";  // Added a newline at the end
+    comment += "If you are a relevant reviewer, you can use the [Vibinex browser extension](https://chromewebstore.google.com/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc) to see parts of the PR relevant to you\n";  // Added a newline at the end
+    comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
+    comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
 
     return comment;
 }
