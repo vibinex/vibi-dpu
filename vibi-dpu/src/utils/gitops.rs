@@ -610,3 +610,42 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
     repo.set_local_dir(&directory);
     save_repo_to_db(repo);
 }
+
+pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
+	let local_dir_opt = repo.local_dir().to_owned();
+	if local_dir_opt.is_none() {
+		return None;
+	}
+	let local_dir = local_dir_opt.expect("Empty local_dir");
+	let output = Command::new("git")
+		.arg("log")
+		.arg("--all")
+		.arg("--format=%ae")
+		.current_dir(&local_dir)
+		.output()
+		.expect("Failed to execute git log");
+	let emails: Vec<String> = match str::from_utf8(&output.stdout) {
+        Ok(output) => output
+            .lines()
+            .map(|line| line.trim().to_string())
+            .collect(),
+        Err(_) => return None, // Return None if unable to parse output
+    };
+	// Sort and remove duplicates
+    let mut unique_emails: Vec<String> = emails.into_iter().collect();
+    unique_emails.sort();
+    unique_emails.dedup();
+
+    // Only for debug purposes
+	match str::from_utf8(&output.stderr) {
+		Ok(v) => log::debug!("[set_git_remote_url] stderr = {:?}", v),
+		Err(e) => log::error!("[set_git_remote_url] stderr error: {}", e), 
+	};
+	match str::from_utf8(&output.stdout) {
+		Ok(v) => log::debug!("[set_git_remote_url] stdout = {:?}", v),
+		Err(e) => log::error!("[set_git_remote_url] stdout error: {}", e), 
+	};
+	log::debug!("[set_git_remote_url] git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
+
+	return Some(unique_emails);
+}
