@@ -618,20 +618,29 @@ pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
 		return None;
 	}
 	let local_dir = local_dir_opt.expect("Empty local_dir");
-	let output = Command::new("git")
+	let output_res = Command::new("git")
 		.arg("log")
 		.arg("--all")
 		.arg("--format=%ae")
 		.current_dir(&local_dir)
-		.output()
-		.expect("Failed to execute git log");
-	let emails: Vec<String> = match str::from_utf8(&output.stdout) {
-        Ok(output) => output
+		.output();
+	if output_res.is_err() {
+		let e = output_res.expect_err("No error in output_res");
+		log::error!("[get_git_aliases] git alias command error {:?}", e);
+		return None;
+	}
+	let output = output_res.expect("Unable to catch error in output_res");
+	let emails_res = str::from_utf8(&output.stdout);
+	if emails_res.is_err() {
+		let e = emails_res.expect_err("Empty error in emails_res");
+		log::error!("[get_git_aliases] Unable to parse git alias command output {:?}", e);
+		return None;
+	}
+	let emails_str = emails_res.expect("Uncaught error in eails_res");
+	let emails: Vec<String> = emails_str
             .lines()
             .map(|line| line.trim().to_string())
-            .collect(),
-        Err(_) => return None, // Return None if unable to parse output
-    };
+            .collect();
 	// Sort and remove duplicates
     let mut unique_emails: Vec<String> = emails.into_iter().collect();
     unique_emails.sort();
