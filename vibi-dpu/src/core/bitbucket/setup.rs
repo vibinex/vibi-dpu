@@ -42,7 +42,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             let token_copy = access_token.clone();
             let mut repo_copy = repo.clone();
             clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
-            let aliases_opt = get_git_aliases(&repo);
+            let aliases_opt = get_git_aliases(&repo_copy);
             if aliases_opt.is_none() {
                 continue;
             }
