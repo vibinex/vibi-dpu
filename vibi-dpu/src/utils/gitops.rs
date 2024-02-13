@@ -612,6 +612,7 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
 }
 
 pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
+	log::debug!("[get_git_aliases] repo = {:?}", &repo);
 	let local_dir_opt = repo.local_dir().to_owned();
 	if local_dir_opt.is_none() {
 		return None;
@@ -635,17 +636,6 @@ pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
     let mut unique_emails: Vec<String> = emails.into_iter().collect();
     unique_emails.sort();
     unique_emails.dedup();
-
-    // Only for debug purposes
-	match str::from_utf8(&output.stderr) {
-		Ok(v) => log::debug!("[set_git_remote_url] stderr = {:?}", v),
-		Err(e) => log::error!("[set_git_remote_url] stderr error: {}", e), 
-	};
-	match str::from_utf8(&output.stdout) {
-		Ok(v) => log::debug!("[set_git_remote_url] stdout = {:?}", v),
-		Err(e) => log::error!("[set_git_remote_url] stdout error: {}", e), 
-	};
-	log::debug!("[set_git_remote_url] git pull output = {:?}, {:?}", &output.stdout, &output.stderr);
 
 	return Some(unique_emails);
 }
