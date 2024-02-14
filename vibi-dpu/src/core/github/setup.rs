@@ -139,9 +139,8 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
     let mut repo_owner_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
 
     for repo in repos {
-        let token_copy = access_token.clone();
         let mut repo_copy = repo.clone();
-        clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
+        clone_git_repo(&mut repo_copy, access_token, &repo_provider).await;
         let repo_name = repo.name();
         let repo_owner = repo.owner();
         repo_owner_map

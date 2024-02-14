@@ -13,3 +13,4 @@ pub mod repo_config;
 pub mod pr_info;
 pub mod reqwest_client;
 pub mod setup_info;
+pub mod aliases;
