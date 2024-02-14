@@ -2,12 +2,14 @@ use std::collections::HashMap;
 use std::env;
 use std::str;
 use serde::{Deserialize, Serialize};
+use tonic::body;
 
 use crate::db::aliases::update_handles_in_db;
 use crate::utils::repo::Repository;
 use crate::utils::reqwest_client::get_client;
 use crate::utils::review::Review;
 use crate::utils::setup_info::SetupInfo;
+use crate::utils::user::ProviderEnum;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct PublishRequest {
@@ -24,7 +26,13 @@ struct AliasRequest {
 }
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct AliasResponse {
-    aliases: HashMap<String, Vec<String>>,
+    aliases: Vec<AliasResponseHandles>,
+}
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct AliasResponseHandles {
+    git_alias: String,
+    github: Option<Vec<String>>,
+    bitbucket: Option<Vec<String>>
 }
 
 pub async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
@@ -100,11 +108,28 @@ pub async fn get_aliases(review: &Review) -> Option<HashMap<String, Vec<String>>
 
     let resp = get_res.expect("Uncaught error in get_res");
     let body_text = resp.text().await.expect("Unable to read response body");
+    log::debug!("[get_aliases] body text = {:?}", &body_text);
     let alias_response: AliasResponse = serde_json::from_str(&body_text)
         .expect("Failed to deserialize JSON response");
-    let alias_map = alias_response.aliases.to_owned();
-    for (alias, handles) in alias_map {
-        update_handles_in_db(&alias, &review.provider(), handles.to_owned());
+    let alias_handles = alias_response.aliases.to_owned();
+    let mut aliases_map = HashMap::<String, Vec<String>>::new();
+    for alias_handle in alias_handles {
+        if review.provider().to_owned() == ProviderEnum::Github.to_string()
+            && alias_handle.github.is_some() {
+                let gh_handles = alias_handle.github.expect("Empty github handles");
+                update_handles_in_db(&alias_handle.git_alias, &review.provider(), gh_handles.clone());
+                aliases_map.insert(alias_handle.git_alias, gh_handles);
+                continue;
+        }
+        if review.provider().to_owned() == ProviderEnum::Bitbucket.to_string()
+            && alias_handle.bitbucket.is_some() {
+                let bb_handles = alias_handle.bitbucket.expect("Empty github handles");
+                update_handles_in_db(&alias_handle.git_alias, &review.provider(), bb_handles.clone());
+                aliases_map.insert(alias_handle.git_alias, bb_handles);
+        }
     }
-    Some(alias_response.aliases)
+    if aliases_map.is_empty() {
+        return None;
+    }
+    Some(aliases_map)
 }

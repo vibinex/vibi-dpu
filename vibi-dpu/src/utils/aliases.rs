@@ -5,17 +5,23 @@ use super::review::Review;
 
 pub async fn get_login_handles(git_alias: &str, review: &Review) -> Option<Vec<String>> {
     // Get aliases from db
-    let handles_opt = get_handles_from_db(git_alias, &review.provider());
-    if handles_opt.is_none() {
+    let handles_db_opt = get_handles_from_db(git_alias, &review.provider());
+    if handles_db_opt.is_none() {
         let server_aliases_opt = get_aliases(review).await;
+        log::debug!("[get_login_handles] server_aliases_opt = {:?}", &server_aliases_opt);
         if server_aliases_opt.is_none() {
             log::debug!("[get_login_strings] No login strings found for git alias {} from server or db", git_alias);
             return None;
         }
         let server_alias_map = server_aliases_opt.expect("Empty server_aliases_opt");
-        let login_handles = &server_alias_map[git_alias];
+        let login_handles_opt = server_alias_map.get(git_alias);
+        if login_handles_opt.is_none() {
+            return None;
+        }
+        let login_handles = login_handles_opt.expect("Empty login_handles_opt");
         return Some(login_handles.to_owned());
     }
-    let handles = handles_opt.expect("Empty handles_opt");
+    log::debug!("[get_login_handles] handles_db_opt = {:?}", &handles_db_opt);
+    let handles = handles_db_opt.expect("Empty handles_db_opt");
     return Some(handles);
 }
