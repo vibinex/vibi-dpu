@@ -65,10 +65,11 @@ pub fn get_handles_from_db(alias_key: &str, provider: &str) -> Option<Vec<String
 
 pub fn update_handles_in_db(alias_key: &str, provider: &str, new_logins: Vec<String>) -> Vec<String>{
     // Retrieve existing aliases from the database
-    let existing_aliases = match get_handles_from_db(alias_key, provider) {
-        Some(aliases) => aliases,
-        None => Vec::new(), // If no aliases found, initialize as empty vector
-    };
+    let existing_aliases_opt = get_handles_from_db(alias_key, provider);
+    let mut existing_aliases = Vec::new();
+    if existing_aliases_opt.is_some() {
+        existing_aliases = existing_aliases_opt.expect("Empty existing_aliases_opt");
+    }
 
     // Convert both existing and new logins into sets for easy set operations
     let mut aliases_set: HashSet<String> = existing_aliases.into_iter().collect();
@@ -84,4 +85,3 @@ pub fn update_handles_in_db(alias_key: &str, provider: &str, new_logins: Vec<Str
     save_handles_to_db(alias_key, provider, updated_aliases.to_owned());
     return updated_aliases;
 }
-

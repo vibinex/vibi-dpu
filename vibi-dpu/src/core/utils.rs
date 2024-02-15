@@ -88,7 +88,7 @@ pub async fn send_aliases(repo: &Repository, aliases: &Vec<String>) {
     log::debug!("[send_aliases] Response: {:?}", resp.text().await);
 }
 
-pub async fn get_aliases(review: &Review) -> Option<HashMap<String, Vec<String>>>{
+pub async fn get_handles_from_server(review: &Review) -> Option<HashMap<String, Vec<String>>>{
     let base_url = env::var("SERVER_URL")
         .expect("SERVER_URL must be set");
     let client = get_client();
@@ -102,13 +102,13 @@ pub async fn get_aliases(review: &Review) -> Option<HashMap<String, Vec<String>>
         .await;
 
     if let Err(e) = get_res {
-        log::error!("[get_aliases] error in get_res: {:?}, url: {:?}", e, &alias_url);
+        log::error!("[get_handles_from_server] error in get_res: {:?}, url: {:?}", e, &alias_url);
         return None;
     }
 
     let resp = get_res.expect("Uncaught error in get_res");
     let body_text = resp.text().await.expect("Unable to read response body");
-    log::debug!("[get_aliases] body text = {:?}", &body_text);
+    log::debug!("[get_handles_from_server] body text = {:?}", &body_text);
     let alias_response: AliasResponse = serde_json::from_str(&body_text)
         .expect("Failed to deserialize JSON response");
     let alias_handles = alias_response.aliases.to_owned();
@@ -129,6 +129,9 @@ pub async fn get_aliases(review: &Review) -> Option<HashMap<String, Vec<String>>
         }
     }
     if aliases_map.is_empty() {
+        log::error!(
+            "[get_handles_from_server] No aliases found for review - {:?}",
+            &review);
         return None;
     }
     Some(aliases_map)
