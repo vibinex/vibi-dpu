@@ -615,6 +615,7 @@ pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
 	log::debug!("[get_git_aliases] repo = {:?}", &repo);
 	let local_dir_opt = repo.local_dir().to_owned();
 	if local_dir_opt.is_none() {
+		log::error!("[get_git_aliases] Unable to get git aliases as local_dir is not set");
 		return None;
 	}
 	let local_dir = local_dir_opt.expect("Empty local_dir");

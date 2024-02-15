@@ -44,6 +44,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
             let aliases_opt = get_git_aliases(&repo_copy);
             if aliases_opt.is_none() {
+                log::error!("[handle_install_bitbucket] No aliases for repo {}", repo.name());
                 continue;
             }
             let aliases = aliases_opt.expect("Empty aliases_opt");
