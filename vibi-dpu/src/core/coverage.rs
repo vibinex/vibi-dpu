@@ -1,14 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{bitbucket::{self, user::author_from_commit}, core::github, utils::{aliases::get_login_handles, hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}};
+use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, utils::{aliases::get_login_handles, hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
 pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &mut RepoConfig, access_token: &str) {
     for prhunk in hunkmap.prhunkvec() {
         // calculate number of hunks for each userid
+        let mut review_mut = review.clone();
         let coverage_map = calculate_coverage(
-            prhunk, review).await;
+            prhunk, &mut review_mut).await;
         let coverage_cond = !coverage_map.is_empty();
         log::debug!("[process_coverage] !coverage_map.is_empty() = {:?}", &coverage_cond);
         log::debug!("[process_coverage] repo_config.comment() = {:?}", repo_config.comment());
@@ -83,7 +84,7 @@ async fn add_bitbucket_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review:
     }
 }
 
-async fn calculate_coverage(prhunk: &PrHunkItem, review: &Review) -> HashMap<String, (String, Option<Vec<String>>)>{
+async fn calculate_coverage(prhunk: &PrHunkItem, review: &mut Review) -> HashMap<String, (String, Option<Vec<String>>)>{
     let mut coverage_floatmap = HashMap::<String, f32>::new();
     let mut total = 0.0;
     for blame in prhunk.blamevec() {
@@ -111,6 +112,8 @@ async fn calculate_coverage(prhunk: &PrHunkItem, review: &Review) -> HashMap<Str
         let provider_id = get_login_handles(blame_author, review).await;
         coverage_map.insert(blame_author.to_string(), (formatted_value, provider_id));
     }
+    review.set_coverage(Some(coverage_map.clone()));
+    save_review_to_db(review);
     return coverage_map;
 }
 
