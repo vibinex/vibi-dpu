@@ -1,10 +1,15 @@
+use std::collections::HashMap;
 use std::env;
 use std::str;
 use serde::{Deserialize, Serialize};
+use tonic::body;
 
+use crate::db::aliases::update_handles_in_db;
 use crate::utils::repo::Repository;
 use crate::utils::reqwest_client::get_client;
+use crate::utils::review::Review;
 use crate::utils::setup_info::SetupInfo;
+use crate::utils::user::ProviderEnum;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct PublishRequest {
@@ -18,6 +23,16 @@ struct AliasRequest {
     repo_owner: String,
     repo_provider: String,
     aliases: Vec<String>
+}
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct AliasResponse {
+    aliases: Vec<AliasResponseHandles>,
+}
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct AliasResponseHandles {
+    git_alias: String,
+    github: Option<Vec<String>>,
+    bitbucket: Option<Vec<String>>
 }
 
 pub async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
@@ -71,4 +86,53 @@ pub async fn send_aliases(repo: &Repository, aliases: &Vec<String>) {
     }
     let resp = post_res.expect("Uncaught error in post_res");
     log::debug!("[send_aliases] Response: {:?}", resp.text().await);
+}
+
+pub async fn get_handles_from_server(review: &Review) -> Option<HashMap<String, Vec<String>>>{
+    let base_url = env::var("SERVER_URL")
+        .expect("SERVER_URL must be set");
+    let client = get_client();
+    let alias_url = format!("{base_url}/api/dpu/aliases?repo_name={}&repo_owner={}&repo_provider={}",
+                            review.repo_name(),
+                            review.repo_owner(),
+                            review.provider());
+    let get_res = client
+        .get(&alias_url)
+        .send()
+        .await;
+
+    if let Err(e) = get_res {
+        log::error!("[get_handles_from_server] error in get_res: {:?}, url: {:?}", e, &alias_url);
+        return None;
+    }
+
+    let resp = get_res.expect("Uncaught error in get_res");
+    let body_text = resp.text().await.expect("Unable to read response body");
+    log::debug!("[get_handles_from_server] body text = {:?}", &body_text);
+    let alias_response: AliasResponse = serde_json::from_str(&body_text)
+        .expect("Failed to deserialize JSON response");
+    let alias_handles = alias_response.aliases.to_owned();
+    let mut aliases_map = HashMap::<String, Vec<String>>::new();
+    for alias_handle in alias_handles {
+        if review.provider().to_owned() == ProviderEnum::Github.to_string()
+            && alias_handle.github.is_some() {
+                let gh_handles = alias_handle.github.expect("Empty github handles");
+                update_handles_in_db(&alias_handle.git_alias, &review.provider(), gh_handles.clone());
+                aliases_map.insert(alias_handle.git_alias, gh_handles);
+                continue;
+        }
+        if review.provider().to_owned() == ProviderEnum::Bitbucket.to_string()
+            && alias_handle.bitbucket.is_some() {
+                let bb_handles = alias_handle.bitbucket.expect("Empty github handles");
+                update_handles_in_db(&alias_handle.git_alias, &review.provider(), bb_handles.clone());
+                aliases_map.insert(alias_handle.git_alias, bb_handles);
+        }
+    }
+    if aliases_map.is_empty() {
+        log::error!(
+            "[get_handles_from_server] No aliases found for review - {:?}",
+            &review);
+        return None;
+    }
+    Some(aliases_map)
 }

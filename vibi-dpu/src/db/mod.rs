@@ -9,3 +9,4 @@ pub mod repo_config;
 pub mod prs;
 pub mod bitbucket;
 pub mod github;
+pub mod aliases;
