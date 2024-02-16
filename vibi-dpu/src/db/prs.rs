@@ -131,7 +131,7 @@ pub async fn github_process_and_update_pr_if_different(webhook_data: &Value, rep
     if event_action == "submitted" {
         let event_review_status = webhook_data["review"]["state"].to_string().trim_matches('"').to_string();
         if event_review_status == "approved" {
-            println!("[github_process_and_update_pr_if_different| pr has been approved] pr_info_parsed: {:?}", &pr_info_parsed);
+            println!("[github_process_and_update_pr_if_different| pr has been approved] webhook data for pr {:?}", &webhook_data);
             update_pr_info_in_db(&repo_owner, &repo_name, &pr_info_parsed, &pr_number, repo_provider).await;
             return true
         } else {

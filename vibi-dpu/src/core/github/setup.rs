@@ -3,8 +3,10 @@ use std::env;
 use std::str;
 use tokio::task;
 
+use crate::core::utils::send_aliases;
 use crate::github::auth::fetch_access_token; use crate::github::prs::{list_prs_github, get_and_store_pr_info};
 use crate::github::repos::get_user_accessed_github_repos;
+use crate::utils::gitops::get_git_aliases;
 // Import shared utilities
 use crate::utils::setup_info::SetupInfo;
 use crate::github::repos::get_github_app_installed_repos;
@@ -40,6 +42,13 @@ pub async fn handle_install_github(installation_code: &str) {
         let token_copy = access_token.clone();
         let mut repo_copy = repo.clone();
         clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
+        let aliases_opt = get_git_aliases(&repo_copy);
+        if aliases_opt.is_none() {
+            log::error!("[handle_install_github] Unable to get aliases for repo: {}", repo.name());
+            continue;
+        }
+        let aliases = aliases_opt.expect("Empty aliases_opt");
+        send_aliases(&repo, &aliases).await;
         let repo_name = repo.name();
         repo_names.push(repo_name.clone());
         log::debug!("[handle_install_github] Repo url git = {:?}", &repo.clone_ssh_url());

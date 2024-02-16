@@ -610,3 +610,42 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
     repo.set_local_dir(&directory);
     save_repo_to_db(repo);
 }
+
+pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
+	log::debug!("[get_git_aliases] repo = {:?}", &repo);
+	let local_dir_opt = repo.local_dir().to_owned();
+	if local_dir_opt.is_none() {
+		log::error!("[get_git_aliases] Unable to get git aliases as local_dir is not set");
+		return None;
+	}
+	let local_dir = local_dir_opt.expect("Empty local_dir");
+	let output_res = Command::new("git")
+		.arg("log")
+		.arg("--all")
+		.arg("--format=%ae")
+		.current_dir(&local_dir)
+		.output();
+	if output_res.is_err() {
+		let e = output_res.expect_err("No error in output_res");
+		log::error!("[get_git_aliases] git alias command error {:?}", e);
+		return None;
+	}
+	let output = output_res.expect("Unable to catch error in output_res");
+	let emails_res = str::from_utf8(&output.stdout);
+	if emails_res.is_err() {
+		let e = emails_res.expect_err("Empty error in emails_res");
+		log::error!("[get_git_aliases] Unable to parse git alias command output {:?}", e);
+		return None;
+	}
+	let emails_str = emails_res.expect("Uncaught error in eails_res");
+	let emails: Vec<String> = emails_str
+            .lines()
+            .map(|line| line.trim().to_string())
+            .collect();
+	// Sort and remove duplicates
+    let mut unique_emails: Vec<String> = emails.into_iter().collect();
+    unique_emails.sort();
+    unique_emails.dedup();
+
+	return Some(unique_emails);
+}

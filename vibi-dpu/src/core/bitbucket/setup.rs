@@ -8,7 +8,9 @@ use crate::bitbucket::workspace::get_bitbucket_workspaces;
 use crate::bitbucket::webhook::{get_webhooks_in_repo, add_webhook};
 use crate::bitbucket::user::get_and_save_workspace_users;
 use crate::bitbucket::prs::{list_prs_bitbucket, get_and_store_pr_info};
+use crate::core::utils::send_aliases;
 use crate::db::webhook::save_webhook_to_db;
+use crate::utils::gitops::get_git_aliases;
 use crate::utils::setup_info::SetupInfo;
 use crate::utils::gitops::clone_git_repo;
 use crate::core::utils::send_setup_info;
@@ -40,6 +42,13 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             let token_copy = access_token.clone();
             let mut repo_copy = repo.clone();
             clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
+            let aliases_opt = get_git_aliases(&repo_copy);
+            if aliases_opt.is_none() {
+                log::error!("[handle_install_bitbucket] No aliases for repo {}", repo.name());
+                continue;
+            }
+            let aliases = aliases_opt.expect("Empty aliases_opt");
+            send_aliases(&repo, &aliases).await;
             let repo_name = repo.name();
             reponames.push(repo_name.clone());
             log::debug!("[handle_install_bitbucket] Repo url git = {:?}", &repo.clone_ssh_url());
