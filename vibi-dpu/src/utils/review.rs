@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -13,6 +15,7 @@ pub struct Review {
     clone_dir: String,
     clone_url: String,
     author: String,
+    coverage: Option<HashMap<String, (String, Option<Vec<String>>)>>
 }
 
 impl Review {
@@ -28,6 +31,7 @@ impl Review {
         clone_dir: String,
         clone_url: String,
         author: String,
+        coverage: Option<HashMap<String, (String, Option<Vec<String>>)>>,
     ) -> Self {
         Self {
             base_head_commit,
@@ -40,6 +44,7 @@ impl Review {
             clone_dir,
             clone_url,
             author,
+            coverage,
         }
     }
 
@@ -82,5 +87,9 @@ impl Review {
 
     pub fn author(&self) -> &String {
         &self.author
+    }
+
+    pub fn set_coverage(&mut self, coverage: Option<HashMap<String, (String, Option<Vec<String>>)>>) {
+        self.coverage = coverage;
     }
 }
