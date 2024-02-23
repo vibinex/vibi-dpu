@@ -125,7 +125,7 @@ async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access
 }
 
 pub async fn setup_self_host_user_repos_github(access_token: &str) {
-    let repo_provider = env::var("PROVIDER").expect("provider must be set");
+    let repo_provider = env::var("PROVIDER").expect("provider must be set").to_lowercase();
 
     let repos_opt = get_user_accessed_github_repos(&access_token).await;
     if repos_opt.is_none() {

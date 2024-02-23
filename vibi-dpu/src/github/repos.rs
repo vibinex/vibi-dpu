@@ -25,7 +25,7 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
         return None;
     }
     let repos_val = repos_opt.expect("Empty repos_opt");
-    let repositories = deserialize_repos(repos_val);
+    let repositories = deserialise_github_pat_repos(repos_val);
     log::debug!("[get_user_accessed_github_repos] Fetched {:?} repositories from GitHub", &repositories);
     return Some(repositories)
 }
@@ -34,6 +34,24 @@ fn deserialize_repos(repos_val: Vec<Value>) -> Vec<Repository> {
     let mut all_repos = Vec::new();
     for response_json in repos_val {
         let repo_json_opt = response_json["repositories"].as_array();
+        if repo_json_opt.is_none() {
+            log::error!("[deserialize_repos] Unable to deserialize repo value: {:?}", &response_json);
+            continue;
+        }
+        let repos_page_json = repo_json_opt.expect("Empty repo_json_opt").to_owned();
+        for repo_json in repos_page_json {
+            let repo = deserialize_repo_object(&repo_json);
+            save_repo_to_db(&repo);
+            all_repos.push(repo);
+        }
+    }
+    return all_repos;
+}
+
+fn deserialise_github_pat_repos(repos_val: Vec<Value>) -> Vec<Repository> {
+    let mut all_repos = Vec::new();
+    for response_json in repos_val {
+        let repo_json_opt = response_json.as_array();
         if repo_json_opt.is_none() {
             log::error!("[deserialize_repos] Unable to deserialize repo value: {:?}", &response_json);
             continue;
