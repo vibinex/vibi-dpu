@@ -125,7 +125,7 @@ fn comment_text(coverage_map: &HashMap<String, (String, Option<Vec<String>>)>, a
             let provider_id_opt = provider_ids.first();
             if provider_id_opt.is_some() {
                 let provider_id = provider_id_opt.expect("Empty provider_id_opt");
-                comment += &format!("| @{} | {}% |\n", provider_id, coverage_val);
+                comment += &format!("| {} | {}% |\n", provider_id, coverage_val);
                 continue;
             }
         }
@@ -135,7 +135,7 @@ fn comment_text(coverage_map: &HashMap<String, (String, Option<Vec<String>>)>, a
 
     if !unmapped_aliases.is_empty() {
         comment += "\n\n";
-        comment += &format!("Missing profile handles for {} aliases. [Log in to Vibinex](https://vibinex.com) to map aliases to profile handles.", unmapped_aliases.len());
+        comment += &format!("Missing profile handles for {} aliases. [Go to your Vibinex settings page](https://vibinex.com/settings) to map aliases to profile handles.", unmapped_aliases.len());
     }
 
     if auto_assign {
