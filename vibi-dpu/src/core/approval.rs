@@ -23,14 +23,15 @@ pub async fn process_approval(deserialised_msg_data: &Value) {
         log::error!("[process_approval] Unable to get coverage from db");
         return;
     }
-    let coverage = coverage_opt.to_owned().expect("Empty coverage_opt");
+    let coverage_vec = coverage_opt.to_owned().expect("Empty coverage_opt");
     let mut curr_coverage = 0;
-    for (git_alias, (coverage_val, handles_opt)) in coverage {
+    for coverage_obj in coverage_vec {
+        let handles_opt = coverage_obj.handles();
         if handles_opt.is_none() {
-            log::debug!("[process_approval] handles not in db for {}", &git_alias);
+            log::debug!("[process_approval] handles not in db for {}", coverage_obj.git_alias());
             continue;
         }
-        let handles = handles_opt.expect("Empty handles_opt");
+        let handles = handles_opt.to_owned().expect("Empty handles_opt");
         for handle in handles {
             if reviewer_handles.contains(&handle) {
                 // curr_coverage += coverage_val

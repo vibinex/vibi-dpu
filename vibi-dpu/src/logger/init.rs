@@ -34,7 +34,7 @@ pub fn init_logger() -> bool {
                 message
             ))
         })
-        .level(LevelFilter::Info)
+        .level(LevelFilter::Debug)
         .chain(std::io::stdout())
         .chain(file_config)
         .apply();
