@@ -43,8 +43,8 @@ ENV GITHUB_PAT=$GITHUB_PAT
 ENV PROVIDER=$PROVIDER
 
 COPY ./vibi-dpu/target/debug/vibi-dpu /app/vibi-dpu
-COPY ./pubsub-sa-test.json /app/pubsub-sa.json
-COPY ./vibinex-code-review-test-app.2024-02-13.private-key.pem /app/repo-profiler.pem
+COPY ./pubsub-sa.json /app/pubsub-sa.json
+COPY ./repo-profiler.pem /app/repo-profiler.pem
 
 # Start the Rust application
 CMD ["/app/vibi-dpu"]
