@@ -2,28 +2,28 @@ use serde::Deserialize;
 use serde::Serialize;
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
-pub struct Coverage {
+pub struct Relevance {
     provider: String,
     git_alias: String,
-    coverage_str: String,
-    coverage_num: f32,
+    relevance_str: String,
+    relevance_num: f32,
     handles: Option<Vec<String>>,
 }
 
-impl Coverage {
+impl Relevance {
     // Constructor
     pub fn new(
         provider: String,
         git_alias: String,
-        coverage_str: String,
-        coverage_num: f32,
+        relevance_str: String,
+        relevance_num: f32,
         handles: Option<Vec<String>>,
     ) -> Self {
         Self {
             provider,
             git_alias,
-            coverage_str,
-            coverage_num,
+            relevance_str,
+            relevance_num,
             handles,
         }
     }
@@ -37,12 +37,12 @@ impl Coverage {
         &self.git_alias
     }
 
-    pub fn coverage_str(&self) -> &String {
-        &self.coverage_str
+    pub fn relevance_str(&self) -> &String {
+        &self.relevance_str
     }
 
-    pub fn coverage_num(&self) -> f32 {
-        self.coverage_num
+    pub fn relevance_num(&self) -> f32 {
+        self.relevance_num
     }
 
     pub fn handles(&self) -> &Option<Vec<String>> {

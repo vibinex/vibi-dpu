@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, utils::{aliases::get_login_handles, coverage::Coverage, hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}};
+use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, utils::{aliases::get_login_handles, relevance::Relevance, hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
@@ -8,17 +8,17 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
     for prhunk in hunkmap.prhunkvec() {
         // calculate number of hunks for each userid
         let mut review_mut = review.clone();
-        let coverage_obj_opt = calculate_coverage(
+        let relevance_vec_opt = calculate_relevance(
             prhunk, &mut review_mut).await;
-        if coverage_obj_opt.is_none() {
+        if relevance_vec_opt.is_none() {
             log::debug!("[process_coverage] Unable to calculate coverage obj");
             continue;
         }
-        let coverage_obj = coverage_obj_opt.expect("Empty coverage_obj_opt");
+        let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
         if repo_config.comment() {
             log::info!("[process_coverage] Inserting comment...");
             // create comment text
-            let comment = comment_text(&coverage_obj, repo_config.auto_assign());
+            let comment = comment_text(&relevance_vec, repo_config.auto_assign());
             // add comment
             if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
                 bitbucket::comment::add_comment(&comment, review, &access_token).await;
@@ -35,16 +35,16 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
                 add_bitbucket_reviewers(&prhunk, hunkmap, review, &access_token).await;
             }
             if review.provider().to_string() == ProviderEnum::Github.to_string() {
-                add_github_reviewers(review, &coverage_obj, &access_token).await;
+                add_github_reviewers(review, &relevance_vec, &access_token).await;
             }
         }  
     }
 }
 
-async fn add_github_reviewers(review: &Review, coverage_vec: &Vec<Coverage>, access_token: &str) {
+async fn add_github_reviewers(review: &Review, relevance_vec: &Vec<Relevance>, access_token: &str) {
     let mut reviewers: HashSet<String> = HashSet::new();
-    for coverage_obj in coverage_vec {
-        let provider_ids_opt = coverage_obj.handles();
+    for relevance_obj in relevance_vec {
+        let provider_ids_opt = relevance_obj.handles();
         if provider_ids_opt.is_none() {
             continue;
         }
@@ -83,8 +83,8 @@ async fn add_bitbucket_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review:
     }
 }
 
-async fn calculate_coverage(prhunk: &PrHunkItem, review: &mut Review) -> Option<Vec<Coverage>>{
-    let mut coverage_floatmap = HashMap::<String, f32>::new();
+async fn calculate_relevance(prhunk: &PrHunkItem, review: &mut Review) -> Option<Vec<Relevance>>{
+    let mut relevance_floatmap = HashMap::<String, f32>::new();
     let mut total = 0.0;
     for blame in prhunk.blamevec() {
         let author_id = blame.author().to_owned();
@@ -92,54 +92,54 @@ async fn calculate_coverage(prhunk: &PrHunkItem, review: &mut Review) -> Option<
             - blame.line_start().parse::<f32>().expect("lines_end invalid float")
             + 1.0;
         total += num_lines;
-        if coverage_floatmap.contains_key(&author_id) {
-            let coverage = coverage_floatmap.get(&author_id).expect("unable to find coverage for author")
+        if relevance_floatmap.contains_key(&author_id) {
+            let relevance = relevance_floatmap.get(&author_id).expect("unable to find coverage for author")
                 + num_lines;
-            coverage_floatmap.insert(author_id, coverage);
+            relevance_floatmap.insert(author_id, relevance);
         }
         else {
-            coverage_floatmap.insert(author_id, num_lines);
+            relevance_floatmap.insert(author_id, num_lines);
         }
     }
-    let mut coverage_vec = Vec::<Coverage>::new();
+    let mut relevance_vec = Vec::<Relevance>::new();
     if total <= 0.0 {
         return None;
     } 
-    for (blame_author, coverage) in coverage_floatmap.iter_mut() {
-        *coverage = *coverage / total * 100.0;
-        let formatted_value = format!("{:.2}", *coverage);
+    for (blame_author, relevance) in relevance_floatmap.iter_mut() {
+        *relevance = *relevance / total * 100.0;
+        let formatted_value = format!("{:.2}", *relevance);
         let provider_ids = get_login_handles(blame_author, review).await;
-        let coverage_obj = Coverage::new(
+        let relevance_obj = Relevance::new(
             review.provider().to_owned(),
             blame_author.to_owned(), 
             formatted_value.to_owned(), 
-            *coverage, 
+            *relevance, 
             provider_ids);
-        coverage_vec.push(coverage_obj);
+        relevance_vec.push(relevance_obj);
     }
-    review.set_coverage(Some(coverage_vec.clone()));
+    review.set_relevance(Some(relevance_vec.clone()));
     save_review_to_db(review);
-    return Some(coverage_vec);
+    return Some(relevance_vec);
 }
 
-fn comment_text(coverage_vec: &Vec<Coverage>, auto_assign: bool) -> String {
+fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
     comment += "| Contributor Name/Alias  | Relevance |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
     let mut unmapped_aliases = Vec::new();
-    for coverage_obj in coverage_vec {
-        let provider_ids_opt = coverage_obj.handles();
+    for relevance_obj in relevance_vec {
+        let provider_ids_opt = relevance_obj.handles();
         if provider_ids_opt.is_some() {
             let provider_ids = provider_ids_opt.to_owned().expect("Empty provider_ids_opt");
             let provider_id_opt = provider_ids.first();
             if provider_id_opt.is_some() {
                 let provider_id = provider_id_opt.expect("Empty provider_id_opt");
-                comment += &format!("| @{} | {}% |\n", provider_id, coverage_obj.coverage_str());
+                comment += &format!("| @{} | {}% |\n", provider_id, relevance_obj.relevance_str());
                 continue;
             }
         }
-        comment += &format!("| {} | {}% |\n", coverage_obj.git_alias(), coverage_obj.coverage_str());  // Added a newline at the end
-        unmapped_aliases.push(coverage_obj.git_alias());
+        comment += &format!("| {} | {}% |\n", relevance_obj.git_alias(), relevance_obj.relevance_str());  // Added a newline at the end
+        unmapped_aliases.push(relevance_obj.git_alias());
     }
 
     if !unmapped_aliases.is_empty() {
