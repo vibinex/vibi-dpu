@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::{db::review::get_review_from_db, utils::{coverage::CoverageMap, user::ProviderEnum}};
+use crate::{core::github, db::review::get_review_from_db, utils::{coverage::CoverageMap, user::ProviderEnum}};
 
 pub async fn process_approval(deserialised_msg_data: &Value) {
     log::debug!("[process_approval] processing approval msg - {:?}", deserialised_msg_data);
@@ -31,6 +31,7 @@ pub async fn process_approval(deserialised_msg_data: &Value) {
     // add comment
     let comment_text = approval_comment_text(&coverage_map_obj);
     // get access token and call add_comment in gh/bb
+    github::comment::add_comment(&comment_text, &review, &access_token).await;
 }
 
 fn approval_comment_text(coverage_map: &CoverageMap) -> String {
