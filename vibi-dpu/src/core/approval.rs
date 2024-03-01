@@ -18,19 +18,20 @@ pub async fn process_approval(deserialised_msg_data: &Value) {
         return;
     }
     let review = review_opt.expect("Empty review_opt");
-    let coverage_opt = review.coverage();
-    if coverage_opt.is_none() {
+    let relevance_vec_opt = review.relevance();
+    if relevance_vec_opt.is_none() {
         log::error!("[process_approval] Unable to get coverage from db");
         return;
     }
-    let coverage = coverage_opt.to_owned().expect("Empty coverage_opt");
+    let relevance_vec = relevance_vec_opt.to_owned().expect("Empty coverage_opt");
     let mut curr_coverage = 0;
-    for (git_alias, (coverage_val, handles_opt)) in coverage {
+    for relevance_obj in relevance_vec {
+        let handles_opt = relevance_obj.handles();
         if handles_opt.is_none() {
-            log::debug!("[process_approval] handles not in db for {}", &git_alias);
+            log::debug!("[process_approval] handles not in db for {}", relevance_obj.git_alias());
             continue;
         }
-        let handles = handles_opt.expect("Empty handles_opt");
+        let handles = handles_opt.to_owned().expect("Empty handles_opt");
         for handle in handles {
             if reviewer_handles.contains(&handle) {
                 // curr_coverage += coverage_val

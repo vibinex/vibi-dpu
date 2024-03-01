@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-
 use serde::Deserialize;
 use serde::Serialize;
+
+use super::relevance::Relevance;
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct Review {
@@ -15,7 +15,7 @@ pub struct Review {
     clone_dir: String,
     clone_url: String,
     author: String,
-    coverage: Option<HashMap<String, (String, Option<Vec<String>>)>>
+    relevance: Option<Vec<Relevance>>,
 }
 
 impl Review {
@@ -31,7 +31,7 @@ impl Review {
         clone_dir: String,
         clone_url: String,
         author: String,
-        coverage: Option<HashMap<String, (String, Option<Vec<String>>)>>,
+        relevance: Option<Vec<Relevance>>,
     ) -> Self {
         Self {
             base_head_commit,
@@ -44,7 +44,7 @@ impl Review {
             clone_dir,
             clone_url,
             author,
-            coverage,
+            relevance,
         }
     }
 
@@ -89,7 +89,11 @@ impl Review {
         &self.author
     }
 
-    pub fn set_coverage(&mut self, coverage: Option<HashMap<String, (String, Option<Vec<String>>)>>) {
-        self.coverage = coverage;
+    pub fn relevance(&self) -> &Option<Vec<Relevance>> {
+        &self.relevance
+    }
+
+    pub fn set_relevance(&mut self, relevance: Option<Vec<Relevance>>) {
+        self.relevance = relevance;
     }
 }
