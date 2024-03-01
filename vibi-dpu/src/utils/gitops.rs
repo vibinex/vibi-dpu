@@ -516,8 +516,8 @@ pub fn create_clone_url(git_url: &str, access_token: &str, repo_provider: &str) 
 	return clone_url;
 }
 
-pub fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str, repo_provider: &str) {
-    let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
+pub fn set_git_remote_url(review: &Review, access_token: &str, repo_provider: &str) {
+    let clone_url_opt = create_clone_url(review.clone_url(), access_token, repo_provider);
     if clone_url_opt.is_none() {
         log::error!("[set_git_remote_url] Unable to create clone url for repo provider {:?}, empty clone_url_opt",
 			repo_provider);
@@ -527,7 +527,7 @@ pub fn set_git_remote_url(git_url: &str, directory: &str, access_token: &str, re
     let output = Command::new("git")
 		.arg("remote").arg("set-url").arg("origin")
 		.arg(clone_url)
-		.current_dir(directory)
+		.current_dir(review.clone_dir())
 		.output()
 		.expect("failed to execute git pull");
     // Only for debug purposes
