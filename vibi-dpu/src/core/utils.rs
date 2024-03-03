@@ -144,7 +144,8 @@ pub async fn get_access_token (review: &Review) -> Option<String> {
 	if review.provider().to_string() == ProviderEnum::Bitbucket.to_string().to_lowercase() {
 		let access_token_opt = bitbucket::auth::refresh_git_auth(review).await;
 		if access_token_opt.is_none() {
-			log::error!("[get_access_token] no refresh token acquired");
+			log::error!("[get_access_token] Unable to get access token, review: {:?}",
+                &review);
 			return None;
 		}
 		access_token = access_token_opt.expect("Empty access_token_opt");
@@ -152,7 +153,8 @@ pub async fn get_access_token (review: &Review) -> Option<String> {
 	else if review.provider().to_string() == ProviderEnum::Github.to_string().to_lowercase(){
 		let access_token_opt = github::auth::gh_access_token(review).await;
 		if access_token_opt.is_none() {
-			log::error!("[get_access_token] no refresh token acquired");
+			log::error!("[get_access_token] Unable to get access token, review: {:?}",
+                &review);
 			return None;
 		}
 		access_token = access_token_opt.expect("Empty access_token");
