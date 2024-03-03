@@ -5,7 +5,9 @@ use std::env;
 use std::str;
 use chrono::{Utc, Duration};
 use std::fs;
-use crate::db::github::auth::github_auth_info;
+use crate::db::github::auth::get_github_auth_info_from_db;
+use crate::utils::review::Review;
+use crate::utils::user::ProviderEnum;
 use crate::{utils::reqwest_client::get_client, utils::github_auth_info::GithubAuthInfo, db::github::auth::save_github_auth_info_to_db};
 use crate::utils::gitops::set_git_remote_url;
 
@@ -23,29 +25,14 @@ struct Claims {
 }
 
 fn generate_jwt(github_app_id: &str) -> Option<String> {
-    let pem_file_path = "/app/repo-profiler.pem";
-    let pem_data_res = fs::read(pem_file_path);
-    
-    if pem_data_res.is_err() {
-        let pem_data_err = pem_data_res.expect_err("No error in reading pem file");
-        log::error!("[generate_jwt] Error reading pem file: {:?}", pem_data_err);
+    let my_claims = generate_claims(github_app_id);
+    let encoding_key_opt = generate_encoding_key();
+    if encoding_key_opt.is_none() {
+        log::error!("[generate_jwt] Unable to generate encoding key");
         return None;
     }
-    let pem_data = pem_data_res.expect("Error reading pem file");
-
-    let my_claims = Claims {
-        iat: Utc::now().timestamp(),
-        exp: (Utc::now() + Duration::minutes(5)).timestamp(),
-        iss: github_app_id.to_string(),
-    };
-
-    let encoding_key = EncodingKey::from_rsa_pem(&pem_data);
-    if encoding_key.is_err() {
-        log::error!("[generate_jwt] Error creating encoding key");
-        return None;
-    }
-
-    let token_res = encode(&Header::new(Algorithm::RS256), &my_claims, &encoding_key.unwrap());
+    let encoding_key = encoding_key_opt.expect("Empty encoding_key_opt");
+    let token_res = encode(&Header::new(Algorithm::RS256), &my_claims, &encoding_key);
     if token_res.is_err() {
         let token_err = token_res.expect_err("No error in fetching token");
         log::error!("[generate_jwt] Error encoding JWT: {:?}", token_err);
@@ -55,11 +42,53 @@ fn generate_jwt(github_app_id: &str) -> Option<String> {
     Some(token)
 }
 
+fn generate_claims(github_app_id: &str) -> Claims{
+    return Claims {
+        iat: Utc::now().timestamp(),
+        exp: (Utc::now() + Duration::minutes(5)).timestamp(),
+        iss: github_app_id.to_string(),
+    };
+}
+
+fn generate_encoding_key() -> Option<EncodingKey>{
+    let pem_file_path = "/app/repo-profiler.pem";
+    let pem_data_res = fs::read(pem_file_path);
+    
+    if pem_data_res.is_err() {
+        let pem_data_err = pem_data_res.expect_err("Empty error in reading pem file");
+        log::error!("[generate_encoding_key] Error reading pem file: {:?}", pem_data_err);
+        return None;
+    }
+    let pem_data = pem_data_res.expect("Error reading pem file");
+    let encoding_key_res = EncodingKey::from_rsa_pem(&pem_data);
+    if encoding_key_res.is_err() {
+        let e= encoding_key_res.err().expect("Empty error in encoding_key_res");
+        log::error!("[generate_encoding_key] Error creating encoding key: {:?}", e);
+        return None;
+    }
+    let encoding_key = encoding_key_res.expect("Uncaught error in encoding_key_res");
+    return Some(encoding_key);
+}
+
 pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo> {
+    let gh_auth_info_opt = call_access_token_api(installation_id).await;
+    if gh_auth_info_opt.is_none() {
+        log::error!("[fetch_access_token] Unable to get gh auth info");
+        return None;
+    }
+    let gh_auth_info = gh_auth_info_opt.expect("Uncaught error in gh_auth_info_opt");
+    return Some(gh_auth_info);
+}
+
+async fn call_access_token_api(installation_id: &str) -> Option<GithubAuthInfo>{
     let github_app_id = env::var("GITHUB_APP_ID");
     let github_app_id_str = github_app_id.expect("GITHUB_APP_ID must be set");
-    let jwt_token = generate_jwt(&github_app_id_str).expect("Error generating JWT");
-
+    let jwt_token_opt = generate_jwt(&github_app_id_str);
+    if jwt_token_opt.is_none() {
+        log::error!("[call_access_token_api] Unable to generate jwt token");
+        return None;
+    }
+    let jwt_token = jwt_token_opt.expect("Empty jwt_token_opt");
     let client = get_client();
     let response = client.post(&format!("https://api.github.com/app/installations/{}/access_tokens", installation_id))
         .header("Accept", "application/vnd.github+json")
@@ -67,80 +96,107 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo>
         .header("User-Agent", "Vibinex code review Test App")
         .send()
         .await;
-        if response.is_err() {
-            let e = response.expect_err("No error in response");
-            log::error!("[fetch_access_token] error in calling github api : {:?}", e);
-            return None;
-        }
-        let response_access_token = response.expect("Uncaught error in reponse");
-        if !response_access_token.status().is_success() {
-            log::error!(
-                "[fetch_access_token] Failed to exchange code for access token. Status code: {}, Response content: {:?}",
-                response_access_token.status(),
-                response_access_token.text().await
-            );
-            return None;
-        }
-        log::debug!("[fetch_access_token] response access token = {:?}", &response_access_token);
-        let parse_res = response_access_token.json::<GithubAuthInfo>().await ;
-        if parse_res.is_err() {
-            let e = parse_res.expect_err("No error in parse_res for AuthInfo");
-            log::info!("[fetch_access_token] error deserializing GithubAuthInfo: {:?}", e);
-            return None;
-        }
-        let mut response_json = parse_res.expect("Uncaught error in parse_res for AuthInfo");
-        response_json.set_installation_id(installation_id);
-        save_github_auth_info_to_db(&mut response_json);
-        return Some(response_json);
+    if response.is_err() {
+        let e = response.expect_err("No error in response");
+        log::error!("[call_access_token_api] error in calling github api : {:?}", e);
+        return None;
+    }
+    let response_access_token = response.expect("Uncaught error in reponse");
+    if !response_access_token.status().is_success() {
+        log::error!(
+            "[call_access_token_api] Failed to exchange code for access token. Status code: {}, Response content: {:?}",
+            response_access_token.status(),
+            response_access_token.text().await
+        );
+        return None;
+    }
+    log::debug!("[call_access_token_api] response access token = {:?}", &response_access_token);
+    let parse_res = response_access_token.json::<GithubAuthInfo>().await ;
+    if parse_res.is_err() {
+        let e = parse_res.expect_err("No error in parse_res for AuthInfo");
+        log::error!("[call_access_token_api] error deserializing GithubAuthInfo: {:?}", e);
+        return None;
+    }
+    let mut gh_auth_info = parse_res.expect("Uncaught error in parse_res for AuthInfo");
+    gh_auth_info.set_installation_id(installation_id);
+    return Some(gh_auth_info);
 }
 
-pub async fn update_access_token(auth_info: &GithubAuthInfo, clone_url: &str, directory: &str) -> Option<GithubAuthInfo> {
-    let repo_provider = "github".to_string();
-	let app_installation_id_opt = auth_info.installation_id().to_owned();
+async fn get_or_update_auth(review: &Review) -> Option<GithubAuthInfo> {
+	let authinfo_opt =  get_github_auth_info_from_db();
+    if authinfo_opt.is_none() {
+        return None;
+    }
+    let auth_info = authinfo_opt.expect("empty authinfo_opt in app_access_token");
+    let app_installation_id_opt = auth_info.installation_id().to_owned();
     if app_installation_id_opt.is_none() {
-        log::error!("[update_access_token] app_installation_id empty");
+        log::error!("[get_or_update_auth] app_installation_id empty");
         return None;
     }
     let app_installation_id = app_installation_id_opt.expect("Empty app_installation_id_opt");
-    let now_ts = Utc::now().timestamp();
-    let expires_at = auth_info.expires_at();
-    let expires_at_dt_res = DateTime::parse_from_rfc3339(expires_at);
-    if expires_at_dt_res.is_err() {
-        let e = expires_at_dt_res.expect_err("No error in expires_at_dt_res");
-        log::error!("[update_access_token] Unable to parse expires_at to datetime: {:?}", e);
-        return None;
-    }
-    let expires_at_dt = expires_at_dt_res.expect("Uncaught error in expires_at_dt_res");
-    let expires_at_ts = expires_at_dt.timestamp();
-    if expires_at_ts > now_ts {  
-        log::error!("[update_access_token] Not yet expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
+    if update_condition_satisfied(auth_info.expires_at()) {  
+        log::debug!("[get_or_update_auth] access token not yet expired");
         return Some(auth_info.to_owned());
     }
     // auth info has expired
-    log::debug!("[update_access_token] github auth info expired, expires_at = {}, now_secs = {}", expires_at, now_ts);
+    log::debug!("[get_or_update_auth] github auth info expired");
     let new_auth_info_opt = fetch_access_token(app_installation_id.as_str()).await;
+    if new_auth_info_opt.is_none() {
+        log::error!("[get_or_update_auth] Unable to fetch access token");
+        return None;
+    }
     let mut new_auth_info = new_auth_info_opt.clone()
-        .expect("empty auhtinfo_opt from update_access_token");
-    log::debug!("[update_access_token] New github auth info  = {:?}", &new_auth_info);
-    let access_token = new_auth_info.token().to_string();
-    set_git_remote_url(clone_url, directory, &access_token, &repo_provider);
+        .expect("empty auhtinfo_opt from get_or_update_auth");
+    log::debug!("[get_or_update_auth] New github auth info  = {:?}", &new_auth_info);
+    set_git_remote_url(review, new_auth_info.token(),
+        &ProviderEnum::Github.to_string().to_lowercase());
     save_github_auth_info_to_db(&mut new_auth_info);
     return new_auth_info_opt;
 
 }
 
-pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String>{
-	let authinfo_opt =  github_auth_info();
-    if authinfo_opt.is_none() {
+fn update_condition_satisfied(expires_at: &str) -> bool{
+    let now_ts = Utc::now().timestamp();
+    let expires_at_dt_res = DateTime::parse_from_rfc3339(expires_at);
+    if expires_at_dt_res.is_err() {
+        let e = expires_at_dt_res.expect_err("No error in expires_at_dt_res");
+        log::error!("[update_condition_satisfied] Unable to parse expires_at to datetime: {:?}", e);
+        return false;
+    }
+    let expires_at_dt = expires_at_dt_res.expect("Uncaught error in expires_at_dt_res");
+    let expires_at_ts = expires_at_dt.timestamp();
+    return expires_at_ts > now_ts;
+}
+
+async fn app_access_token(review: &Review) -> Option<String>{
+    let latest_authinfo_opt = get_or_update_auth(review).await;
+    if latest_authinfo_opt.is_none() {
+        log::error!("[app_access_token] Empty latest_authinfo_opt for github auth info");
         return None;
     }
-    let authinfo = authinfo_opt.expect("empty authinfo_opt in refresh_git_auth");
-    let authinfo_opt = update_access_token(&authinfo, clone_url, directory).await;
-    if authinfo_opt.is_none() {
-        log::error!("[refresh_git_auth] Empty authinfo_opt from update_access_token for github auth info");
-        return None;
-    }
-    let latest_authinfo = authinfo_opt.expect("Empty authinfo_opt");
+    let latest_authinfo = latest_authinfo_opt.expect("Empty latest_authinfo_opt");
     let access_token = latest_authinfo.token().to_string();
     return Some(access_token);
+}
+
+pub async fn gh_access_token(review: &Review) -> Option<String> {
+    let github_pat_res: Result<String, env::VarError> = env::var("GITHUB_PAT");
+	let provider_res = env::var("PROVIDER");	
+	if github_pat_res.is_err() {
+		log::debug!("[gh_access_token] GITHUB PAT env var must be set");
+        return None;
+    }
+    let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
+    log::debug!("[gh_access_token] GITHUB PAT: [REDACTED]");
+
+    if provider_res.is_err() {
+        log::error!("[gh_access_token] PROVIDER env var must be set");
+        return None;
+    }
+    let provider = provider_res.expect("Empty PROVIDER env var");
+    log::debug!("[gh_access_token] PROVIDER: {}", provider);
+    if provider.eq_ignore_ascii_case(&ProviderEnum::Github.to_string()) {
+        return Some(github_pat);
+    }
+    return app_access_token(review).await;
 }
