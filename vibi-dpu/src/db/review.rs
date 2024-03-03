@@ -20,10 +20,12 @@ pub fn save_review_to_db(review: &Review) {
 pub fn get_review_from_db(repo_name: &str, repo_owner: &str,
         repo_provider: &str, review_id: &str) -> Option<Review> {
     let db = get_db();
-    let review_key = format!("review/{}/{}/{}/{}", repo_provider, repo_owner, repo_name, review_id);
+    let review_key = format!("review/{}/{}/{}/{}",
+        repo_provider, repo_owner, repo_name, review_id);
     let review_res = db.get(IVec::from(review_key.as_bytes()));
     if let Err(e) = review_res {
-        log::error!("[get_review_from_db] Review key not found in db - {}", &review_key);
+        log::error!("[get_review_from_db] Review key not found in db - {}, error: {:?}",
+            &review_key, e);
         return None;
     }
     let ivec_opt = review_res.expect("Uncaught error in review_res");
@@ -31,11 +33,11 @@ pub fn get_review_from_db(repo_name: &str, repo_owner: &str,
     let review_res = serde_json::from_slice(&ivec);
     if let Err(e) = review_res {
         log::error!(
-            "[get_handles_from_db] Failed to deserialize aliases from json: {:?}",
+            "[get_handles_from_db] Failed to deserialize review from json: {:?}",
             e
         );
         return None;
     }
-    let review: Review = review_res.expect("Uncaught error in alias_res");
+    let review: Review = review_res.expect("Uncaught error in review_res");
     return Some(review);
 }
