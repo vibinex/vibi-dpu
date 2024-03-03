@@ -249,6 +249,7 @@ fn create_and_save_bitbucket_review_object(deserialized_data: &Value) -> Option<
 		clone_dir,
 		clone_url,
 		deserialized_data["eventPayload"]["pullrequest"]["author"]["uuid"].to_string().replace("\"", ""),
+		None,
 	);
 	log::debug!("[create_and_save_bitbucket_review_object] bitbucket review object= {:?}", &review);
 	save_review_to_db(&review);
@@ -279,6 +280,7 @@ fn create_and_save_github_review_object(deserialized_data: &Value) -> Option<Rev
 		clone_dir,
 		clone_url,
 		deserialized_data["eventPayload"]["pull_request"]["user"]["id"].to_string().replace("\"", ""),
+		None,
 	);
 	log::debug!("[create_and_save_github_review_object] github review object = {:?}", &review);
 	save_review_to_db(&review);

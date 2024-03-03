@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+use super::relevance::Relevance;
+
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct Review {
     base_head_commit: String,
@@ -13,6 +15,7 @@ pub struct Review {
     clone_dir: String,
     clone_url: String,
     author: String,
+    relevance: Option<Vec<Relevance>>,
 }
 
 impl Review {
@@ -28,6 +31,7 @@ impl Review {
         clone_dir: String,
         clone_url: String,
         author: String,
+        relevance: Option<Vec<Relevance>>,
     ) -> Self {
         Self {
             base_head_commit,
@@ -40,6 +44,7 @@ impl Review {
             clone_dir,
             clone_url,
             author,
+            relevance,
         }
     }
 
@@ -82,5 +87,13 @@ impl Review {
 
     pub fn author(&self) -> &String {
         &self.author
+    }
+
+    pub fn relevance(&self) -> &Option<Vec<Relevance>> {
+        &self.relevance
+    }
+
+    pub fn set_relevance(&mut self, relevance: Option<Vec<Relevance>>) {
+        self.relevance = relevance;
     }
 }
