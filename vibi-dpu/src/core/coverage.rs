@@ -134,7 +134,7 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
             let provider_id_opt = provider_ids.first();
             if provider_id_opt.is_some() {
                 let provider_id = provider_id_opt.expect("Empty provider_id_opt");
-                comment += &format!("| {} | {}% |\n", provider_id, coverage_val);
+                comment += &format!("| {} | {}% |\n", provider_id, relevance_obj.relevance_str());
                 continue;
             }
         }
