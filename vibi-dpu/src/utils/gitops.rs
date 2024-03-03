@@ -524,12 +524,16 @@ pub fn set_git_remote_url(review: &Review, access_token: &str, repo_provider: &s
         return;
     }
     let clone_url = clone_url_opt.expect("empty clone_url_opt");
-    let output = Command::new("git")
+    let output_res = Command::new("git")
 		.arg("remote").arg("set-url").arg("origin")
 		.arg(clone_url)
 		.current_dir(review.clone_dir())
-		.output()
-		.expect("failed to execute git pull");
+		.output();
+	if let Err(e) = output_res {
+		log::error!("[set_git_remote_url] Unable to execute git pull: {:?}", e);
+		return;
+	}
+	let output = output_res.expect("Uncaught error in output_res");
     // Only for debug purposes
 	match str::from_utf8(&output.stderr) {
 		Ok(v) => log::debug!("[set_git_remote_url] stderr = {:?}", v),
