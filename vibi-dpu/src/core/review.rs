@@ -3,8 +3,22 @@ use std::env;
 use serde_json::Value;
 
 use crate::{
-	core::{coverage::process_coverage, utils::get_access_token}, db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, repo::get_clone_url_clone_dir, repo_config::save_repo_config_to_db, review::save_review_to_db}, utils::{gitops::{commit_exists, generate_blame, generate_diff, get_excluded_files, git_pull, process_diffmap}, hunk::{HunkMap, PrHunkItem}, repo_config::RepoConfig, reqwest_client::get_client, review::Review}};
-use crate::utils::user::ProviderEnum;
+    core::{coverage::process_coverage, utils::get_access_token},
+    db::{
+        hunk::{get_hunk_from_db, store_hunkmap_to_db},
+        repo::get_clone_url_clone_dir,
+        repo_config::save_repo_config_to_db,
+        review::save_review_to_db,
+    },
+    utils::{
+        gitops::{commit_exists, generate_blame, generate_diff, get_excluded_files, git_pull, process_diffmap},
+        hunk::{HunkMap, PrHunkItem},
+        repo_config::RepoConfig,
+        reqwest_client::get_client,
+        review::Review,
+        user::ProviderEnum,
+    },
+};
 
 pub async fn process_review(message_data: &Vec<u8>) {
 	let review_opt = parse_review(message_data);
