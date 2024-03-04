@@ -109,6 +109,7 @@ async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 		prvec,
 		format!("{}/hunkmap", review.db_key()),
 	);
+	log::debug!("[process_review_changes] hunkmap: {:?}", hunkmap);
 	return Some(hunkmap);
 }
 
