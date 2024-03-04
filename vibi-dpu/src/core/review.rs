@@ -3,10 +3,22 @@ use std::env;
 use serde_json::Value;
 
 use crate::{
-	core::coverage::process_coverage, db::{hunk::{get_hunk_from_db, store_hunkmap_to_db}, repo::get_clone_url_clone_dir, repo_config::save_repo_config_to_db, review::save_review_to_db}, github::config::{get_access_token_based_on_env_values, is_github_pat_set}, utils::{gitops::{commit_exists, generate_blame, generate_diff, get_excluded_files, git_pull, process_diffmap}, hunk::{HunkMap, PrHunkItem}, repo_config::RepoConfig, reqwest_client::get_client, review::Review}};
-use crate::utils::user::ProviderEnum;
-use crate::bitbucket;
-use crate::github;
+    core::{coverage::process_coverage, utils::get_access_token},
+    db::{
+        hunk::{get_hunk_from_db, store_hunkmap_to_db},
+        repo::get_clone_url_clone_dir,
+        repo_config::save_repo_config_to_db,
+        review::save_review_to_db,
+    },
+    utils::{
+        gitops::{commit_exists, generate_blame, generate_diff, get_excluded_files, git_pull, process_diffmap},
+        hunk::{HunkMap, PrHunkItem},
+        repo_config::RepoConfig,
+        reqwest_client::get_client,
+        review::Review,
+        user::ProviderEnum,
+    },
+};
 
 pub async fn process_review(message_data: &Vec<u8>) {
 	let review_opt = parse_review(message_data);
@@ -20,42 +32,19 @@ pub async fn process_review(message_data: &Vec<u8>) {
 		return;
 	}
 	log::info!("[process_review] Processing PR : {}", &review.id());
+	let access_token_opt = get_access_token(&review).await;
 
-	let access_token= get_access_token_based_on_env_values(&review).await;
-	if access_token.is_none(){
-		log::error!("[process review] no final access token opt");
+	if access_token_opt.is_none() {
+		log::error!("[process_review] Unable to retrieve access token, failing, message: {:?}",
+			&review);
 		return;
 	}
-	let final_access_token = access_token.expect("Empty final access token opt");
-
-	commit_check(&review, &final_access_token).await;
+	let access_token = access_token_opt.expect("Empty access_token_opt");
+	commit_check(&review, &access_token).await;
 	let hunkmap_opt = process_review_changes(&review).await;
-	send_hunkmap(&hunkmap_opt, &review, &repo_config, &final_access_token).await;
+	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token).await;
 }
 
-pub async fn get_access_token (review: &Review) -> Option<String> {
-	let access_token: String;
-	if review.provider().to_string() == ProviderEnum::Bitbucket.to_string().to_lowercase() {
-		let access_token_opt = bitbucket::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
-		if access_token_opt.is_none() {
-			log::error!("[get_access_token] no refresh token acquired");
-			return None;
-		}
-		access_token = access_token_opt.expect("Empty access_token_opt");
-	} 
-	else if review.provider().to_string() == ProviderEnum::Github.to_string().to_lowercase(){
-		let access_token_opt = github::auth::refresh_git_auth(review.clone_url(), review.clone_dir()).await;
-		if access_token_opt.is_none() {
-			log::error!("[get_access_token] no refresh token acquired");
-			return None;
-		}
-		access_token = access_token_opt.expect("Empty access_token");
-	} else {
-		log::error!("[git pull] | repo provider is not github or bitbucket");
-		return None;
-	}
-	return Some(access_token);
-}
 async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review, repo_config: &RepoConfig, access_token: &str) {
 	if hunkmap_opt.is_none() {
 		log::error!("[send_hunkmap] Empty hunkmap in send_hunkmap");

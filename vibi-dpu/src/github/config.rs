@@ -2,8 +2,7 @@ use std::{env, collections::HashMap};
 use reqwest::{Response, header::{HeaderMap, HeaderValue, AUTHORIZATION, ACCEPT, USER_AGENT}, header};
 use serde_json::Value;
 
-use crate::{core::review::get_access_token, utils::reqwest_client::get_client};
-use crate::utils::review::Review;
+use crate::utils::reqwest_client::get_client;
 
 pub fn github_base_url() -> String {
     env::var("GITHUB_BASE_URL").expect("BITBUCKET_BASE_URL must be set")
@@ -153,55 +152,4 @@ pub fn prepare_headers(access_token: &str) -> Option<HeaderMap> {
     headers.insert(USER_AGENT, user_agent_header);
 
     return Some(headers)
-}
-
-pub fn is_github_pat_set() -> Option<String> {
-     // Retrieve the GitHub PAT from the environment variable
-     let github_pat_res: Result<String, env::VarError> = env::var("GITHUB_PAT");
-     if github_pat_res.is_err() {
-         log::info!("[is_github_pat_set] GITHUB PAT env var must be set");
-         return None;
-     }
- 
-     let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
-     log::info!("[is_github_pat_set] GITHUB PAT: [REDACTED]");
-     
-     // Check if the provider is GitHub
-     let provider_res = env::var("PROVIDER");
-     if provider_res.is_err() {
-         log::info!("[is_github_pat_set] PROVIDER env var must be set");
-         return None;
-     }
- 
-     let provider = provider_res.expect("Empty PROVIDER env var");
-     log::info!("[is_github_pat_set] PROVIDER: {}", provider);
- 
-     if !provider.eq_ignore_ascii_case("GITHUB") {
-         return None;
-     }
- 
-     Some(github_pat)
-}
-
-pub async fn get_access_token_based_on_env_values(review: &Review) -> Option<String> {
-    let mut access_token: Option<String> = None;
-	
-	access_token = is_github_pat_set();
-
-	if access_token.is_none() {
-		let access_token_opt = get_access_token(&review).await;
-		if access_token_opt.is_none() {
-			log::error!("[process_review] empty access_token_opt");
-			return None;
-		}
-		access_token = access_token_opt;
-	}
-
-	let final_access_token_opt = access_token;
-	if final_access_token_opt.is_none() {
-		log::error!("[process review] no final access token opt");
-		return None;
-	}
-	let final_access_token = final_access_token_opt.expect("Empty final access token opt");
-    Some(final_access_token)
 }

@@ -1,7 +1,8 @@
 use serde_json::Value;
 
+use crate::core::utils::get_access_token;
 use crate::{db::review::get_review_from_db, utils::user::ProviderEnum};
-use crate::github::config::{prepare_headers, get_access_token_based_on_env_values};
+use crate::github::config::prepare_headers;
 use crate::utils::reqwest_client::get_client;
 
 
@@ -20,7 +21,7 @@ pub async fn process_approval(deserialised_msg_data: &Value, repo_provider: &str
     }
     let review = review_opt.expect("Empty review_opt");
 
-    let access_token= get_access_token_based_on_env_values(&review).await;
+    let access_token= get_access_token(&review).await;
 	if access_token.is_none(){
 		log::error!("[process_approval] no final access token opt");
 		return;
