@@ -6,14 +6,13 @@ use crate::utils::reqwest_client::get_client;
 
 
 
-pub async fn process_approval(deserialised_msg_data: &Value) {
+pub async fn process_approval(deserialised_msg_data: &Value, repo_provider: &str) {
     log::debug!("[process_approval] processing approval msg - {:?}", deserialised_msg_data);
-    let repo_owner = deserialised_msg_data["eventPayload"]["repository"]["owner"]["login"].to_string().trim_matches('"').to_string();
-    let repo_name = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
-    let pr_number = deserialised_msg_data["eventPayload"]["pull_request"]["number"].to_string().trim_matches('"').to_string();
-    let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
-    let pr_head_commit = deserialised_msg_data["eventPayload"]["commit_id"].to_string().trim_matches('"').to_string();
-    log::debug!("[process_approval] repo_name: {:?}, repo_owner: {:?}, repo_provider: {:?}, review_id: {:?}", &repo_name, &repo_owner, &repo_provider, &pr_number);
+    let repo_owner = deserialised_msg_data["repository"]["owner"]["login"].to_string().trim_matches('"').to_string();
+    let repo_name = deserialised_msg_data["repository"]["name"].to_string().trim_matches('"').to_string();
+    let pr_number = deserialised_msg_data["pull_request"]["number"].to_string().trim_matches('"').to_string();
+    let repo_provider = repo_provider.to_string().trim_matches('"').to_string();
+    let pr_head_commit = deserialised_msg_data["review"]["commit_id"].to_string().trim_matches('"').to_string();
     let review_opt = get_review_from_db(&repo_name, &repo_owner, &repo_provider, &pr_number);
     if review_opt.is_none() {
         log::error!("[process_approval] Unable to get review from db");
@@ -31,13 +30,13 @@ pub async fn process_approval(deserialised_msg_data: &Value) {
     // get reviewer login array by getting pr all reviewer info from gh/bb
     let mut reviewer_handles = Vec::<String>::new();
     if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
-        log::debug!("[process_approval]/get_reviewer's_login_handles repo_name: {:?}, repo_owner: {:?}, repo_provider: {:?}, review_id: {:?}, pr_head_commit: {:?}, access_token: {:?}", &repo_name, &repo_owner, &repo_provider, &pr_number, &pr_head_commit, &final_access_token);
         let reviewer_handles_opt = get_reviewers_login_handles_for_github_pr(&repo_owner, &repo_name, &pr_number, &pr_head_commit, &final_access_token).await;
         if reviewer_handles_opt.is_none(){
             log::error!("[process_approval] no reviewers handles opt");
             return;
         }
         reviewer_handles = reviewer_handles_opt.expect("Empty reviewer_handles_opt");
+
     } //TODO: create a similar function for bitbucket too
     // get coverage map aliases and their corresponding logins from db/server
     let relevance_vec_opt = review.relevance();
@@ -106,7 +105,6 @@ pub async fn get_reviewers_login_handles_for_github_pr(repo_owner: &str, repo_na
 		return None;
 	}
 	let reviewr_list_result = parse_result.expect("Uncaught error in parsing reviewers list data");
-
     // Initialize a vector to store reviewer handles
     let mut reviewer_handles = Vec::new();
 
@@ -114,13 +112,12 @@ pub async fn get_reviewers_login_handles_for_github_pr(repo_owner: &str, repo_na
     for review in reviewr_list_result {
         let state = review["state"].as_str().unwrap_or_default();
         let commit_id = review["commit_id"].as_str().unwrap_or_default();
-        if state == "approved" && commit_id == pr_head_commit {
+        if state == "APPROVED" && commit_id == pr_head_commit {
             // Extract reviewer login
             if let Some(login) = review["user"]["login"].as_str() {
                 reviewer_handles.push(login.to_string());
             }
         }
     }
-
     Some(reviewer_handles)
 }
