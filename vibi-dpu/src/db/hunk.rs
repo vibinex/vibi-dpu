@@ -1,6 +1,7 @@
 use sled::IVec;
 
 use crate::db::config::get_db;
+use crate::db::hunk;
 use crate::utils::hunk::HunkMap;
 use crate::utils::review::Review;
 pub fn get_hunk_from_db(review: &Review) -> Option<HunkMap> {
@@ -30,6 +31,7 @@ pub fn get_hunk_from_db(review: &Review) -> Option<HunkMap> {
 }
 
 pub fn store_hunkmap_to_db(hunkmap: &HunkMap, review: &Review) {
+	log::debug!("[store_hunkmap_to_db]: hunkmap: {:?}, review: {:?}", &hunkmap, &review);
     let db = get_db();
 	let hunk_key = format!("hunk/{}/{}/{}", review.db_key(), review.base_head_commit(), review.pr_head_commit());
 	log::debug!("[store_hunkmap_to_db] hunk_key = {}", hunk_key);

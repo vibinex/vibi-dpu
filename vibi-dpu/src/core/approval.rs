@@ -13,7 +13,7 @@ pub async fn process_approval(deserialised_msg_data: &Value) {
     let pr_number = deserialised_msg_data["eventPayload"]["pull_request"]["number"].to_string().trim_matches('"').to_string();
     let repo_provider = deserialised_msg_data["repositoryProvider"].to_string().trim_matches('"').to_string();
     let pr_head_commit = deserialised_msg_data["eventPayload"]["commit_id"].to_string().trim_matches('"').to_string();
-
+    log::debug!("[process_approval] repo_name: {:?}, repo_owner: {:?}, repo_provider: {:?}, review_id: {:?}", &repo_name, &repo_owner, &repo_provider, &pr_number);
     let review_opt = get_review_from_db(&repo_name, &repo_owner, &repo_provider, &pr_number);
     if review_opt.is_none() {
         log::error!("[process_approval] Unable to get review from db");
@@ -31,6 +31,7 @@ pub async fn process_approval(deserialised_msg_data: &Value) {
     // get reviewer login array by getting pr all reviewer info from gh/bb
     let mut reviewer_handles = Vec::<String>::new();
     if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
+        log::debug!("[process_approval]/get_reviewer's_login_handles repo_name: {:?}, repo_owner: {:?}, repo_provider: {:?}, review_id: {:?}, pr_head_commit: {:?}, access_token: {:?}", &repo_name, &repo_owner, &repo_provider, &pr_number, &pr_head_commit, &final_access_token);
         let reviewer_handles_opt = get_reviewers_login_handles_for_github_pr(&repo_owner, &repo_name, &pr_number, &pr_head_commit, &final_access_token).await;
         if reviewer_handles_opt.is_none(){
             log::error!("[process_approval] no reviewers handles opt");
@@ -113,7 +114,7 @@ pub async fn get_reviewers_login_handles_for_github_pr(repo_owner: &str, repo_na
     for review in reviewr_list_result {
         let state = review["state"].as_str().unwrap_or_default();
         let commit_id = review["commit_id"].as_str().unwrap_or_default();
-        if state == "APPROVED" && commit_id == pr_head_commit {
+        if state == "approved" && commit_id == pr_head_commit {
             // Extract reviewer login
             if let Some(login) = review["user"]["login"].as_str() {
                 reviewer_handles.push(login.to_string());
