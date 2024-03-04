@@ -4,19 +4,19 @@ use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::revie
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
-pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &mut RepoConfig, access_token: &str) {
+pub async fn process_relevance(hunkmap: &HunkMap, review: &Review, repo_config: &mut RepoConfig, access_token: &str) {
     for prhunk in hunkmap.prhunkvec() {
         // calculate number of hunks for each userid
         let mut review_mut = review.clone();
         let relevance_vec_opt = calculate_relevance(
             prhunk, &mut review_mut).await;
         if relevance_vec_opt.is_none() {
-            log::debug!("[process_coverage] Unable to calculate coverage obj");
+            log::debug!("[process_relevance] Unable to calculate coverage obj");
             continue;
         }
         let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
         if repo_config.comment() {
-            log::info!("[process_coverage] Inserting comment...");
+            log::info!("[process_relevance] Inserting comment...");
             // create comment text
             let comment = comment_text(&relevance_vec, repo_config.auto_assign());
             // add comment
@@ -29,8 +29,8 @@ pub async fn process_coverage(hunkmap: &HunkMap, review: &Review, repo_config: &
             
         }
         if repo_config.auto_assign() {
-            log::info!("[process_coverage] Auto assigning reviewers...");
-            log::debug!("[process_coverage] review.provider() = {:?}", review.provider());
+            log::info!("[process_relevance] Auto assigning reviewers...");
+            log::debug!("[process_relevance] review.provider() = {:?}", review.provider());
             if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
                 add_bitbucket_reviewers(&prhunk, hunkmap, review, &access_token).await;
             }
@@ -70,7 +70,7 @@ async fn add_bitbucket_reviewers(prhunk: &PrHunkItem, hunkmap: &HunkMap, review:
         let blame_author_opt = author_from_commit(blame.commit(),
             hunkmap.repo_name(), hunkmap.repo_owner()).await;
         if blame_author_opt.is_none() {
-            log::error!("[process_coverage] Unable to get blame author from bb for commit: {}", &blame.commit());
+            log::error!("[process_relevance] Unable to get blame author from bb for commit: {}", &blame.commit());
             continue;
         }
         let blame_author = blame_author_opt.expect("Empty blame_author_opt");
@@ -134,7 +134,7 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
             let provider_id_opt = provider_ids.first();
             if provider_id_opt.is_some() {
                 let provider_id = provider_id_opt.expect("Empty provider_id_opt");
-                comment += &format!("| @{} | {}% |\n", provider_id, relevance_obj.relevance_str());
+                comment += &format!("| {} | {}% |\n", provider_id, relevance_obj.relevance_str());
                 continue;
             }
         }
@@ -144,7 +144,7 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
 
     if !unmapped_aliases.is_empty() {
         comment += "\n\n";
-        comment += &format!("Missing profile handles for {} aliases. [Log in to Vibinex](https://vibinex.com) to map aliases to profile handles.", unmapped_aliases.len());
+        comment += &format!("Missing profile handles for {} aliases. [Go to your Vibinex settings page](https://vibinex.com/settings) to map aliases to profile handles.", unmapped_aliases.len());
     }
 
     if auto_assign {
