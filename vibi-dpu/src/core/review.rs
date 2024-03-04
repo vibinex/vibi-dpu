@@ -17,7 +17,7 @@ use crate::{
 		repo::get_clone_url_clone_dir, 
 		review::save_review_to_db,
 		repo_config::save_repo_config_to_db},
-	core::coverage::process_coverage};
+	core::relevance::process_relevance};
 use crate::utils::user::ProviderEnum;
 use crate::bitbucket;
 use crate::github;
@@ -112,7 +112,7 @@ async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review, repo_confi
 	let hunkmap_async = hunkmap.clone();
 	let review_async = review.clone();
 	let mut repo_config_clone = repo_config.clone();
-	process_coverage(&hunkmap_async, &review_async, &mut repo_config_clone, access_token).await;
+	process_relevance(&hunkmap_async, &review_async, &mut repo_config_clone, access_token).await;
 }
 
 fn hunk_already_exists(review: &Review) -> bool {

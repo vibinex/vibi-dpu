@@ -1,5 +1,5 @@
 pub mod review;
-mod coverage;
+mod relevance;
 pub mod utils;
 pub mod approval;
 
