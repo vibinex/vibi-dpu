@@ -127,15 +127,38 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     comment += "| Contributor Name/Alias  | Relevance |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
     let mut unmapped_aliases = Vec::new();
+
+    // A HashMap to store combined relevance values for aliases with common handles
+    let mut combined_relevance: HashMap<Vec<String>, f32> = HashMap::new();
+
     for relevance_obj in relevance_vec {
         let provider_ids_opt = relevance_obj.handles();
         if provider_ids_opt.is_some() {
             let provider_ids = provider_ids_opt.to_owned().expect("Empty provider_ids_opt");
-            let provider_id_opt = provider_ids.first();
+
+            // Check if combined relevance for handles set already exists
+            let mut found = false;
+            for (existing_handles, rel) in combined_relevance.iter_mut() {
+                let intersection: HashSet<_> = existing_handles.iter().cloned().collect();
+                if !intersection.is_empty() && provider_ids.iter().any(|h| intersection.contains(h)) {
+                    *rel += relevance_obj.relevance_num(); // Add relevance to existing combined relevance
+                    found = true;
+                    break;
+                }
+            }
+
+            // If no combined relevance found, add a new entry
+            if !found {
+                combined_relevance.insert(provider_ids.clone(), relevance_obj.relevance_num());
+            }
+            let provider_id_opt = provider_ids.iter().next();
             if provider_id_opt.is_some() {
                 let provider_id = provider_id_opt.expect("Empty provider_id_opt");
-                comment += &format!("| {} | {}% |\n", provider_id, relevance_obj.relevance_str());
-                continue;
+                let combined_relevance_opt = combined_relevance.get(&provider_ids).cloned();
+                if combined_relevance_opt.is_some(){
+                    let combined_relevance = combined_relevance_opt.expect("Empty combined_relevance_opt");
+                    comment += &format!("| {} | {}% |\n", provider_id, combined_relevance);
+                }
             }
         }
         comment += &format!("| {} | {}% |\n", relevance_obj.git_alias(), relevance_obj.relevance_str());  // Added a newline at the end
