@@ -126,16 +126,45 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
     comment += "| Contributor Name/Alias  | Relevance |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
+
+    let (combined_relevance, unmapped_aliases) = calculate_final_relevance_vec_for_comment(relevance_vec);
+    let mut final_relevance_vec: Vec<(&Vec<String>, &f32)> = combined_relevance.iter().collect();
+    final_relevance_vec.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // I couldn't find a way to avoid unwrap here :(
+    
+    for (provider_ids, rel) in &final_relevance_vec {
+        let provider_id_opt = provider_ids.iter().next();
+        if provider_id_opt.is_some() {
+            let provider_id = provider_id_opt.expect("Empty provider_id_opt");
+            log::info!("[comment-text] provider_id: {:?}", provider_id);
+            comment += &format!("| {} | {}% |\n", provider_id, rel);
+        }
+    }
+
+    if !&unmapped_aliases.is_empty() {
+        comment += "\n\n";
+        comment += &format!("Missing profile handles for {} aliases. [Go to your Vibinex settings page](https://vibinex.com/settings) to map aliases to profile handles.", unmapped_aliases.len());
+    }
+
+    if auto_assign {
+        comment += "\n\n";
+        comment += "Auto assigning to relevant reviewers.";
+    }
+    comment += "\n\n";
+    comment += "If you are a relevant reviewer, you can use the [Vibinex browser extension](https://chromewebstore.google.com/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc) to see parts of the PR relevant to you\n";  // Added a newline at the end
+    comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
+    comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
+
+    return comment;
+}
+
+fn calculate_final_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {
+    let mut combined_relevance: HashMap<Vec<String>, f32> = HashMap::new();
     let mut unmapped_aliases = Vec::new();
 
-    // A HashMap to store combined relevance values for aliases with common handles
-    let mut combined_relevance: HashMap<Vec<String>, f32> = HashMap::new();
-
+    // Iterate through relevance_vec and handle entries with provider IDs
     for relevance_obj in relevance_vec {
         let provider_ids_opt = relevance_obj.handles();
-        if provider_ids_opt.is_some() {
-            let provider_ids = provider_ids_opt.to_owned().expect("Empty provider_ids_opt");
-
+        if let Some(provider_ids) = provider_ids_opt {
             // Check if combined relevance for handles set already exists
             let mut found = false;
             for (existing_handles, rel) in combined_relevance.iter_mut() {
@@ -151,33 +180,15 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
             if !found {
                 combined_relevance.insert(provider_ids.clone(), relevance_obj.relevance_num());
             }
-            let provider_id_opt = provider_ids.iter().next();
-            if provider_id_opt.is_some() {
-                let provider_id = provider_id_opt.expect("Empty provider_id_opt");
-                let combined_relevance_opt = combined_relevance.get(&provider_ids).cloned();
-                if combined_relevance_opt.is_some(){
-                    let combined_relevance = combined_relevance_opt.expect("Empty combined_relevance_opt");
-                    comment += &format!("| {} | {}% |\n", provider_id, combined_relevance);
-                }
-            }
+        } else {
+            // For entries without provider IDs, add them to the combined_relevance map
+            let git_alias = relevance_obj.git_alias();
+            let git_alias_vec: Vec<String> = vec![git_alias.to_owned()];
+            combined_relevance.insert(git_alias_vec, relevance_obj.relevance_num());
+            // Add the git alias to the unmapped aliases array
+            unmapped_aliases.push(git_alias.to_string());
         }
-        comment += &format!("| {} | {}% |\n", relevance_obj.git_alias(), relevance_obj.relevance_str());  // Added a newline at the end
-        unmapped_aliases.push(relevance_obj.git_alias());
     }
 
-    if !unmapped_aliases.is_empty() {
-        comment += "\n\n";
-        comment += &format!("Missing profile handles for {} aliases. [Go to your Vibinex settings page](https://vibinex.com/settings) to map aliases to profile handles.", unmapped_aliases.len());
-    }
-
-    if auto_assign {
-        comment += "\n\n";
-        comment += "Auto assigning to relevant reviewers.";
-    }
-    comment += "\n\n";
-    comment += "If you are a relevant reviewer, you can use the [Vibinex browser extension](https://chromewebstore.google.com/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc) to see parts of the PR relevant to you\n";  // Added a newline at the end
-    comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
-    comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
-
-    return comment;
+    (combined_relevance, unmapped_aliases)
 }
