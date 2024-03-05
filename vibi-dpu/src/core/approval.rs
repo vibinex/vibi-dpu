@@ -7,13 +7,11 @@ use crate::utils::reqwest_client::get_client;
 
 
 
-pub async fn process_approval(deserialised_msg_data: &Value, repo_provider: &str) {
+pub async fn process_approval(deserialised_msg_data: &Value,
+        repo_owner: &str, repo_name: &str, pr_number: &str, repo_provider: &str) {
     log::debug!("[process_approval] processing approval msg - {:?}", deserialised_msg_data);
-    let repo_owner = deserialised_msg_data["repository"]["owner"]["login"].to_string().trim_matches('"').to_string();
-    let repo_name = deserialised_msg_data["repository"]["name"].to_string().trim_matches('"').to_string();
-    let pr_number = deserialised_msg_data["pull_request"]["number"].to_string().trim_matches('"').to_string();
-    let repo_provider = repo_provider.to_string().trim_matches('"').to_string();
-    let pr_head_commit = deserialised_msg_data["review"]["commit_id"].to_string().trim_matches('"').to_string();
+    let pr_head_commit = deserialised_msg_data["review"]["commit_id"]
+        .to_string().trim_matches('"').to_string();
     let review_opt = get_review_from_db(&repo_name, &repo_owner, &repo_provider, &pr_number);
     if review_opt.is_none() {
         log::error!("[process_approval] Unable to get review from db");
