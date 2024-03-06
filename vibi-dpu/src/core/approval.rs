@@ -4,6 +4,7 @@ use crate::core::utils::get_access_token;
 use crate::utils::coverage::CoverageMap;
 use crate::github;
 use crate::core;
+use crate::utils::relevance::Relevance;
 use crate::{db::review::get_review_from_db, utils::user::ProviderEnum};
 
 
@@ -47,17 +48,17 @@ pub async fn process_approval(deserialised_msg_data: &Value,
     }
     let relevance_vec = relevance_vec_opt.to_owned().expect("Empty coverage_opt");
     let mut coverage_map_obj = CoverageMap::new(repo_provider.to_string());
-    coverage_map_obj.calculate_coverage_map(relevance_vec, reviewer_handles);
+    coverage_map_obj.calculate_coverage_map(relevance_vec.clone(), reviewer_handles.clone());
     // add up contribution of aliases
     // add comment
-    let comment_text = approval_comment_text(&coverage_map_obj);
+    let comment_text = approval_comment_text(&coverage_map_obj, relevance_vec, reviewer_handles);
     // get access token and call add_comment in gh/bb
     core::github::comment::add_comment(&comment_text, &review, &final_access_token).await;
 }
 
-fn approval_comment_text(coverage_map: &CoverageMap) -> String {
+fn approval_comment_text(coverage_map: &CoverageMap, relevance_vec: Vec<Relevance>, reviewer_handles: Vec<String>) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
-    let coverage_text = coverage_map.generate_coverage_table();
+    let coverage_text = coverage_map.generate_coverage_table(relevance_vec, reviewer_handles);
     comment += &coverage_text;
     comment += "\n\n";
     comment += "If you are a relevant reviewer, you can use the [Vibinex browser extension](https://chromewebstore.google.com/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc) to see parts of the PR relevant to you\n";  // Added a newline at the end

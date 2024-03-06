@@ -158,7 +158,7 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     return comment;
 }
 
-fn deduplicated_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {
+pub fn deduplicated_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {
     let mut combined_relevance_map: HashMap<Vec<String>, f32> = HashMap::new();
     let mut unmapped_aliases = Vec::new();
 
