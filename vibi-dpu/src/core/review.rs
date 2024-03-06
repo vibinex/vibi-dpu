@@ -57,7 +57,7 @@ async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review, repo_confi
 	let hunkmap_async = hunkmap.clone();
 	let review_async = review.clone();
 	let mut repo_config_clone = repo_config.clone();
-	process_coverage(&hunkmap_async, &review_async, &mut repo_config_clone, access_token).await;
+	process_relevance(&hunkmap_async, &review_async, &mut repo_config_clone, access_token).await;
 }
 
 fn hunk_already_exists(review: &Review) -> bool {
