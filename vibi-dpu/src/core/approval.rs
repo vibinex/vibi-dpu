@@ -1,16 +1,32 @@
 use serde_json::Value;
 
 use crate::core::utils::get_access_token;
+use crate::db::repo_config::save_repo_config_to_db;
 use crate::utils::coverage::CoverageMap;
 use crate::github;
 use crate::core;
 use crate::utils::relevance::Relevance;
+use crate::utils::repo_config::RepoConfig;
 use crate::{db::review::get_review_from_db, utils::user::ProviderEnum};
 
 
 pub async fn process_approval(deserialised_msg_data: &Value,
         repo_owner: &str, repo_name: &str, pr_number: &str, repo_provider: &str) {
     log::debug!("[process_approval] processing approval msg - {:?}", deserialised_msg_data);
+    let repo_config_res = serde_json::from_value(deserialised_msg_data["repoConfig"].clone());
+    let repo_config: RepoConfig;
+	if let Err(e) = &repo_config_res {
+		log::error!("[process_approval] Unable to deserialze repo_config_res: {:?}", e);
+		repo_config = RepoConfig::default();
+	} else {
+        repo_config = repo_config_res.expect("Uncaught error in repo_config_res");
+    }
+	log::debug!("[process_approval] repo_config = {:?}", &repo_config);
+	save_repo_config_to_db(&repo_config, repo_name, repo_owner, repo_provider);
+    if !repo_config.comment() {
+        log::info!("[process_approval] Comment setting is turned off");
+        return;
+    }
     let pr_head_commit = deserialised_msg_data["review"]["commit_id"]
         .to_string().trim_matches('"').to_string();
     let review_opt = get_review_from_db(&repo_name,
