@@ -5,6 +5,7 @@ use crate::db::bitbucket::auth::{save_bitbucket_auth_info_to_db, bitbucket_auth_
 use crate::utils::gitops::set_git_remote_url;
 use crate::utils::reqwest_client::get_client;
 use crate::utils::bitbucket_auth_info::BitbucketAuthInfo;
+use crate::utils::review::Review;
 
 pub async fn get_access_token_from_bitbucket(code: &str) -> Option<BitbucketAuthInfo> {
     let client = get_client();
@@ -49,13 +50,13 @@ pub async fn get_access_token_from_bitbucket(code: &str) -> Option<BitbucketAuth
     return Some(response_json);
 }
 
-pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String>{
+pub async fn refresh_git_auth(review: &Review) -> Option<String>{
 	let authinfo_opt =  bitbucket_auth_info();
     if authinfo_opt.is_none() {
         return None;
     }
     let authinfo = authinfo_opt.expect("empty authinfo_opt in refresh_git_auth");
-    let authinfo_opt = update_access_token(&authinfo, clone_url, directory).await;
+    let authinfo_opt = update_access_token(&authinfo, review).await;
     if authinfo_opt.is_none() {
         log::error!("[get_access_token_from_bitbucket] Empty authinfo_opt from update_access_token for BitbucketAuthInfo");
         return None;
@@ -65,7 +66,7 @@ pub async fn refresh_git_auth(clone_url: &str, directory: &str) -> Option<String
     return Some(access_token);
 }
 
-pub async fn update_access_token(auth_info: &BitbucketAuthInfo, clone_url: &str, directory: &str) -> Option<BitbucketAuthInfo> {
+pub async fn update_access_token(auth_info: &BitbucketAuthInfo, review: &Review) -> Option<BitbucketAuthInfo> {
     let repo_provider = "bitbucket".to_string();
     let now = SystemTime::now();
     let now_secs = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
@@ -87,7 +88,7 @@ pub async fn update_access_token(auth_info: &BitbucketAuthInfo, clone_url: &str,
         .expect("empty auhtinfo_opt from update_access_token");
     log::debug!("[update_access_token] New auth info  = {:?}", &new_auth_info);
     let access_token = new_auth_info.access_token().to_string();
-    set_git_remote_url(clone_url, directory, &access_token, &repo_provider);
+    set_git_remote_url(review, &access_token, &repo_provider);
     save_bitbucket_auth_info_to_db(&mut new_auth_info);
     return new_auth_info_opt;
 }
