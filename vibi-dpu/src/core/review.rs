@@ -3,7 +3,7 @@ use std::env;
 use serde_json::Value;
 
 use crate::{
-    core::{coverage::process_coverage, utils::get_access_token},
+    core::{relevance::process_relevance, utils::get_access_token},
     db::{
         hunk::{get_hunk_from_db, store_hunkmap_to_db},
         repo::get_clone_url_clone_dir,
