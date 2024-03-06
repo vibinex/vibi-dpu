@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use crate::core::utils::get_access_token;
-use crate::github::prs::pr_reviewer_handles;
+use crate::github;
 use crate::{db::review::get_review_from_db, utils::user::ProviderEnum};
 
 
@@ -29,7 +29,7 @@ pub async fn process_approval(deserialised_msg_data: &Value,
     // get reviewer login array by getting pr all reviewer info from gh/bb
     let mut reviewer_handles = Vec::<String>::new();
     if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
-        let reviewer_handles_opt = pr_reviewer_handles(
+        let reviewer_handles_opt = github::prs::pr_reviewer_handles(
             &repo_owner, &repo_name, &pr_number, &pr_head_commit, &final_access_token).await;
         if reviewer_handles_opt.is_none(){
             log::error!("[process_approval] no reviewers handles opt");
