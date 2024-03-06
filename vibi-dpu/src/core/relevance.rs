@@ -131,12 +131,13 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     let mut deduplicated_relevance_vec: Vec<(&Vec<String>, &f32)> = deduplicated_relevance_map.iter().collect();
     deduplicated_relevance_vec.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // I couldn't find a way to avoid unwrap here :(
     
-    for (provider_ids, rel) in &deduplicated_relevance_vec {
+    for (provider_ids, relevance) in &deduplicated_relevance_vec {
         let provider_id_opt = provider_ids.iter().next();
         if provider_id_opt.is_some() {
             let provider_id = provider_id_opt.expect("Empty provider_id_opt");
             log::info!("[comment-text] provider_id: {:?}", provider_id);
-            comment += &format!("| {} | {}% |\n", provider_id, rel);
+            let formatted_relevance_value = format!("{:.2}", *relevance);
+            comment += &format!("| {} | {}% |\n", provider_id, formatted_relevance_value);
         }
     }
 
