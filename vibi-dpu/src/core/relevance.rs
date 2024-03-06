@@ -127,11 +127,11 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     comment += "| Contributor Name/Alias  | Relevance |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
 
-    let (combined_relevance, unmapped_aliases) = calculate_final_relevance_vec_for_comment(relevance_vec);
-    let mut final_relevance_vec: Vec<(&Vec<String>, &f32)> = combined_relevance.iter().collect();
-    final_relevance_vec.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // I couldn't find a way to avoid unwrap here :(
+    let (deduplicated_relevance_map, unmapped_aliases) = deduplicated_relevance_vec_for_comment(relevance_vec);
+    let mut deduplicated_relevance_vec: Vec<(&Vec<String>, &f32)> = deduplicated_relevance_map.iter().collect();
+    deduplicated_relevance_vec.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // I couldn't find a way to avoid unwrap here :(
     
-    for (provider_ids, rel) in &final_relevance_vec {
+    for (provider_ids, rel) in &deduplicated_relevance_vec {
         let provider_id_opt = provider_ids.iter().next();
         if provider_id_opt.is_some() {
             let provider_id = provider_id_opt.expect("Empty provider_id_opt");
@@ -157,8 +157,8 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     return comment;
 }
 
-fn calculate_final_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {
-    let mut combined_relevance: HashMap<Vec<String>, f32> = HashMap::new();
+fn deduplicated_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {
+    let mut combined_relevance_map: HashMap<Vec<String>, f32> = HashMap::new();
     let mut unmapped_aliases = Vec::new();
 
     // Iterate through relevance_vec and handle entries with provider IDs
@@ -167,10 +167,10 @@ fn calculate_final_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> 
         if let Some(provider_ids) = provider_ids_opt {
             // Check if combined relevance for handles set already exists
             let mut found = false;
-            for (existing_handles, rel) in combined_relevance.iter_mut() {
+            for (existing_handles, relevance) in combined_relevance_map.iter_mut() {
                 let intersection: HashSet<_> = existing_handles.iter().cloned().collect();
                 if !intersection.is_empty() && provider_ids.iter().any(|h| intersection.contains(h)) {
-                    *rel += relevance_obj.relevance_num(); // Add relevance to existing combined relevance
+                    *relevance += relevance_obj.relevance_num(); // Add relevance to existing combined relevance
                     found = true;
                     break;
                 }
@@ -178,17 +178,17 @@ fn calculate_final_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> 
 
             // If no combined relevance found, add a new entry
             if !found {
-                combined_relevance.insert(provider_ids.clone(), relevance_obj.relevance_num());
+                combined_relevance_map.insert(provider_ids.clone(), relevance_obj.relevance_num());
             }
         } else {
             // For entries without provider IDs, add them to the combined_relevance map
             let git_alias = relevance_obj.git_alias();
             let git_alias_vec: Vec<String> = vec![git_alias.to_owned()];
-            combined_relevance.insert(git_alias_vec, relevance_obj.relevance_num());
+            combined_relevance_map.insert(git_alias_vec, relevance_obj.relevance_num());
             // Add the git alias to the unmapped aliases array
             unmapped_aliases.push(git_alias.to_string());
         }
     }
 
-    (combined_relevance, unmapped_aliases)
+    (combined_relevance_map, unmapped_aliases)
 }
