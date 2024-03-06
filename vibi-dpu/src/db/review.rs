@@ -29,6 +29,7 @@ pub fn get_review_from_db(repo_name: &str, repo_owner: &str,
         return None;
     }
     let ivec_opt = review_res.expect("Uncaught error in review_res");
+    log::debug!("[get_review_from_db] ivec_opt: {:?}", ivec_opt);
     let ivec = ivec_opt.expect("Empty ivec_opt");
     let review_res = serde_json::from_slice(&ivec);
     if let Err(e) = review_res {
