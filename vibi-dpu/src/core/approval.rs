@@ -45,7 +45,21 @@ pub async fn process_approval(deserialised_msg_data: &Value,
         return;
     }
     let relevance_vec = relevance_vec_opt.to_owned().expect("Empty coverage_opt");
-    let coverage_map_obj = CoverageMap::calculate_coverage_map(repo_provider.to_string(), reviewer_handles, relevance_vec);
+    let mut coverage_map_obj = CoverageMap::new(repo_provider.to_string());
+    coverage_map_obj.calculate_coverage_map(relevance_vec, reviewer_handles);
     // add up contribution of aliases
     // add comment
+    let comment_text = approval_comment_text(&coverage_map_obj);
+    // get access token and call add_comment in gh/bb
+}
+
+fn approval_comment_text(coverage_map: &CoverageMap) -> String {
+    let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
+    let coverage_text = coverage_map.generate_coverage_table();
+    comment += &coverage_text;
+    comment += "\n\n";
+    comment += "If you are a relevant reviewer, you can use the [Vibinex browser extension](https://chromewebstore.google.com/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc) to see parts of the PR relevant to you\n";  // Added a newline at the end
+    comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
+    comment += "To change comment and auto-assign settings, go to [your Vibinex repository settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
+    return comment;
 }

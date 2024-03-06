@@ -53,36 +53,45 @@ pub struct CoverageMap {
     provider: String,
     handle_map: HashMap<String, Coverage>,
     coverage_total: f32,
+    coverage_comment: Option<String>,
+    unmapped_aliases: Vec<String>,
 }
 
 impl CoverageMap {
     // Constructor
-    pub fn calculate_coverage_map(
+    pub fn new(
         provider: String,
-        reviewer_handles: Vec<String>,
-        relevance_vec: Vec<Relevance>,
     ) -> Self {
-        let mut coverage_map_obj = Self {
+        Self {
             provider,
             handle_map: HashMap::<String, Coverage>::new(),
             coverage_total: 0.0,
-        };
+            coverage_comment: None,
+            unmapped_aliases: Vec::<String>::new(),
+        }
+    }
+
+    pub fn calculate_coverage_map(&mut self, relevance_vec: Vec<Relevance>, reviewer_handles: Vec<String>) {
+        let mut unmapped_aliases = Vec::<String>::new();
         for relevance_obj in relevance_vec {
             let handles_opt = relevance_obj.handles();
             let relevance_num = relevance_obj.relevance_num();
             if handles_opt.is_none() {
                 log::debug!("[process_approval] handles not in db for {}", relevance_obj.git_alias());
+                unmapped_aliases.push(relevance_obj.git_alias().to_owned());
                 continue;
             }
             let handles = handles_opt.to_owned().expect("Empty handles_opt");
             for handle in handles {
                 if reviewer_handles.contains(&handle) {
-                    coverage_map_obj.update_coverage(&handle, relevance_num);
+                    self.update_coverage(&handle, relevance_num);
                     break;
                 }
             }
         }
-        return coverage_map_obj;
+        if !unmapped_aliases.is_empty() {
+            self.update_unmapped_aliases(&mut unmapped_aliases);
+        }
     }
 
     // Public getter methods
@@ -103,7 +112,11 @@ impl CoverageMap {
         self.coverage_total
     }
 
-    pub fn update_coverage(&mut self, handle: &str, relevance: f32) {
+    fn update_unmapped_aliases(&mut self, aliases: &mut Vec<String>) {
+        self.unmapped_aliases.append(aliases);
+    }
+
+    fn update_coverage(&mut self, handle: &str, relevance: f32) {
         self.coverage_total += relevance;
         if let Some(coverage) = self.handle_map.get_mut(handle) {
             coverage.update_coverage(relevance);
@@ -112,5 +125,29 @@ impl CoverageMap {
         let coverage = Coverage::new(
             self.provider.clone(), handle.to_owned(), relevance);
         self.handle_map.insert(handle.to_owned(), coverage);
+    }
+
+    pub fn generate_coverage_table(&self) -> String {
+        let mut comment = "| Contributor Name/Alias  | Relevance |\n".to_string();  // Added a newline at the end
+        comment += "| -------------- | --------------- |\n";  // Added a newline at the end
+        let mut rev_handles: Vec<_> = self.handle_map.keys().filter(|k| !k.is_empty()).cloned().collect();
+        rev_handles.sort();
+        for handle in rev_handles {
+            let coverage_opt = self.handle_map.get(&handle);
+            if coverage_opt.is_none() {
+                log::debug!("[generate_coverage_table] empty value for key {} in handle map",
+                    &handle);
+                continue;
+            }
+            let coverage = coverage_opt.expect("Empty coverage_opt");
+            let coverage_text = coverage.coverage_str();
+            comment += &format!("| {} | {}% |\n", &handle, &coverage_text);
+        }
+        if !self.unmapped_aliases.is_empty() {
+            comment += "\n\n";
+            comment += &format!("Missing profile handles for {} aliases. [Go to your Vibinex settings page](https://vibinex.com/settings) to map aliases to profile handles.",
+                self.unmapped_aliases.len());
+        }
+        return comment;
     }
 }
