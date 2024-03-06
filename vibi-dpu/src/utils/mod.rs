@@ -15,3 +15,4 @@ pub mod reqwest_client;
 pub mod setup_info;
 pub mod aliases;
 pub mod relevance;
+pub mod coverage;

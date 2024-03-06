@@ -1,9 +1,9 @@
 use serde_json::Value;
 
 use crate::core::utils::get_access_token;
+use crate::utils::coverage::CoverageMap;
 use crate::github;
 use crate::{db::review::get_review_from_db, utils::user::ProviderEnum};
-
 
 
 pub async fn process_approval(deserialised_msg_data: &Value,
@@ -45,20 +45,7 @@ pub async fn process_approval(deserialised_msg_data: &Value,
         return;
     }
     let relevance_vec = relevance_vec_opt.to_owned().expect("Empty coverage_opt");
-    let mut curr_coverage = 0;
-    for relevance_obj in relevance_vec {
-        let handles_opt = relevance_obj.handles();
-        if handles_opt.is_none() {
-            log::debug!("[process_approval] handles not in db for {}", relevance_obj.git_alias());
-            continue;
-        }
-        let handles = handles_opt.to_owned().expect("Empty handles_opt");
-        for handle in handles {
-            if reviewer_handles.contains(&handle) {
-                // curr_coverage += coverage_val
-            }
-        }
-    }
+    let coverage_map_obj = CoverageMap::calculate_coverage_map(repo_provider.to_string(), reviewer_handles, relevance_vec);
     // add up contribution of aliases
     // add comment
 }
