@@ -76,7 +76,8 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo>
         log::error!("[fetch_access_token] Unable to get gh auth info");
         return None;
     }
-    let gh_auth_info = gh_auth_info_opt.expect("Uncaught error in gh_auth_info_opt");
+    let mut gh_auth_info = gh_auth_info_opt.expect("Uncaught error in gh_auth_info_opt");
+    save_github_auth_info_to_db(&mut gh_auth_info);
     return Some(gh_auth_info);
 }
 
@@ -169,34 +170,52 @@ fn update_condition_satisfied(expires_at: &str) -> bool{
 }
 
 async fn app_access_token(review: &Review) -> Option<String>{
-    let latest_authinfo_opt = get_or_update_auth(review).await;
-    if latest_authinfo_opt.is_none() {
+    let authinfo_opt = get_or_update_auth(review).await;
+    log::debug!("[app_access_token] authinfo_opt = {:?}", &authinfo_opt);
+    if authinfo_opt.is_none() {
         log::error!("[app_access_token] Empty latest_authinfo_opt for github auth info");
         return None;
     }
-    let latest_authinfo = latest_authinfo_opt.expect("Empty latest_authinfo_opt");
-    let access_token = latest_authinfo.token().to_string();
+    let authinfo = authinfo_opt.expect("Empty latest_authinfo_opt");
+    let access_token = authinfo.token().to_string();
     return Some(access_token);
 }
 
-pub async fn gh_access_token(review: &Review) -> Option<String> {
+fn pat_access_token() -> Option<String> {
     let github_pat_res: Result<String, env::VarError> = env::var("GITHUB_PAT");
 	let provider_res = env::var("PROVIDER");	
 	if github_pat_res.is_err() {
-		log::debug!("[gh_access_token] GITHUB PAT env var must be set");
+		log::debug!("[pat_access_token] GITHUB PAT env var must be set");
         return None;
     }
     let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
-    log::debug!("[gh_access_token] GITHUB PAT: [REDACTED]");
-
+    if github_pat.len() == 0 {
+        log::debug!("[pat_access_token] GITHUB PAT 0 length");
+        return None;
+    }
+    log::debug!("[pat_access_token] GITHUB PAT: [REDACTED], length = {}",
+        github_pat.len());
     if provider_res.is_err() {
-        log::error!("[gh_access_token] PROVIDER env var must be set");
+        log::error!("[pat_access_token] PROVIDER env var must be set");
         return None;
     }
     let provider = provider_res.expect("Empty PROVIDER env var");
-    log::debug!("[gh_access_token] PROVIDER: {}", provider);
+    if provider.len() == 0 {
+        log::debug!("[pat_access_token] PROVIDER 0 length");
+        return None;
+    }
+    log::debug!("[pat_access_token] PROVIDER: {}", provider);
     if provider.eq_ignore_ascii_case(&ProviderEnum::Github.to_string()) {
         return Some(github_pat);
+    }
+    return None;
+}
+
+pub async fn gh_access_token(review: &Review) -> Option<String> {
+    let pat_token_opt = pat_access_token();
+    log::debug!("[gh_access_token] pat_token_opt = {:?}", &pat_token_opt);
+    if let Some(pat_token) = pat_token_opt {
+        return Some(pat_token);
     }
     return app_access_token(review).await;
 }
