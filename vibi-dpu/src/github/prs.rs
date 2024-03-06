@@ -1,6 +1,7 @@
 use crate::db::prs::update_pr_info_in_db;
 use crate::utils::{pr_info::PrInfo, reqwest_client::get_client};
 use reqwest::header::{HeaderMap, USER_AGENT};
+use reqwest::Response;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::str;
@@ -127,4 +128,76 @@ pub async fn get_and_store_pr_info(repo_owner: &str, repo_name: &str, access_tok
     } else {
         log::error!("[get_and_store_pr_info] No PR info available for PR number: {:?} repository: {:?} repo_owner{:?}", pr_number, repo_name, repo_owner);
     }
+}
+
+pub async fn pr_reviewer_handles(repo_owner: &str, repo_name: &str,
+        pr_number: &str, pr_head_commit: &str,access_token: &str)
+        -> Option<Vec<String>> {
+    let response_opt = all_pr_reviews(access_token,
+        repo_owner, repo_name, pr_number).await;
+    if response_opt.is_none() {
+        log::error!("[pr_reviewer_handles] Unable to get reviewer handles from gh api");
+        return None;
+    }
+    let response = response_opt.expect("Uncaught empty pr reviewers response");
+    let parse_result = response.json::<Vec<Value>>().await;
+    if parse_result.is_err() {
+		let e = parse_result.expect_err("No error in parsing");
+		log::error!(
+			"[pr_reviewer_handles] Failed to parse JSON: {:?}",
+			e
+		);
+		return None;
+	}
+	let reviewer_list_result = parse_result.expect("Uncaught error in parsing reviewers list data");
+    // Initialize a vector to store reviewer handles
+    let mut reviewer_handles = Vec::new();
+
+    // Process the review list
+    for review in reviewer_list_result {
+        let state = review["state"].as_str().unwrap_or_default();
+        let commit_id = review["commit_id"].as_str().unwrap_or_default();
+        if state == "APPROVED" && commit_id == pr_head_commit {
+            // Extract reviewer login
+            if let Some(login) = review["user"]["login"].as_str() {
+                reviewer_handles.push(login.to_string());
+            }
+        }
+    }
+    Some(reviewer_handles)
+}
+
+async fn all_pr_reviews(access_token: &str,
+        repo_owner: &str, repo_name: &str, pr_number: &str) -> Option<Response> {
+    let headers_opt = prepare_headers(access_token);
+    if headers_opt.is_none() {
+        log::error!("[all_pr_reviews] Unable to prepare auth headers for repository: {}", repo_name);
+        return None;
+    }
+    let headers = headers_opt.expect("Headers should be present");
+    let client = get_client();
+    let response_result = client
+        .get(&format!(
+            "https://api.github.com/repos/{}/{}/pulls/{}/reviews",
+            repo_owner, repo_name, pr_number
+        ))
+        .headers(headers)
+        .send()
+        .await;
+
+    if response_result.is_err() {
+		let e = response_result.expect_err("No error in sending request");
+		log::error!("[all_pr_reviews] Failed to send the request: {:?}", e);
+		return None;
+	}
+
+	let response = response_result.expect("Uncaught error in parsing response");
+    if !response.status().is_success() {
+        log::error!(
+            "[all_pr_reviews] Error in retrieving review list: {:?}",
+            response.status()
+        );
+        return None;
+    }
+    return Some(response);
 }
