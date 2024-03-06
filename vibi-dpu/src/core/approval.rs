@@ -10,10 +10,10 @@ use crate::utils::repo_config::RepoConfig;
 use crate::{db::review::get_review_from_db, utils::user::ProviderEnum};
 
 
-pub async fn process_approval(deserialised_msg_data: &Value,
+pub async fn process_approval(deserialised_msg_data: &Value, repo_config_val: &Value,
         repo_owner: &str, repo_name: &str, pr_number: &str, repo_provider: &str) {
     log::debug!("[process_approval] processing approval msg - {:?}", deserialised_msg_data);
-    let repo_config_res = serde_json::from_value(deserialised_msg_data["repoConfig"].clone());
+    let repo_config_res = serde_json::from_value(repo_config_val.to_owned());
     let repo_config: RepoConfig;
 	if let Err(e) = &repo_config_res {
 		log::error!("[process_approval] Unable to deserialze repo_config_res: {:?}", e);

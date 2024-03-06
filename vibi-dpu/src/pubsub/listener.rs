@@ -182,11 +182,11 @@ async fn process_and_update_pr_if_different(deserialised_msg_data: &Value) -> bo
         log::debug!("[process_webhook_callback] {}, {}, {}, {}", event_type, repo_owner, repo_name, pr_number);
         if event_type == "pull_request_review" {
 			log::info!("[process_webhook_callback] Github PR review event");
-			is_reviewable = github_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &repo_owner, &repo_name, &pr_number, &repo_provider).await;
+			is_reviewable = github_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &deserialised_msg_data["repoConfig"], &repo_owner, &repo_name, &pr_number, &repo_provider).await;
         }
         if event_type == "pull_request" {
             log::info!("[process_webhook_callback] Github PR opened");
-            is_reviewable = github_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &repo_owner, &repo_name, &pr_number, &repo_provider).await;
+            is_reviewable = github_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"], &deserialised_msg_data["repoConfig"], &repo_owner, &repo_name, &pr_number, &repo_provider).await;
         }
     }
     if repo_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
