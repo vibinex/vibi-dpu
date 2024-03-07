@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::core::relevance::deduplicated_relevance_vec_for_comment;
+
 use super::relevance::Relevance;
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
@@ -53,7 +55,6 @@ pub struct CoverageMap {
     provider: String,
     handle_map: HashMap<String, Coverage>,
     coverage_total: f32,
-    coverage_comment: Option<String>,
     unmapped_aliases: Vec<String>,
 }
 
@@ -66,7 +67,6 @@ impl CoverageMap {
             provider,
             handle_map: HashMap::<String, Coverage>::new(),
             coverage_total: 0.0,
-            coverage_comment: None,
             unmapped_aliases: Vec::<String>::new(),
         }
     }
@@ -127,23 +127,30 @@ impl CoverageMap {
         self.handle_map.insert(handle.to_owned(), coverage);
     }
 
-    pub fn generate_coverage_table(&self) -> String {
-        let mut comment = "| Contributor Name/Alias  | Relevance |\n".to_string();  // Added a newline at the end
-        comment += "| -------------- | --------------- |\n";  // Added a newline at the end
-        let mut rev_handles: Vec<_> = self.handle_map.keys().filter(|k| !k.is_empty()).cloned().collect();
-        rev_handles.sort();
-        for handle in rev_handles {
-            let coverage_opt = self.handle_map.get(&handle);
-            if coverage_opt.is_none() {
-                log::debug!("[generate_coverage_table] empty value for key {} in handle map",
-                    &handle);
-                continue;
+    pub fn generate_coverage_table(&self, relevance_vec: Vec<Relevance>, reviewer_handles: Vec<String>) -> String {
+        let mut comment = "| Contributor Name/Alias  | Relevance | Approval |\n".to_string();  // Added a newline at the end
+        comment += "| -------------- | --------------- |--------------- |\n";  // Added a newline at the end
+        let (deduplicated_relevance_map, unmapped_aliases) = deduplicated_relevance_vec_for_comment(&relevance_vec);
+        let mut deduplicated_relevance_vec: Vec<(&Vec<String>, &f32)> = deduplicated_relevance_map.iter().collect();
+        deduplicated_relevance_vec.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // I couldn't find a way to avoid unwrap here :(
+        let mut total_coverage = 0.0f32;
+        for (provider_ids, relevance) in &deduplicated_relevance_vec {
+            let provider_id_opt = provider_ids.iter().next();
+            if provider_id_opt.is_some() {
+                let provider_id_alias = provider_id_opt.expect("Empty provider_id_opt");
+                log::info!("[comment-text] provider_id: {:?}", provider_id_alias);
+                let formatted_relevance_value = format!("{:.2}", *relevance);
+                if reviewer_handles.contains(provider_id_alias) {
+                    comment += &format!("| {} | {}% | :white_check_mark: |\n", provider_id_alias, formatted_relevance_value);
+                    total_coverage += *relevance;
+                } else {
+                    comment += &format!("| {} | {}% | :x: |\n", provider_id_alias, formatted_relevance_value);
+                }
             }
-            let coverage = coverage_opt.expect("Empty coverage_opt");
-            let coverage_text = coverage.coverage_str();
-            comment += &format!("| {} | {}% |\n", &handle, &coverage_text);
         }
-        if !self.unmapped_aliases.is_empty() {
+        comment += "\n\n";
+        comment += &format!("Total Coverage for PR: {:.2}%", total_coverage);
+        if !unmapped_aliases.is_empty() {
             comment += "\n\n";
             comment += &format!("Missing profile handles for {} aliases. [Go to your Vibinex settings page](https://vibinex.com/settings) to map aliases to profile handles.",
                 self.unmapped_aliases.len());
