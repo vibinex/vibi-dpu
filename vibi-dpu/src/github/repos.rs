@@ -26,6 +26,7 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
     }
     let repos_val = repos_opt.expect("Empty repos_opt");
     let repositories = deserialise_github_pat_repos(repos_val);
+    // filter repositories vec after calling vibinex-server api
     log::debug!("[get_user_accessed_github_repos] Fetched {:?} repositories from GitHub", &repositories);
     return Some(repositories)
 }
