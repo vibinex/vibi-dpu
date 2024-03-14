@@ -27,8 +27,25 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
     let repos_val = repos_opt.expect("Empty repos_opt");
     let repositories = deserialise_github_pat_repos(repos_val);
     // filter repositories vec after calling vibinex-server api
-    log::debug!("[get_user_accessed_github_repos] Fetched {:?} repositories from GitHub", &repositories);
-    return Some(repositories)
+    // call vibinex-server api and get selected repo list
+    let selected_repositories: Vec<Repository>; //comes from server api
+    let mut pat_repos: Vec<Repository> = Vec::<Repository>::new();
+    // go over all entries in vec and filter them out by repo_name,provider,owner
+    for repo in repositories {
+        let mut found = false;
+        for selected_repo in selected_repositories {
+            if repo.name() == selected_repo.name() && repo.provider() == selected_repo.provider() && repo.owner() == selected_repo.owner() {
+                found = true;
+                break;
+            }
+        }
+        if found {
+            pat_repos.push(repo.clone());
+            break;
+        }
+    }
+    log::debug!("[get_user_accessed_github_repos] Fetched {:?} repositories from GitHub", &pat_repos);
+    return Some(pat_repos)
 }
 
 fn deserialize_repos(repos_val: Vec<Value>) -> Vec<Repository> {
