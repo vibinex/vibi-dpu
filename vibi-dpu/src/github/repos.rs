@@ -1,7 +1,9 @@
+use std::env;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::db::repo::save_repo_to_db;
+use crate::{db::repo::save_repo_to_db, utils::reqwest_client::get_client};
 use crate::utils::repo::Repository;
 use super::config::{github_base_url, get_api_paginated};
 
@@ -36,12 +38,12 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
     let repositories = deserialise_github_pat_repos(repos_val);
     // filter repositories vec after calling vibinex-server api
     // call vibinex-server api and get selected repo list
-    let selected_repositories: Vec<UserSelectedRepo>; //comes from server api
+    let selected_repositories: Vec<UserSelectedRepo> = user_selected_repos().await;
     let mut pat_repos: Vec<Repository> = Vec::<Repository>::new();
     // go over all entries in vec and filter them out by repo_name,provider,owner
     for repo in repositories {
         let mut found = false;
-        for selected_repo in selected_repositories {
+        for selected_repo in &selected_repositories {
             if repo.name() == &selected_repo.name && repo.provider() == &selected_repo.provider && repo.owner() == &selected_repo.owner {
                 found = true;
                 break;
@@ -54,6 +56,26 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
     }
     log::debug!("[get_user_accessed_github_repos] Fetched {:?} repositories from GitHub", &pat_repos);
     return Some(pat_repos)
+}
+
+async fn user_selected_repos() -> Vec<UserSelectedRepo> {
+    let client = get_client();
+    // get topic id and add it as a query option instead of direct formatting in url string
+    let url = format!("{}/api/hunks",
+			env::var("SERVER_URL").expect("SERVER_URL must be set"));
+    let repos_res = client.get(url).send().await;
+    if let Err(e) = repos_res {
+        log::error!("[user_selected_repos] Unable to get repos from server, {:?}", e);
+        return Vec::<UserSelectedRepo>::new();
+    }
+    let repos_response = repos_res.expect("Uncaught error in repos_res");
+    let parsed_repos_res = repos_response.json::<Vec<UserSelectedRepo>>().await;
+    if let Err(e) = parsed_repos_res {
+        log::error!("[user_selected_repos] Unable to parse server repos response: {:?}", e);
+        return Vec::<UserSelectedRepo>::new();
+    }
+    let repos: Vec<UserSelectedRepo> = parsed_repos_res.expect("Unacaught error in parsed_repos_res");
+    return repos;
 }
 
 fn deserialize_repos(repos_val: Vec<Value>) -> Vec<Repository> {
