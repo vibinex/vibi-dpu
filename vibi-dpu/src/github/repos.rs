@@ -1,8 +1,16 @@
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::db::repo::save_repo_to_db;
 use crate::utils::repo::Repository;
 use super::config::{github_base_url, get_api_paginated};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserSelectedRepo {
+    name: String,
+    owner: String,
+    provider: String,
+}
 
 pub async fn get_github_app_installed_repos(access_token: &str) -> Option<Vec<Repository>> {
     let repos_url = format!("{}/installation/repositories", github_base_url());
@@ -28,13 +36,13 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
     let repositories = deserialise_github_pat_repos(repos_val);
     // filter repositories vec after calling vibinex-server api
     // call vibinex-server api and get selected repo list
-    let selected_repositories: Vec<Repository>; //comes from server api
+    let selected_repositories: Vec<UserSelectedRepo>; //comes from server api
     let mut pat_repos: Vec<Repository> = Vec::<Repository>::new();
     // go over all entries in vec and filter them out by repo_name,provider,owner
     for repo in repositories {
         let mut found = false;
         for selected_repo in selected_repositories {
-            if repo.name() == selected_repo.name() && repo.provider() == selected_repo.provider() && repo.owner() == selected_repo.owner() {
+            if repo.name() == &selected_repo.name && repo.provider() == &selected_repo.provider && repo.owner() == &selected_repo.owner {
                 found = true;
                 break;
             }
