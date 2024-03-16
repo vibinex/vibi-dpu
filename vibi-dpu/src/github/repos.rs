@@ -60,9 +60,10 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
 
 async fn user_selected_repos() -> Vec<UserSelectedRepo> {
     let client = get_client();
-    // get topic id and add it as a query option instead of direct formatting in url string
-    let url = format!("{}/api/hunks",
-			env::var("SERVER_URL").expect("SERVER_URL must be set"));
+    let topic_name = env::var("INSTALL_ID").expect("INSTALL_ID must be set");
+    let server_prefix_url = env::var("SERVER_URL").expect("SERVER_URL must be set");
+    let url = format!("{}/api/dpu/repos?topicId={}",
+			&server_prefix_url, &topic_name);
     let repos_res = client.get(url).send().await;
     if let Err(e) = repos_res {
         log::error!("[user_selected_repos] Unable to get repos from server, {:?}", e);
