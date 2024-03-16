@@ -10,9 +10,9 @@ use super::config::{github_base_url, get_api_paginated};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserSelectedRepo {
-    name: String,
-    owner: String,
-    provider: String,
+    repo_name: String,
+    repo_owner: String,
+    repo_provider: String,
 }
 
 pub async fn get_github_app_installed_repos(access_token: &str) -> Option<Vec<Repository>> {
@@ -50,7 +50,7 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
     for repo in repositories {
         let mut found = false;
         for selected_repo in &selected_repositories {
-            if repo.name() == &selected_repo.name && repo.provider() == &selected_repo.provider && repo.owner() == &selected_repo.owner {
+            if repo.name() == &selected_repo.repo_name && repo.provider() == &selected_repo.repo_provider && repo.owner() == &selected_repo.repo_owner {
                 found = true;
                 break;
             }
@@ -67,22 +67,17 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
 async fn user_selected_repos() -> Option<Vec<UserSelectedRepo>> {
     let client = get_client();
     let topic_name = env::var("INSTALL_ID").expect("INSTALL_ID must be set");
+    let provider = env::var("PROVIDER").expect("PROVIDER must be set");
     let server_prefix_url = env::var("SERVER_URL").expect("SERVER_URL must be set");
-    let url = format!("{}/api/dpu/repos?topicId={}",
-			&server_prefix_url, &topic_name);
+    let url = format!("{}/api/dpu/repos?topicId={}&provider={}",
+			&server_prefix_url, &topic_name, &provider);
     let repos_res = client.get(url).send().await;
     if let Err(e) = repos_res {
         log::error!("[user_selected_repos] Unable to get repos from server, {:?}", e);
         return None;
     }
     let repos_response = repos_res.expect("Uncaught error in repos_res");
-    let parsed_repos_res = repos_response.json::<Vec<UserSelectedRepo>>().await;
-    if let Err(e) = parsed_repos_res {
-        log::error!("[user_selected_repos] Unable to parse server repos response: {:?}", e);
-        return None;
-    }
-    let repos: Vec<UserSelectedRepo> = parsed_repos_res.expect("Unacaught error in parsed_repos_res");
-    return Some(repos);
+    return parse_repos_response(repos_response).await;
 }
 
 async fn parse_repos_response(response: Response) -> Option<Vec<UserSelectedRepo>>{
