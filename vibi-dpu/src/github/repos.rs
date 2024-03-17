@@ -57,7 +57,6 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
         }
         if found {
             pat_repos.push(repo.clone());
-            break;
         }
     }
     log::debug!("[get_user_accessed_github_repos] Fetched {:?} repositories from GitHub", &pat_repos);
