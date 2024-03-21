@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::{core::utils::get_access_token, db::{repo_config::save_repo_config_to_db, review::get_review_from_db}, utils::{repo_config::RepoConfig, review::Review, user::ProviderEnum}};
+use crate::{core::utils::get_access_token, db::{repo_config::save_repo_config_to_db, review::get_review_from_db}, github::prs::get_and_store_pr_info, utils::{repo_config::RepoConfig, review::Review, user::ProviderEnum}};
 
 pub async fn process_trigger(message_data: &Vec<u8>) {
     // parse message
@@ -19,12 +19,18 @@ pub async fn process_trigger(message_data: &Vec<u8>) {
     }
     let access_token_opt = get_access_token(&review).await;
 	if access_token_opt.is_none() {
-		log::error!("[process_review] Unable to retrieve access token, failing, message: {:?}",
+		log::error!("[process_trigger] Unable to retrieve access token, failing, message: {:?}",
 			&review);
 		return;
 	}
     let access_token = access_token_opt.expect("Empty access_token_opt");
     // get pr information and update review object
+    let pr_info_opt = get_and_store_pr_info(&review.repo_owner(),
+        &review.repo_name(), &access_token, &review.id()).await;
+    if pr_info_opt.is_none() {
+        log::error!("[process_trigger] Unable to get pr info from provider");
+        return;
+    }
     // commit_check
     // process_review_changes
     // send_hunkmap
