@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::{core::utils::get_access_token, db::{repo_config::save_repo_config_to_db, review::get_review_from_db}, github::prs::get_and_store_pr_info, utils::{repo_config::RepoConfig, review::Review, user::ProviderEnum}};
+use crate::{core::{review::{commit_check, process_review_changes, send_hunkmap}, utils::get_access_token}, db::{repo_config::save_repo_config_to_db, review::get_review_from_db}, github::prs::get_and_store_pr_info, utils::{repo_config::RepoConfig, review::Review, user::ProviderEnum}};
 
 pub async fn process_trigger(message_data: &Vec<u8>) {
     // parse message
@@ -32,8 +32,11 @@ pub async fn process_trigger(message_data: &Vec<u8>) {
         return;
     }
     // commit_check
+    commit_check(&review, &access_token).await;
     // process_review_changes
+	let hunkmap_opt = process_review_changes(&review).await;
     // send_hunkmap
+	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token).await;
 }
 
 
