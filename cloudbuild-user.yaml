@@ -19,5 +19,5 @@ steps:
     args:
       - run
       - --filename=generated-dpu-deployment.yaml
-      - --location=asia-south1
+      - --location=asia-south1-b
       - --cluster=dpu-cluster
