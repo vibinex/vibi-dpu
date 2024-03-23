@@ -31,13 +31,12 @@ pub async fn process_trigger(message_data: &Vec<u8>) {
 		return;
 	}
     let access_token = access_token_opt.expect("Empty access_token_opt");
-    // get pr information and update review object
-    let pr_info_opt = get_and_store_pr_info(&trigger_repo.repo_owner,
-        &trigger_repo.repo_name, &access_token, &trigger_repo.pr_number).await;
-    if pr_info_opt.is_none() {
-        log::error!("[process_trigger] Unable to get pr info from provider");
+    let review_opt = get_review_obj(&trigger_repo, &access_token).await;
+    if review_opt.is_none() {
+        log::error!("[process_trigger] Unable to get review details: {:?}", &trigger_repo);
         return;
     }
+    let review = review_opt.expect("Empty review_opt");
     // commit_check
     commit_check(&review, &access_token).await;
     // process_review_changes
@@ -68,23 +67,20 @@ fn parse_trigger_msg(message_data: &Vec<u8>) -> Option<(TriggerRepo, RepoConfig)
     let repo_config: RepoConfig = repo_config_res.expect("Uncaught error in repo_config_res");
     let trigger_repo = TriggerRepo { repo_name, repo_owner, repo_provider, pr_number };
     return Some((trigger_repo, repo_config));
-    // get_and_store_pr_info(&repo_owner, &repo_name, &access_token, &pr_number);
-    // let review_opt = get_review_from_db(&repo_name, &repo_owner,
-    //     &repo_provider, &pr_number);
-    // if review_opt.is_none() {
-    //     log::error!("[parse_trigger_msg] Unable to get review from db: {:?}", &deserialized_data);
-    //     return None;
-    // }
-    // let review = review_opt.expect("Empty review_opt");
-	// let repo_config_res = serde_json::from_value(deserialized_data["repo_config"].clone());
-	// if repo_config_res.is_err() {
-	// 	let e = repo_config_res.expect_err("No error in repo_config_res");
-	// 	log::error!("[parse_review] Unable to deserialze repo_config_res: {:?}", e);
-	// 	let default_config = RepoConfig::default();
-	// 	return Some((review, default_config));
-	// }
-	// let repo_config = repo_config_res.expect("Uncaught error in repo_config_res");
-	// log::debug!("[parse_review] repo_config = {:?}", &repo_config);
-	// save_repo_config_to_db(&repo_config, &review.repo_name(), &review.repo_owner(), &review.provider());
-	// return Some((review, repo_config));
+}
+
+async fn get_review_obj(trigger_repo: &TriggerRepo, access_token: &str) -> Option<Review> {
+    let pr_info_opt = get_and_store_pr_info(&trigger_repo.repo_owner, &trigger_repo.repo_name, access_token, &trigger_repo.pr_number).await;
+    if pr_info_opt.is_none() {
+        log::error!("[get_review_obj] Unable to get and store pr info: {:?}", &trigger_repo);
+        return None;
+    }
+    let review_opt = get_review_from_db(&trigger_repo.repo_name, &trigger_repo.repo_owner,
+        &trigger_repo.repo_provider, &trigger_repo.pr_number);
+    if review_opt.is_none() {
+        log::error!("[parse_trigger_msg] Unable to get review from db: {:?}", &trigger_repo);
+        return None;
+    }
+    let review = review_opt.expect("Empty review_opt");
+    return Some(review);
 }
