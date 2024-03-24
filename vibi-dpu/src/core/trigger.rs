@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::{core::{review::{commit_check, process_review_changes, send_hunkmap}, utils::get_access_token}, db::{repo_config::save_repo_config_to_db, review::get_review_from_db}, github::prs::get_and_store_pr_info, utils::{repo_config::RepoConfig, review::Review, user::ProviderEnum}};
+use crate::{core::{review::{commit_check, process_review_changes, send_hunkmap}, utils::get_access_token}, db::{repo::get_clone_url_clone_dir, repo_config::save_repo_config_to_db, review::get_review_from_db}, github::prs::get_and_store_pr_info, utils::{repo_config::RepoConfig, review::Review, user::ProviderEnum}};
 
 #[derive(Debug)]
 struct TriggerRepo {
@@ -75,12 +75,32 @@ async fn get_review_obj(trigger_repo: &TriggerRepo, access_token: &str) -> Optio
         log::error!("[get_review_obj] Unable to get and store pr info: {:?}", &trigger_repo);
         return None;
     }
-    let review_opt = get_review_from_db(&trigger_repo.repo_name, &trigger_repo.repo_owner,
-        &trigger_repo.repo_provider, &trigger_repo.pr_number);
-    if review_opt.is_none() {
-        log::error!("[parse_trigger_msg] Unable to get review from db: {:?}", &trigger_repo);
+    let pr_info = pr_info_opt.expect("Empty pr_info_opt");
+    let clone_opt = get_clone_url_clone_dir(&trigger_repo.repo_provider, &trigger_repo.repo_owner, &trigger_repo.repo_name);
+	if clone_opt.is_none() {
+		log::error!("[get_review_obj] Unable to get clone url and directory for bitbucket review");
+		return None;
+	}
+	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");
+    let author_opt = pr_info.author;
+    if author_opt.is_none() {
+        log::error!("[get_review_obj] Unable to get pr author");
         return None;
     }
-    let review = review_opt.expect("Empty review_opt");
+    let author = author_opt.expect("Empty author_opt");
+    let review = Review::new(
+		pr_info.base_head_commit,
+		pr_info.pr_head_commit,
+		trigger_repo.pr_number.clone(),
+		trigger_repo.repo_name.clone(),
+		trigger_repo.repo_owner.clone(),
+		trigger_repo.repo_provider.clone(),
+		format!("github/{}/{}/{}", 
+            &trigger_repo.repo_owner, &trigger_repo.repo_name, &trigger_repo.pr_number),
+		clone_dir,
+		clone_url,
+		author,
+		None,
+	);
     return Some(review);
 }
