@@ -68,7 +68,8 @@ fn parse_bitbucket_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
     let pr_info = PrInfo { base_head_commit: base_head_commit.to_string(),
         pr_head_commit: pr_head_commit.to_string(),
         state: pr_state.to_string(),
-        pr_branch: pr_branch.to_string()
+        pr_branch: pr_branch.to_string(),
+        author: None,
     };
     println!("[parse_webhook_data] pr_info :{:?}", &pr_info);
     return Some(pr_info);
@@ -157,6 +158,7 @@ fn parse_github_webhook_data(webhook_data: &Value) -> Option<PrInfo> {
         pr_head_commit: pr_head_commit,
         state: pr_state,
         pr_branch: pr_branch,
+        author: None,
     };
     println!("[parse_github_webhook_data] pr_info :{:?}", &pr_info);
     return Some(pr_info)

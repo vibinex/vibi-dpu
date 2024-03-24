@@ -6,6 +6,7 @@ pub struct PrInfo {
     pub pr_head_commit: String,
     pub state: String,
     pub pr_branch: String,
+    pub author: Option<String>,
 }
 
 impl PrInfo {

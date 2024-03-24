@@ -111,6 +111,7 @@ pub async fn get_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str
         pr_head_commit: pr_data["source"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
         state: pr_data["state"].to_string().trim_matches('"').to_string(),
         pr_branch: pr_data["source"]["branch"]["name"].to_string().trim_matches('"').to_string(),
+        author: None,
     };
     log::debug!("[get_pr_info] pr_info: {:?}", &pr_info);
     Some(pr_info)
