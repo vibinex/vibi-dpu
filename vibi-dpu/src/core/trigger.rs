@@ -81,14 +81,6 @@ fn parse_trigger_msg(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)> {
 		return None;
 	}
 	let review = review_opt.expect("Empty review_opt");
-	let repo_config_res = serde_json::from_value(deserialized_data["repo_config"].clone());
-	if repo_config_res.is_err() {
-		let e = repo_config_res.expect_err("No error in repo_config_res");
-		log::error!("[parse_review] Unable to deserialze repo_config_res: {:?}", e);
-		let default_config = RepoConfig::default();
-		return Some((review, default_config));
-	}
-	let repo_config = repo_config_res.expect("Uncaught error in repo_config_res");
 	log::debug!("[parse_review] repo_config = {:?}", &repo_config);
 	save_repo_config_to_db(&repo_config, &review.repo_name(), &review.repo_owner(), &review.provider());
 	return Some((review, repo_config));
