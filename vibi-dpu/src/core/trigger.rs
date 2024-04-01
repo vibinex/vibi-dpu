@@ -2,6 +2,13 @@ use serde_json::Value;
 
 use crate::{db::{repo_config::save_repo_config_to_db, review::get_review_from_db}, utils::{repo_config::RepoConfig, review::Review}};
 
+struct TriggerReview {
+	repo_provider: String,
+	repo_owner: String,
+	repo_name: String,
+	pr_number: String
+}
+
 pub async fn process_trigger(message_data: &Vec<u8>) {
 	// parse message
 	let parse_res = parse_trigger_msg(message_data);
@@ -28,14 +35,22 @@ fn parse_field(field_name: &str, msg: &Value) -> Option<String> {
 	return Some(field_val.to_string().trim_matches('"').to_string());
 }
 
-fn parse_message_fields(msg: &Value) ->
-	(Option<String>, Option<String>, Option<String>, Option<String>) {
-
+fn parse_message_fields(msg: &Value) -> Option<TriggerReview> {
 	let repo_provider_opt = parse_field("repo_provider", msg);
 	let repo_owner_opt = parse_field("repo_owner", msg);
 	let repo_name_opt = parse_field("repo_name", msg);
 	let pr_number_opt = parse_field("pr_number", msg);
-	return (repo_provider_opt, repo_owner_opt, repo_name_opt, pr_number_opt);
+	if repo_provider_opt.is_none() || repo_owner_opt.is_none() 
+		|| repo_name_opt.is_none() || pr_number_opt.is_none() {
+		log::error!("[parse_message_fields] Could not parse {:?}, {:?}, {:?}, {:?}", 
+			repo_provider_opt, repo_owner_opt, repo_name_opt, pr_number_opt);
+		return None;
+	}
+	let repo_provider = repo_provider_opt.expect("Empty repo_provider_opt");
+	let repo_owner = repo_owner_opt.expect("Empty repo_provider_opt");
+	let repo_name = repo_name_opt.expect("Empty repo_provider_opt");
+	let pr_number = pr_number_opt.expect("Empty repo_provider_opt");
+	return Some(TriggerReview { repo_provider, repo_owner, repo_name, pr_number });
 }
 
 fn parse_trigger_msg(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)> {
@@ -47,23 +62,20 @@ fn parse_trigger_msg(message_data: &Vec<u8>) -> Option<(Review, RepoConfig)> {
 	}
 	let deserialized_data = data_res.expect("Uncaught error in deserializing message_data");
 	log::debug!("[parse_trigger_msg] deserialized_data == {:?}", &deserialized_data);
-	let (repo_provider_opt, repo_owner_opt, repo_name_opt, pr_number_opt) = parse_message_fields(&deserialized_data);
-	if repo_provider_opt.is_none() || repo_owner_opt.is_none() || repo_name_opt.is_none() || pr_number_opt.is_none() {
-		log::error!("[parse_trigger_msg] Could not parse {:?}, {:?}, {:?}, {:?}", repo_provider_opt, repo_owner_opt, repo_name_opt, pr_number_opt);
+	let trigger_review_opt = parse_message_fields(&deserialized_data);
+	if trigger_review_opt.is_none() {
+		log::error!("[parse_trigger_msg] Unable to parse message fields: {:?}", &deserialized_data);
 		return None;
 	}
-	let repo_provider = repo_provider_opt.expect("Empty repo_provider_opt");
-	let repo_owner = repo_owner_opt.expect("Empty repo_provider_opt");
-	let repo_name = repo_name_opt.expect("Empty repo_provider_opt");
-	let pr_number = pr_number_opt.expect("Empty repo_provider_opt");
+	let trigger_review = trigger_review_opt.expect("Empty trigger_review_opt");
 	let repo_config_res = serde_json::from_value(deserialized_data["repo_config"].clone());
 	if let Err(e) = &repo_config_res {
 		log::error!("[parse_trigger_msg] Error in parsing repo config: {:?}", e);
 		return None;
 	}
 	let repo_config: RepoConfig = repo_config_res.expect("Uncaught error in repo_config_res");
-	let review_opt = get_review_from_db(&repo_name, &repo_owner,
-		&repo_provider, &pr_number);
+	let review_opt = get_review_from_db(&trigger_review.repo_name,
+		&trigger_review.repo_owner, &trigger_review.repo_provider, &trigger_review.pr_number);
 	if review_opt.is_none() {
 		log::error!("[parse_trigger_msg] Unable to get review from db: {:?}", &deserialized_data);
 		return None;
