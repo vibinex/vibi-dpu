@@ -18,19 +18,19 @@ pub async fn process_trigger(message_data: &Vec<u8>) {
 		return;
 	}
 	let (review, repo_config) = parse_res.expect("Empty parse_res");
-    log::info!("[process_trigger] Processing PR: {} in repo: {}", &review.id(), &review.repo_name());
+	log::info!("[process_trigger] Processing PR: {} in repo: {}", &review.id(), &review.repo_name());
 	// get access token
-    if review.provider().to_owned() != ProviderEnum::Github.to_string().to_lowercase() {
-        log::error!("[process_trigger] Not implemented for non github providers");
-        return;
-    }
-    let access_token_opt = get_access_token(&review).await;
+	if review.provider().to_owned() != ProviderEnum::Github.to_string().to_lowercase() {
+		log::error!("[process_trigger] Not implemented for non github providers");
+		return;
+	}
+	let access_token_opt = get_access_token(&review).await;
 	if access_token_opt.is_none() {
 		log::error!("[process_review] Unable to retrieve access token, failing, message: {:?}",
 			&review);
 		return;
 	}
-    let access_token = access_token_opt.expect("Empty access_token_opt");
+	let access_token = access_token_opt.expect("Empty access_token_opt");
 	// get pr information and update review object
 	// commit_check
 	// process_review_changes
