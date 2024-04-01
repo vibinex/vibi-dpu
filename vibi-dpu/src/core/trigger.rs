@@ -7,7 +7,7 @@ struct TriggerReview {
 	repo_provider: String,
 	repo_owner: String,
 	repo_name: String,
-	pr_number: String,
+	pr_number: String
 }
 pub async fn process_trigger(message_data: &Vec<u8>) {
 	// parse message
