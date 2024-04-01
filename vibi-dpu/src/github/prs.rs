@@ -114,6 +114,7 @@ pub async fn get_pr_info_github(repo_owner: &str, repo_name: &str, access_token:
         pr_head_commit: pr_data["head"]["sha"].as_str()?.to_string(),
         state: pr_data["state"].as_str()?.to_string(),
         pr_branch: pr_data["head"]["ref"].as_str()?.to_string(),
+        author: Some(pr_data["user"]["login"].as_str()?.to_string()),
     };
 
     log::debug!("[get_pr_info_github] PR info: {:?}", &pr_info);
