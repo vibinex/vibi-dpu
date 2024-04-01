@@ -114,14 +114,14 @@ fn parse_trigger_msg(message_data: &Vec<u8>) -> Option<(TriggerReview, RepoConfi
 	return Some((trigger_review, repo_config));
 }
 
-async fn get_review_obj(trigger_repo: &TriggerReview, access_token: &str) -> Option<Review> {
-	let pr_info_opt = get_and_store_pr_info(&trigger_repo.repo_owner, &trigger_repo.repo_name, access_token, &trigger_repo.pr_number).await;
+async fn get_review_obj(trigger_review: &TriggerReview, access_token: &str) -> Option<Review> {
+	let pr_info_opt = get_and_store_pr_info(&trigger_review.repo_owner, &trigger_review.repo_name, access_token, &trigger_review.pr_number).await;
 	if pr_info_opt.is_none() {
-		log::error!("[get_review_obj] Unable to get and store pr info: {:?}", &trigger_repo);
+		log::error!("[get_review_obj] Unable to get and store pr info: {:?}", &trigger_review);
 		return None;
 	}
 	let pr_info = pr_info_opt.expect("Empty pr_info_opt");
-	let clone_opt = get_clone_url_clone_dir(&trigger_repo.repo_provider, &trigger_repo.repo_owner, &trigger_repo.repo_name);
+	let clone_opt = get_clone_url_clone_dir(&trigger_review.repo_provider, &trigger_review.repo_owner, &trigger_review.repo_name);
 	if clone_opt.is_none() {
 		log::error!("[get_review_obj] Unable to get clone url and directory for bitbucket review");
 		return None;
@@ -136,12 +136,12 @@ async fn get_review_obj(trigger_repo: &TriggerReview, access_token: &str) -> Opt
 	let review = Review::new(
 		pr_info.base_head_commit,
 		pr_info.pr_head_commit,
-		trigger_repo.pr_number.clone(),
-		trigger_repo.repo_name.clone(),
-		trigger_repo.repo_owner.clone(),
-		trigger_repo.repo_provider.clone(),
+		trigger_review.pr_number.clone(),
+		trigger_review.repo_name.clone(),
+		trigger_review.repo_owner.clone(),
+		trigger_review.repo_provider.clone(),
 		format!("github/{}/{}/{}", 
-			&trigger_repo.repo_owner, &trigger_repo.repo_name, &trigger_repo.pr_number),
+			&trigger_review.repo_owner, &trigger_review.repo_name, &trigger_review.pr_number),
 		clone_dir,
 		clone_url,
 		author,
