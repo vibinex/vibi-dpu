@@ -31,25 +31,25 @@ pub async fn process_trigger(message_data: &Vec<u8>) {
 			&trigger_review);
 		return;
 	}
-    let access_token = access_token_opt.expect("Empty access_token_opt");
-    // get pr information and update review object
-    let pr_info_opt = get_and_store_pr_info(&trigger_review.repo_owner,
-        &trigger_review.repo_name, &access_token, &trigger_review.pr_number).await;
-    if pr_info_opt.is_none() {
-        log::error!("[process_trigger] Unable to get pr info from provider");
-        return;
-    }
+	let access_token = access_token_opt.expect("Empty access_token_opt");
+	// get pr information and update review object
+	let pr_info_opt = get_and_store_pr_info(&trigger_review.repo_owner,
+		&trigger_review.repo_name, &access_token, &trigger_review.pr_number).await;
+	if pr_info_opt.is_none() {
+		log::error!("[process_trigger] Unable to get pr info from provider");
+		return;
+	}
 	let review_opt = get_review_obj(&trigger_review, &access_token).await;
-    if review_opt.is_none() {
-        log::error!("[process_trigger] Unable to get review details: {:?}", &trigger_review);
-        return;
-    }
-    let review = review_opt.expect("Empty review_opt");
-    // commit_check
-    commit_check(&review, &access_token).await;
-    // process_review_changes
+	if review_opt.is_none() {
+		log::error!("[process_trigger] Unable to get review details: {:?}", &trigger_review);
+		return;
+	}
+	let review = review_opt.expect("Empty review_opt");
+	// commit_check
+	commit_check(&review, &access_token).await;
+	// process_review_changes
 	let hunkmap_opt = process_review_changes(&review).await;
-    // send_hunkmap
+	// send_hunkmap
 	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token).await;
 }
 
@@ -115,25 +115,25 @@ fn parse_trigger_msg(message_data: &Vec<u8>) -> Option<(TriggerReview, RepoConfi
 }
 
 async fn get_review_obj(trigger_repo: &TriggerReview, access_token: &str) -> Option<Review> {
-    let pr_info_opt = get_and_store_pr_info(&trigger_repo.repo_owner, &trigger_repo.repo_name, access_token, &trigger_repo.pr_number).await;
-    if pr_info_opt.is_none() {
-        log::error!("[get_review_obj] Unable to get and store pr info: {:?}", &trigger_repo);
-        return None;
-    }
-    let pr_info = pr_info_opt.expect("Empty pr_info_opt");
-    let clone_opt = get_clone_url_clone_dir(&trigger_repo.repo_provider, &trigger_repo.repo_owner, &trigger_repo.repo_name);
+	let pr_info_opt = get_and_store_pr_info(&trigger_repo.repo_owner, &trigger_repo.repo_name, access_token, &trigger_repo.pr_number).await;
+	if pr_info_opt.is_none() {
+		log::error!("[get_review_obj] Unable to get and store pr info: {:?}", &trigger_repo);
+		return None;
+	}
+	let pr_info = pr_info_opt.expect("Empty pr_info_opt");
+	let clone_opt = get_clone_url_clone_dir(&trigger_repo.repo_provider, &trigger_repo.repo_owner, &trigger_repo.repo_name);
 	if clone_opt.is_none() {
 		log::error!("[get_review_obj] Unable to get clone url and directory for bitbucket review");
 		return None;
 	}
 	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");
-    let author_opt = pr_info.author;
-    if author_opt.is_none() {
-        log::error!("[get_review_obj] Unable to get pr author");
-        return None;
-    }
-    let author = author_opt.expect("Empty author_opt");
-    let review = Review::new(
+	let author_opt = pr_info.author;
+	if author_opt.is_none() {
+		log::error!("[get_review_obj] Unable to get pr author");
+		return None;
+	}
+	let author = author_opt.expect("Empty author_opt");
+	let review = Review::new(
 		pr_info.base_head_commit,
 		pr_info.pr_head_commit,
 		trigger_repo.pr_number.clone(),
@@ -141,11 +141,11 @@ async fn get_review_obj(trigger_repo: &TriggerReview, access_token: &str) -> Opt
 		trigger_repo.repo_owner.clone(),
 		trigger_repo.repo_provider.clone(),
 		format!("github/{}/{}/{}", 
-            &trigger_repo.repo_owner, &trigger_repo.repo_name, &trigger_repo.pr_number),
+			&trigger_repo.repo_owner, &trigger_repo.repo_name, &trigger_repo.pr_number),
 		clone_dir,
 		clone_url,
 		author,
 		None,
 	);
-    return Some(review);
+	return Some(review);
 }
