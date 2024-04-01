@@ -4,9 +4,9 @@ use crate::{core::utils::get_access_token, db::{repo_config::save_repo_config_to
 
 #[derive(Debug)]
 struct TriggerReview {
-	repo_name: String,
-	repo_owner: String,
 	repo_provider: String,
+	repo_owner: String,
+	repo_name: String,
 	pr_number: String,
 }
 pub async fn process_trigger(message_data: &Vec<u8>) {
