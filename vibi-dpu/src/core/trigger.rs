@@ -102,15 +102,7 @@ fn parse_trigger_msg(message_data: &Vec<u8>) -> Option<(TriggerReview, RepoConfi
 		return None;
 	}
 	let repo_config: RepoConfig = repo_config_res.expect("Uncaught error in repo_config_res");
-	let review_opt = get_review_from_db(&trigger_review.repo_name,
-		&trigger_review.repo_owner, &trigger_review.repo_provider, &trigger_review.pr_number);
-	if review_opt.is_none() {
-		log::error!("[parse_trigger_msg] Unable to get review from db: {:?}", &deserialized_data);
-		return None;
-	}
-	let review = review_opt.expect("Empty review_opt");
-	log::debug!("[parse_trigger_msg] repo_config = {:?}", &repo_config);
-	save_repo_config_to_db(&repo_config, &review.repo_name(), &review.repo_owner(), &review.provider());
+	save_repo_config_to_db(&repo_config, &trigger_review.repo_name, &trigger_review.repo_owner, &trigger_review.repo_provider);
 	return Some((trigger_review, repo_config));
 }
 
