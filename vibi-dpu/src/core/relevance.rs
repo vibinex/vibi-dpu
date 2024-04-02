@@ -5,6 +5,7 @@ use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
 pub async fn process_relevance(hunkmap: &HunkMap, review: &Review, repo_config: &mut RepoConfig, access_token: &str) {
+    log::info!("[process_relevance] Process relevence for PR: {}, repo config: {:?}", review.id(), repo_config);
     for prhunk in hunkmap.prhunkvec() {
         // calculate number of hunks for each userid
         let mut review_mut = review.clone();
