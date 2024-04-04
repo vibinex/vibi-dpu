@@ -26,7 +26,10 @@ pub async fn handle_install_github(installation_code: &str) {
     }
     let auth_info = auth_info_opt.expect("Empty authinfo_opt");
     let access_token = auth_info.token().clone();
-    
+    process_repos(&access_token, repo_provider).await;
+}
+
+pub async fn process_repos(access_token: &str, repo_provider: &str) {
     let mut pubreqs: Vec<SetupInfo> = Vec::new();
     let repos_opt = get_github_app_installed_repos(&access_token).await;
     if repos_opt.is_none(){
@@ -39,9 +42,9 @@ pub async fn handle_install_github(installation_code: &str) {
     let mut repo_names: Vec<String> = Vec::new();
 
     for repo in repos{
-        let token_copy = access_token.clone();
+        let token_copy = access_token.to_owned().clone();
         let mut repo_copy = repo.clone();
-        clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
+        clone_git_repo(&mut repo_copy, &token_copy, repo_provider).await;
         let aliases_opt = get_git_aliases(&repo_copy);
         if aliases_opt.is_none() {
             log::error!("[handle_install_github] Unable to get aliases for repo: {}", repo.name());
@@ -57,7 +60,7 @@ pub async fn handle_install_github(installation_code: &str) {
         process_webhooks(repo_owner.to_string(), repo_name.to_string(), access_token.to_string()).await;
         let repo_name_async = repo_name.clone();
         let repo_owner_async = repo_owner.clone();
-        let access_token_async = access_token.clone();
+        let access_token_async = access_token.to_owned().clone();
         task::spawn(async move {
             process_prs(&repo_owner_async, &repo_name_async, &access_token_async).await;
         });
@@ -68,7 +71,6 @@ pub async fn handle_install_github(installation_code: &str) {
         repos: repo_names
     });
     send_setup_info(&pubreqs).await;
-
 }
 
 

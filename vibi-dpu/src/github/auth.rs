@@ -78,6 +78,7 @@ pub async fn fetch_access_token(installation_id: &str) -> Option<GithubAuthInfo>
     }
     let mut gh_auth_info = gh_auth_info_opt.expect("Uncaught error in gh_auth_info_opt");
     save_github_auth_info_to_db(&mut gh_auth_info);
+    gh_auth_info.save_to_file();
     return Some(gh_auth_info);
 }
 
@@ -124,9 +125,14 @@ async fn call_access_token_api(installation_id: &str) -> Option<GithubAuthInfo>{
 }
 
 async fn get_or_update_auth(review_opt: &Option<Review>) -> Option<GithubAuthInfo> {
-	let authinfo_opt =  get_github_auth_info_from_db();
+	let mut authinfo_opt =  get_github_auth_info_from_db();
     if authinfo_opt.is_none() {
-        return None;
+        let authinfo_file_opt = GithubAuthInfo::load_from_file();
+        if authinfo_file_opt.is_none() {
+            log::error!("[get_or_update_auth] Unable to get github auth info from db or storage");
+            return None;
+        }
+        authinfo_opt = authinfo_file_opt;
     }
     let auth_info = authinfo_opt.expect("empty authinfo_opt in app_access_token");
     let app_installation_id_opt = auth_info.installation_id().to_owned();
@@ -154,7 +160,6 @@ async fn get_or_update_auth(review_opt: &Option<Review>) -> Option<GithubAuthInf
         set_git_remote_url(&review, new_auth_info.token(),
             &ProviderEnum::Github.to_string().to_lowercase());
     }
-    save_github_auth_info_to_db(&mut new_auth_info);
     return new_auth_info_opt;
 
 }
