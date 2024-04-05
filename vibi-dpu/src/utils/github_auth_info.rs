@@ -76,4 +76,4 @@ impl GithubAuthInfo {
 }
 
 static PATH: &str = "/app/config/dpu_creds.json";
-//docker run -e INSTALL_ID=topic-3d4b63e6-f543-47f6-95bf-785ed1fc75d0 -v ~/.config/vibinex:/app/config dpu:local
+//docker run -e INSTALL_ID=topic-name -v ~/.config/vibinex:/app/config dpu:local
