@@ -125,14 +125,11 @@ async fn call_access_token_api(installation_id: &str) -> Option<GithubAuthInfo>{
 }
 
 async fn get_or_update_auth(review_opt: &Option<Review>) -> Option<GithubAuthInfo> {
-	let mut authinfo_opt =  get_github_auth_info_from_db();
+    let authinfo_opt = get_github_auth_info_from_db()
+        .or_else(|| GithubAuthInfo::load_from_file());
     if authinfo_opt.is_none() {
-        let authinfo_opt = get_github_auth_info_from_db()
-            .or_else(|| GithubAuthInfo::load_from_file());
-        if authinfo_opt.is_none() {
-            log::error!("[get_or_update_auth] Unable to get github auth info from db or storage");
-            return None;
-        }
+        log::error!("[get_or_update_auth] Unable to get github auth info from db or storage");
+        return None;
     }
     let auth_info = authinfo_opt.expect("empty authinfo_opt in app_access_token");
     let app_installation_id_opt = auth_info.installation_id().to_owned();
