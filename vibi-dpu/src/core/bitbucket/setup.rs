@@ -44,7 +44,6 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
         get_and_save_workspace_users(workspace.uuid(), &access_token).await;
         let all_repos = repos_opt.expect("Empty repos_opt");
         let filtered_repos = filter_user_selected_repos(all_repos, user_selected_repos_opt.clone());
-        log::debug!("[handle_install_bitbucket] filtered repos: {:?}", &filtered_repos);
         let mut reponames: Vec<String> = Vec::new();
         for repo in filtered_repos {
             log::info!("[handle_install_bitbucket] Processing repo: {}/{}", &repo.owner(), &repo.name());
