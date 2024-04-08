@@ -4,6 +4,7 @@ use super::config::{get_api_paginated, github_base_url};
 use crate::core::utils::user_selected_repos;
 use crate::utils::repo::Repository;
 use crate::db::repo::save_repo_to_db;
+use crate::utils::user::ProviderEnum;
 
 pub async fn get_github_app_installed_repos(access_token: &str) -> Option<Vec<Repository>> {
 	let repos_url = format!("{}/installation/repositories", github_base_url());
@@ -29,7 +30,7 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
 	let all_repos = deserialise_github_pat_repos(repos_val);
 	// filter repositories vec after calling vibinex-server api
 	// call vibinex-server api and get selected repo list
-	let selected_repositories_opt = user_selected_repos().await;
+	let selected_repositories_opt = user_selected_repos(&ProviderEnum::Github.to_string()).await;
 	if selected_repositories_opt.is_none() {
 		log::error!("[get_user_accessed_github_repos] Unable to get repos from server");
 		return None;

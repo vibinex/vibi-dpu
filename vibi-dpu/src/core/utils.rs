@@ -173,10 +173,9 @@ pub struct UserSelectedRepo {
 	pub repo_provider: String,
 }
 
-pub async fn user_selected_repos() -> Option<Vec<UserSelectedRepo>> {
+pub async fn user_selected_repos(provider: &str) -> Option<Vec<UserSelectedRepo>> {
 	let client = get_client();
 	let topic_name = env::var("INSTALL_ID").expect("INSTALL_ID must be set");
-	let provider = env::var("PROVIDER").expect("PROVIDER must be set");
 	let server_prefix_url = env::var("SERVER_URL").expect("SERVER_URL must be set");
 	let url = format!("{}/api/dpu/repos?topicId={}&provider={}",
 			&server_prefix_url, &topic_name, &provider);

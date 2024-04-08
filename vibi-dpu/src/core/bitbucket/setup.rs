@@ -17,6 +17,7 @@ use crate::utils::repo::Repository;
 use crate::utils::setup_info::SetupInfo;
 use crate::utils::gitops::clone_git_repo;
 use crate::core::utils::send_setup_info;
+use crate::utils::user::ProviderEnum;
 
 pub async fn handle_install_bitbucket(installation_code: &str) {
     // get access token from installation code by calling relevant repo provider's api
@@ -31,7 +32,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
     log::debug!("[handle_install_bitbucket] AuthInfo: {:?}", authinfo);
     // let auth_info = { "access_token": access_token, "expires_in": expires_in_formatted, "refresh_token": auth_info["refresh_token"] }; db.insert("auth_info", serde_json::to_string(&auth_info).unwrap());
     let access_token = authinfo.access_token().clone();
-    let user_selected_repos_opt = user_selected_repos().await;
+    let user_selected_repos_opt = user_selected_repos(&ProviderEnum::Bitbucket.to_string()).await;
     let user_workspaces = get_bitbucket_workspaces(&access_token).await;
     let mut pubreqs: Vec<SetupInfo> = Vec::new();
     for workspace in user_workspaces {
