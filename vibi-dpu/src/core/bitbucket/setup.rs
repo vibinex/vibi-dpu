@@ -9,8 +9,11 @@ use crate::bitbucket::webhook::{get_webhooks_in_repo, add_webhook};
 use crate::bitbucket::user::get_and_save_workspace_users;
 use crate::bitbucket::prs::{list_prs_bitbucket, get_and_store_pr_info};
 use crate::core::utils::send_aliases;
+use crate::core::utils::user_selected_repos;
+use crate::core::utils::UserSelectedRepo;
 use crate::db::webhook::save_webhook_to_db;
 use crate::utils::gitops::get_git_aliases;
+use crate::utils::repo::Repository;
 use crate::utils::setup_info::SetupInfo;
 use crate::utils::gitops::clone_git_repo;
 use crate::core::utils::send_setup_info;
@@ -28,17 +31,20 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
     log::debug!("[handle_install_bitbucket] AuthInfo: {:?}", authinfo);
     // let auth_info = { "access_token": access_token, "expires_in": expires_in_formatted, "refresh_token": auth_info["refresh_token"] }; db.insert("auth_info", serde_json::to_string(&auth_info).unwrap());
     let access_token = authinfo.access_token().clone();
+    let user_selected_repos_opt = user_selected_repos().await;
     let user_workspaces = get_bitbucket_workspaces(&access_token).await;
     let mut pubreqs: Vec<SetupInfo> = Vec::new();
     for workspace in user_workspaces {
         let workspace_slug = workspace.slug();
         log::debug!("=========<{:?}>=======", workspace_slug);
     
-        let repos = get_workspace_repos(workspace.uuid(), 
+        let repos_opt = get_workspace_repos(workspace.uuid(), 
             &access_token).await;
         get_and_save_workspace_users(workspace.uuid(), &access_token).await;
+        let all_repos = repos_opt.expect("Empty repos_opt");
+        let filtered_repos = filter_user_selected_repos(all_repos, user_selected_repos_opt.clone());
         let mut reponames: Vec<String> = Vec::new();
-        for repo in repos.expect("repos is None") {
+        for repo in filtered_repos {
             let token_copy = access_token.clone();
             let mut repo_copy = repo.clone();
             clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
@@ -85,6 +91,22 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
         });
     } 
     send_setup_info(&pubreqs).await;
+}
+
+fn filter_user_selected_repos(all_repos: Vec<Repository>, user_selected_repos_opt: Option<Vec<UserSelectedRepo>>) -> Vec<Repository> {
+    if user_selected_repos_opt.is_none() {
+        return all_repos;
+    }
+    let user_selected_repos = user_selected_repos_opt.expect("Empty user selected repos");
+    let filtered_repos: Vec<Repository> = all_repos.into_iter().filter(|repo| {
+		user_selected_repos.iter().any(|selected_repo| {
+			repo.name() == &selected_repo.repo_name &&
+			repo.provider() == &selected_repo.repo_provider &&
+			repo.owner() == &selected_repo.repo_owner
+		})
+	})
+	.collect();
+    return filtered_repos;
 }
 
 async fn process_webhooks(workspace_slug: String, repo_name: String, access_token: String) {
