@@ -44,8 +44,10 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
         get_and_save_workspace_users(workspace.uuid(), &access_token).await;
         let all_repos = repos_opt.expect("Empty repos_opt");
         let filtered_repos = filter_user_selected_repos(all_repos, user_selected_repos_opt.clone());
+        log::debug!("[handle_install_bitbucket] filtered repos: {:?}", &filtered_repos);
         let mut reponames: Vec<String> = Vec::new();
         for repo in filtered_repos {
+            log::info!("[handle_install_bitbucket] Processing repo: {}/{}", &repo.owner(), &repo.name());
             let token_copy = access_token.clone();
             let mut repo_copy = repo.clone();
             clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
@@ -95,7 +97,9 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 }
 
 fn filter_user_selected_repos(all_repos: Vec<Repository>, user_selected_repos_opt: Option<Vec<UserSelectedRepo>>) -> Vec<Repository> {
-    if user_selected_repos_opt.is_none() {
+    if user_selected_repos_opt.as_ref().map_or(true,
+        |user_repos| user_repos.is_empty()) {
+        log::error!("[filter_user_selected_repos] No user selected repos found");
         return all_repos;
     }
     let user_selected_repos = user_selected_repos_opt.expect("Empty user selected repos");
