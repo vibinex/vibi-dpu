@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::env;
 use std::str;
+use reqwest::Response;
 use serde::{Deserialize, Serialize};
-use tonic::body;
+use serde_json::Value;
 
 use crate::bitbucket;
 use crate::db::aliases::update_handles_in_db;
@@ -163,4 +164,48 @@ pub async fn get_access_token (review: &Option<Review>, provider: &str) -> Optio
 		return None;
 	}
 	return Some(access_token);
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserSelectedRepo {
+	pub repo_name: String,
+	pub repo_owner: String,
+	pub repo_provider: String,
+}
+
+pub async fn user_selected_repos(provider: &str) -> Option<Vec<UserSelectedRepo>> {
+	let client = get_client();
+	let topic_name = env::var("INSTALL_ID").expect("INSTALL_ID must be set");
+	let server_prefix_url = env::var("SERVER_URL").expect("SERVER_URL must be set");
+	let url = format!("{}/api/dpu/repos?topicId={}&provider={}",
+			&server_prefix_url, &topic_name, &provider);
+	let repos_res = client.get(url).send().await;
+	if let Err(e) = repos_res {
+		log::error!("[user_selected_repos] Unable to get repos from server, {:?}", e);
+		return None;
+	}
+	let repos_response = repos_res.expect("Uncaught error in repos_res");
+	return parse_repos_response(repos_response).await;
+}
+
+async fn parse_repos_response(response: Response) -> Option<Vec<UserSelectedRepo>>{
+	let repos_value_res = response.json::<Value>().await;
+	if let Err(e) = &repos_value_res {
+		log::error!("[parse_repos_response] Unable to parse response {:?}", e);
+		return None;
+	}
+	let repos_value = repos_value_res.expect("Uncaught error in repos_values_res");
+	let repolist_json_opt = repos_value.get("repoList");
+	if repolist_json_opt.is_none() {
+		log::error!("[parse_repos_response] No repoList key in response json: {:?}", &repos_value);
+		return None;
+	}
+	let repolist_json = repolist_json_opt.expect("Uncaught error in repolist_json_opt");
+	let repolist_vec_res = serde_json::from_value(repolist_json.clone());
+	if let Err(e) = &repolist_vec_res {
+		log::error!("[parse_repos_response] Unable to parse vec of UserSelectedRepo from response: {:?}", e);
+		return None;
+	}
+	let repolist_vec: Vec<UserSelectedRepo> = repolist_vec_res.expect("Uncaught error in repolist_vec_res");
+	return Some(repolist_vec);
 }
