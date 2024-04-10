@@ -1,6 +1,5 @@
 use serde_json::Value;
 
-use crate::db::repo::save_repo_to_db;
 use crate::utils::repo::Repository;
 use super::config::{bitbucket_base_url, get_api_values};
 
@@ -30,7 +29,6 @@ pub async fn get_workspace_repos(workspace: &str, access_token: &str) -> Option<
             None,
             "bitbucket".to_string(),
         );
-        save_repo_to_db(&val);
         repos_data.push(val);
     }
     Some(repos_data)
