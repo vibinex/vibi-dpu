@@ -10,7 +10,6 @@ pub fn bitbucket_base_url() -> String {
 
 pub async fn get_api_values(url: &str, access_token: &str ) -> Vec<Value> {
     let response_opt = get_api_response(url, None, access_token).await;
-    log::debug!("[get_api_values] response of get_api = {:?}", &response_opt);
     let (mut response_values, next_url) = deserialize_paginated_response(response_opt).await;
     if next_url.is_some() {
         let mut page_values = get_all_pages(next_url, access_token).await;
