@@ -1,0 +1,49 @@
+steps:
+  # Fetch the credentials from the GCP bucket
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['cp', 'gs://vibi-secrets-prod/pubsub-sa.json', 'pubsub-sa.json']
+  
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['cp', 'gs://vibi-secrets-prod/vibinex-dpu.2024-01-11.private-key.pem', 'repo-profiler.pem']
+
+
+  # Perform cargo build inside vibi-dpu directory
+  - name: 'rust:latest'
+    entrypoint: 'cargo'
+    args: ['build']
+    dir: 'vibi-dpu'
+
+  # Build the Docker image with the build arguments
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'GCP_CREDENTIALS=$_GCP_CREDENTIALS'
+      - '--build-arg'
+      - 'SERVER_URL=$_SERVER_URL'
+      - '--build-arg'
+      - 'INSTALL_ID=$_INSTALL_ID'
+      - '--build-arg'
+      - 'BITBUCKET_CLIENT_ID=$_BITBUCKET_CLIENT_ID'
+      - '--build-arg'
+      - 'BITBUCKET_CLIENT_SECRET=$_BITBUCKET_CLIENT_SECRET'
+      - '--build-arg'
+      - 'BITBUCKET_BASE_URL=$_BITBUCKET_BASE_URL'
+      - '--build-arg'
+      - 'GITHUB_BASE_URL=$_GITHUB_BASE_URL'
+      - '--build-arg'
+      - 'GITHUB_PAT=$_GITHUB_PAT'
+      - '--build-arg'
+      - 'PROVIDER=$_PROVIDER'
+      - '-t'
+      - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA'
+      - '-t'
+      - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest'
+      - '.'
+
+  # Push the Docker image to Google Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest']
