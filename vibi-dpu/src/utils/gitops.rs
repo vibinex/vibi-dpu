@@ -503,6 +503,7 @@ fn extract_timestamp(wordvec: &Vec<&str>, mut idx: usize) -> String {
 }
 
 pub fn create_clone_url(git_url: &str, access_token: &str, repo_provider: &str) -> Option<String> {
+	log::info!("[create_clone_url] Creating clone URL for repo provider: {}", repo_provider);
 	let mut clone_url = None;
 	if repo_provider == "github" {
 		clone_url = Some(git_url.to_string()
@@ -513,6 +514,7 @@ pub fn create_clone_url(git_url: &str, access_token: &str, repo_provider: &str) 
 			.replace("git@", format!("https://x-token-auth:{{{access_token}}}@").as_str())
 			.replace("bitbucket.org:", "bitbucket.org/"));
 	}
+	log::info!("[create_clone_url] clone URL: {:?}", clone_url);
 	return clone_url;
 }
 
@@ -547,6 +549,7 @@ pub fn set_git_remote_url(review: &Review, access_token: &str, repo_provider: &s
 }
 
 pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_provider: &str) {
+	log::info!("[clone_git_repo] Cloning repository: {}", repo.clone_ssh_url());
     let git_url = repo.clone_ssh_url();
     // call function for provider specific git url formatting
     let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
@@ -556,6 +559,7 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
         return;
     }
     let clone_url = clone_url_opt.expect("empty clone_url_opt");
+	log::info!("[clone_git_repo] clone url: {}", clone_url);
     let random_string: String = thread_rng()
         .sample_iter(&Alphanumeric)
         .take(10)
@@ -569,6 +573,8 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
         let e = exists_res.expect_err("No error in exists_res");
         log::debug!("[clone_git_repo] executing metadata in {:?}, output: {:?}",
                 &directory, e);
+		log::info!("[clone_git_repo] executing metadata in {:?}, output: {:?}",
+				&directory, e);
         if e.kind() != ErrorKind::NotFound {
             return;
         }
@@ -577,6 +583,8 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
     if remove_dir_opt.is_err() {
         let e = remove_dir_opt.expect_err("No error in remove_dir_opt");
         log::debug!("[clone_git_repo] Execute in directory: {:?}, remove_dir_all: {:?}",
+            &directory, e);
+		log::info!("[clone_git_repo] Execute in directory: {:?}, remove_dir_all: {:?}",
             &directory, e);
         if e.kind() != ErrorKind::NotFound {
             return;
@@ -587,11 +595,14 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
         let e = create_dir_opt.expect_err("No error in create_dir_opt");
         log::debug!("[clone_git_repo] Executing in directory: {:?}, create_dir_all: {:?}",
             &directory, e);
+		log::info!("[clone_git_repo] Executing in directory: {:?}, create_dir_all: {:?}",
+            &directory, e);
         if e.kind() != ErrorKind::NotFound {
             return;
         }
     }
     log::debug!("[clone_git_repo] directory exists? {}", fs::metadata(&directory).await.is_ok());
+	log::info!("[clone_git_repo] directory exists? {}", fs::metadata(&directory).await.is_ok());
     let mut cmd = std::process::Command::new("git");
     cmd.arg("clone").arg(clone_url).current_dir(&directory);
     let output_res = cmd.output();
@@ -603,20 +614,22 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
     }
     let output = output_res.expect("Uncaught error in output_res");
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => log::debug!("[clone_git_repo] stderr = {:?}", v),
+		Ok(v) => log::info!("[clone_git_repo] stderr = {:?}", v),
 		Err(e) => {/* error handling */ log::error!("[clone_git_repo] git clone stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => log::debug!("[clone_git_repo] stdout = {:?}", v),
+		Ok(v) => log::info!("[clone_git_repo] stdout = {:?}", v),
 		Err(e) => {/* error handling */ log::error!("[clone_git_repo] git clone stdout error {}", e)}, 
 	};
     directory = format!("{}/{}", &directory, repo.name());
+	log::info!("[clone_git_repo] Cloning repository: {} to directory: {}", repo.clone_ssh_url(), directory);
     repo.set_local_dir(&directory);
     save_repo_to_db(repo);
 }
 
 pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
 	log::debug!("[get_git_aliases] repo = {:?}", &repo);
+	log::info!("[get_git_aliases] repo = {:?}", &repo);
 	let local_dir_opt = repo.local_dir().to_owned();
 	if local_dir_opt.is_none() {
 		log::error!("[get_git_aliases] Unable to get git aliases as local_dir is not set");
@@ -642,6 +655,7 @@ pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
 		return None;
 	}
 	let emails_str = emails_res.expect("Uncaught error in eails_res");
+	log::info!("[get_git_aliases] Extracted git aliases: {:?}", &emails_str);
 	let emails: Vec<String> = emails_str
             .lines()
             .map(|line| line.trim().to_string())
@@ -650,6 +664,6 @@ pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
     let mut unique_emails: Vec<String> = emails.into_iter().collect();
     unique_emails.sort();
     unique_emails.dedup();
-
+	log::info!("[get_git_aliases] Extracted unique git aliases: {:?}", &unique_emails);
 	return Some(unique_emails);
 }
