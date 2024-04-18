@@ -595,7 +595,7 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
         let e = create_dir_opt.expect_err("No error in create_dir_opt");
         log::debug!("[clone_git_repo] Executing in directory: {:?}, create_dir_all: {:?}",
             &directory, e);
-		log::debug!("[clone_git_repo] Executing in directory: {:?}, create_dir_all: {:?}",
+		log::info!("[clone_git_repo] Executing in directory: {:?}, create_dir_all: {:?}",
             &directory, e);
         if e.kind() != ErrorKind::NotFound {
             return;
