@@ -614,11 +614,11 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
     }
     let output = output_res.expect("Uncaught error in output_res");
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => log::debug!("[clone_git_repo] stderr = {:?}", v),
+		Ok(v) => log::info!("[clone_git_repo] stderr = {:?}", v),
 		Err(e) => {/* error handling */ log::error!("[clone_git_repo] git clone stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => log::debug!("[clone_git_repo] stdout = {:?}", v),
+		Ok(v) => log::info!("[clone_git_repo] stdout = {:?}", v),
 		Err(e) => {/* error handling */ log::error!("[clone_git_repo] git clone stdout error {}", e)}, 
 	};
     directory = format!("{}/{}", &directory, repo.name());
