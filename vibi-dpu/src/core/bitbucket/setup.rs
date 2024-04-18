@@ -50,16 +50,19 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             let token_copy = access_token.clone();
             let mut repo_copy = repo.clone();
             clone_git_repo(&mut repo_copy, &token_copy, &repo_provider).await;
+            log::info!("[handle_install_bitbucket] cloning repo: {}/{}", &repo.owner(), &repo.name());
             let aliases_opt = get_git_aliases(&repo_copy);
             if aliases_opt.is_none() {
                 log::error!("[handle_install_bitbucket] No aliases for repo {}", repo.name());
                 continue;
             }
             let aliases = aliases_opt.expect("Empty aliases_opt");
+            log::info!("[handle_install_bitbucket] Getting aliases for repo: {}/{}, and aliases: {:?}", &repo.owner(), &repo.name(), &aliases);
             send_aliases(&repo, &aliases).await;
             let repo_name = repo.name();
             reponames.push(repo_name.clone());
             log::debug!("[handle_install_bitbucket] Repo url git = {:?}", &repo.clone_ssh_url());
+            log::info!("[handle_install_bitbucket] Repo url git = {:?}", &repo.clone_ssh_url());
             log::debug!("[handle_install_bitbucket] Repo name = {:?}", repo_name);
             process_webhooks(workspace_slug.to_string(),
             repo_name.to_string(),
@@ -91,7 +94,8 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
             owner: workspace_slug.clone(),
             repos: reponames
         });
-    } 
+    }
+    log::info!("[handle_install_bitbucket] SetupInfo: {:?}", &pubreqs);
     send_setup_info(&pubreqs).await;
 }
 
