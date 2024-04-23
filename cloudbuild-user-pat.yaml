@@ -7,7 +7,7 @@ steps:
     entrypoint: 'bash'
     args:
       - '-c'
-      - './user-deploy-script.sh'
+      - './user-deploy-cloud-pat-script.sh'
     env:
       - 'PROJECT_ID=$PROJECT_ID'
       - 'SHORT_SHA=$SHORT_SHA'
