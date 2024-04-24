@@ -37,7 +37,7 @@ spec:
         value: $_INSTALL_ID
       - name: GITHUB_PAT
         value: $_GITHUB_PAT
-      -name: PROVIDER
+      - name: PROVIDER
         value: $_PROVIDER	
 EOF
 
