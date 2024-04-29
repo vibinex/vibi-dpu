@@ -29,16 +29,16 @@ spec:
     spec:
       containers:
       - name: $CONTAINER_NAME
-      image: asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA
-      ports:
-      - containerPort: 80
-      env:
-      - name: INSTALL_ID
-        value: $_INSTALL_ID
-      - name: GITHUB_PAT
-        value: $_GITHUB_PAT
-      - name: PROVIDER
-        value: $_PROVIDER	
+        image: asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA
+        ports:
+        - containerPort: 80
+        env:
+        - name: INSTALL_ID
+          value: $_INSTALL_ID
+        - name: GITHUB_PAT
+          value: $_GITHUB_PAT
+        - name: PROVIDER
+          value: $_PROVIDER	
 EOF
 
 # Display the generated YAML for debugging
