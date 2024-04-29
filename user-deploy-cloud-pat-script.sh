@@ -21,11 +21,7 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: dpu-pat
-  template:
-    metadata:
-      labels:
-      app: dpu-pat
+      app: dpu
     spec:
       containers:
       - name: $CONTAINER_NAME
