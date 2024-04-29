@@ -22,6 +22,7 @@ spec:
   selector:
     matchLabels:
       app: dpu
+  template:
     spec:
       containers:
       - name: $CONTAINER_NAME
