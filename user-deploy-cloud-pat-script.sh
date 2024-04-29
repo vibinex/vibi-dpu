@@ -23,6 +23,9 @@ spec:
     matchLabels:
       app: dpu
   template:
+    metadata:
+      labels:
+        app: dpu
     spec:
       containers:
       - name: $CONTAINER_NAME
