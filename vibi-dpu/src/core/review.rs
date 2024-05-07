@@ -215,8 +215,8 @@ fn create_and_save_github_review_object(deserialized_data: &Value) -> Option<Rev
 		log::error!("[create_and_save_github_review_object] Unable to get clone url and directory for bitbucket review");
 		return None;
 	}
-	let pr_id = deserialized_data["eventPayload"]["pull_request"]["number"].to_string().trim_matches('"').to_string();
 	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");
+	let pr_id = deserialized_data["eventPayload"]["pull_request"]["number"].to_string().trim_matches('"').to_string();
 	let review = Review::new(
 		deserialized_data["eventPayload"]["pull_request"]["base"]["sha"].to_string().replace("\"", ""),
 		deserialized_data["eventPayload"]["pull_request"]["head"]["sha"].to_string().replace("\"", ""),

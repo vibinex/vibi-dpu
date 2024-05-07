@@ -44,7 +44,10 @@ ENV PROVIDER=$PROVIDER
 
 COPY ./vibi-dpu/target/debug/vibi-dpu /app/vibi-dpu
 COPY ./pubsub-sa.json /app/pubsub-sa.json
-COPY ./repo-profiler.pem /app/repo-profiler.pem
+COPY ./repo-profiler-test.pem /app/repo-profiler.pem
+
+# Create directory for configuration
+RUN mkdir /app/config
 
 # Start the Rust application
 CMD ["/app/vibi-dpu"]
