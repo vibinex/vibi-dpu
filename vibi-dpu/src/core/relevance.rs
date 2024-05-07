@@ -61,16 +61,16 @@ fn did_comment_change(relevance_vec: &Vec<Relevance>, old_review_opt: &Option<Re
 	}
 	let old_relevance_vec = old_relevance_vec_opt.to_owned()
 		.expect("Empty old_relevance_vec_opt");
-	return compare_relevance_vectors(relevance_vec, &old_relevance_vec);
+	return did_relevance_change(relevance_vec, &old_relevance_vec);
 }
 
-fn compare_relevance_vectors(relevance_new: &[Relevance], relevance_old: &[Relevance]) -> bool {
+fn did_relevance_change(relevance_new: &[Relevance], relevance_old: &[Relevance]) -> bool {
     // Ensure both vectors have the same length
     if relevance_new.len() != relevance_old.len() {
 		log::debug!(
 			"[compare_relevance_vectors] relevance vec length mismatch, new = {}, old = {}",
 			relevance_new.len(), relevance_old.len());
-        return false;
+        return true;
     }
 
     // Iterate over each Relevance object in relevance_vec1
@@ -84,22 +84,21 @@ fn compare_relevance_vectors(relevance_new: &[Relevance], relevance_old: &[Relev
 					log::debug!(
 						"[compare_relevance_vectors] relevance_num old = {}, new = {}",
 						relevance_item_new.relevance_num(), relevance_item_old.relevance_num());
-                    return false;
+                    return true;
                 }
                 found_match = true;
                 break; // Break the inner loop since we found a match
             }
         }
-        // If no match found for relevance_item_new in relevance_old, return false
+        // If no match found for relevance_item_new in relevance_old, return true
         if !found_match {
 			log::debug!("[compare_relevance_vectors] not found match for {} in old",
 				relevance_item_new.git_alias());
-            return false;
+            return true;
         }
     }
 	log::debug!("[compare_relevance_vectors] all relevance vectors are same");
-    // If all comparisons passed, return true
-    return true;
+    return false;
 }
 
 async fn add_github_reviewers(review: &Review, relevance_vec: &Vec<Relevance>, access_token: &str) {
