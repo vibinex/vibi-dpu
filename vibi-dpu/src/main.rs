@@ -39,7 +39,7 @@ async fn main() {
 
 			if provider.eq_ignore_ascii_case("GITHUB") {
 				task::spawn(async move {
-					core::github::setup::setup_self_host_user_repos_github(&github_pat).await;
+					// core::github::setup::setup_self_host_user_repos_github(&github_pat).await;
 					log::info!("[main] Github repos self host setup processed");
 				});
 			}

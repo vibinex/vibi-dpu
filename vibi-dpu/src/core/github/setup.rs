@@ -1,12 +1,15 @@
 // setup_gh.rs
 use std::env;
 use std::str;
+use serde_json::Value;
 use tokio::task;
 
 use crate::core::utils::send_aliases;
+use crate::db::repo::get_repo_from_db;
 use crate::github::auth::fetch_access_token; use crate::github::prs::{list_prs_github, get_and_store_pr_info};
-use crate::github::repos::get_user_accessed_github_repos;
 use crate::utils::gitops::get_git_aliases;
+use crate::utils::parsing::parse_string_field_pubsub;
+use crate::utils::repo::Repository;
 // Import shared utilities
 use crate::utils::setup_info::SetupInfo;
 use crate::github::repos::get_github_app_installed_repos;
@@ -126,10 +129,10 @@ async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access
     
 }
 
-pub async fn setup_self_host_user_repos_github(access_token: &str) {
+pub async fn setup_self_host_user_repos_github(message_data: &Vec<u8>) {
     let repo_provider = env::var("PROVIDER").expect("provider must be set").to_lowercase();
-
-    let repos_opt = get_user_accessed_github_repos(&access_token).await;
+    let access_token = &env::var("GITHUB_PAT").expect("Github PAT must be set");
+    let repos_opt = parse_pat_repos(message_data);
     if repos_opt.is_none() {
         log::error!("[setup_self_host_user_repos_github] No repositories found for the user");
         return;
@@ -174,4 +177,46 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
         };
         send_setup_info(&vec![pubreq]).await;
     }
+}
+
+fn parse_pat_repos(message_data: &[u8]) -> Option<Vec<Repository>> {
+    let data_res = serde_json::from_slice::<Value>(&message_data);
+	if data_res.is_err() {
+		let e = data_res.expect_err("No error in data_res");
+		log::error!("[parse_pat_repos] Error parsing incoming messages: {:?}", e);
+		return None;
+	}
+	let deserialized_data = data_res.expect("Uncaught error in deserializing message_data");
+	log::debug!("[parse_trigger_msg] deserialized_data == {:?}", &deserialized_data);
+	let user_repos_opt = parse_user_repos(&deserialized_data);
+    if user_repos_opt.is_none() {
+        log::error!("[parse_pat_repos] Unable to parse message and get user repos");
+        return None;
+    }
+    let user_repos = user_repos_opt.expect("Empty user_repos_opt");
+	let provider = &user_repos.provider;
+    let owner = &user_repos.owner;
+    let mut repos = Vec::<Repository>::new();
+    for repo_name in user_repos.repos.iter() { 
+        let repo_db_opt = get_repo_from_db(provider, owner, repo_name);
+        if repo_db_opt.is_none() { continue; }
+        let repo_db = repo_db_opt.expect("Empty repo_db_opt");
+        repos.push(repo_db);
+    } 
+    return Some(repos);
+}
+
+fn parse_user_repos(msg: &Value) -> Option<SetupInfo> {
+    let repo_provider_opt = parse_string_field_pubsub("provider", msg);
+	let repo_owner_opt = parse_string_field_pubsub("owner", msg);
+	let repo_names_res = serde_json::from_value::<Vec<String>>(msg["names"].clone());
+    if repo_provider_opt.is_none() || repo_names_res.is_err() || repo_owner_opt.is_none() {
+        log::error!("Unable to parse message fields --> {:?},", &msg);
+        return None;
+    }
+    return Some(SetupInfo {
+        provider: repo_provider_opt.expect("Empty repo_provider_opt"),
+        owner: repo_owner_opt.expect("Empty repo_owner_opt"),
+        repos: repo_names_res.expect("Empty repo_names_opt")
+    });
 }
