@@ -4,101 +4,42 @@ use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::revie
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
-pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
-	repo_config: &mut RepoConfig, access_token: &str, old_review_opt: &Option<Review>,
-) {
-	log::info!("[process_relevance] Process relevence for PR: {}, repo config: {:?}", review.id(), repo_config);
-	for prhunk in hunkmap.prhunkvec() {
-		// calculate number of hunks for each userid
-		let mut review_mut = review.clone();
-		// old review needs to be accesed before calculate_relevance,
-		// which changes relevance vector in db
-		let relevance_vec_opt = calculate_relevance(prhunk, &mut review_mut).await;
-		if relevance_vec_opt.is_none() {
-			log::error!("[process_relevance] Unable to calculate coverage obj");
-			continue;
-		}
-		let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
-		if repo_config.comment() {
-			log::info!("[process_relevance] Inserting comment...");
-			// create comment text
-			let comment = comment_text(&relevance_vec, repo_config.auto_assign());
-			// add comment
-			if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
-				// TODO - add feature flag check
-				// TODO - add comment change check
-				if did_comment_change(&relevance_vec, &old_review_opt) {
-					bitbucket::comment::add_comment(&comment, review, &access_token).await;
-				}
-			}
-			if review.provider().to_string() == ProviderEnum::Github.to_string() {
-				github::comment::add_comment(&comment, review, &access_token).await;
-			}
-		}
-		if repo_config.auto_assign() {
-			log::info!("[process_relevance] Auto assigning reviewers...");
-			log::debug!("[process_relevance] review.provider() = {:?}", review.provider());
-			if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
-				add_bitbucket_reviewers(&prhunk, hunkmap, review, &access_token).await;
-			}
-			if review.provider().to_string() == ProviderEnum::Github.to_string() {
-				add_github_reviewers(review, &relevance_vec, &access_token).await;
-			}
-		}
-	}
-}
-
-fn did_comment_change(relevance_vec: &Vec<Relevance>, old_review_opt: &Option<Review>) -> bool {
-	if old_review_opt.is_none() {
-		log::info!("[did_comment_change] No review record found in db, inserting comment...");
-		return true;
-	}
-	let old_review = old_review_opt.to_owned().expect("Empty old_review_opt");
-	let old_relevance_vec_opt = old_review.relevance();
-	if old_relevance_vec_opt.is_none() {
-		log::info!("[did_comment_change] No relevance found in db, inserting comment...");
-		return true;
-	}
-	let old_relevance_vec = old_relevance_vec_opt.to_owned()
-		.expect("Empty old_relevance_vec_opt");
-	return did_relevance_change(relevance_vec, &old_relevance_vec);
-}
-
-fn did_relevance_change(relevance_new: &[Relevance], relevance_old: &[Relevance]) -> bool {
-    // Ensure both vectors have the same length
-    if relevance_new.len() != relevance_old.len() {
-		log::debug!(
-			"[compare_relevance_vectors] relevance vec length mismatch, new = {}, old = {}",
-			relevance_new.len(), relevance_old.len());
-        return true;
-    }
-
-    // Iterate over each Relevance object in relevance_vec1
-    for relevance_item_new in relevance_new {
-        // Check if there's a Relevance object in relevance_old with the same git_alias
-        let mut found_match = false;
-        for relevance_item_old in relevance_old {
-            if relevance_item_new.git_alias() == relevance_item_old.git_alias() {
-                // If git_alias matches, compare only the integer part of relevance_num
-                if relevance_item_new.relevance_num() as i32 != relevance_item_old.relevance_num() as i32 {
-					log::debug!(
-						"[compare_relevance_vectors] relevance_num old = {}, new = {}",
-						relevance_item_new.relevance_num(), relevance_item_old.relevance_num());
-                    return true;
-                }
-                found_match = true;
-                break; // Break the inner loop since we found a match
+pub async fn process_relevance(hunkmap: &HunkMap, review: &Review, repo_config: &mut RepoConfig, access_token: &str) {
+    log::info!("[process_relevance] Process relevence for PR: {}, repo config: {:?}", review.id(), repo_config);
+    for prhunk in hunkmap.prhunkvec() {
+        // calculate number of hunks for each userid
+        let mut review_mut = review.clone();
+        let relevance_vec_opt = calculate_relevance(
+            prhunk, &mut review_mut).await;
+        if relevance_vec_opt.is_none() {
+            log::debug!("[process_relevance] Unable to calculate coverage obj");
+            continue;
+        }
+        let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
+        if repo_config.comment() {
+            log::info!("[process_relevance] Inserting comment...");
+            // create comment text
+            let comment = comment_text(&relevance_vec, repo_config.auto_assign());
+            // add comment
+            if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
+                bitbucket::comment::add_comment(&comment, review, &access_token).await;
             }
+            if review.provider().to_string() == ProviderEnum::Github.to_string() {
+                github::comment::add_comment(&comment, review, &access_token).await;
+            }
+            
         }
-        // If no match found for relevance_item_new in relevance_old, return true
-        if !found_match {
-			log::debug!("[compare_relevance_vectors] not found match for {} in old",
-				relevance_item_new.git_alias());
-            return true;
-        }
+        if repo_config.auto_assign() {
+            log::info!("[process_relevance] Auto assigning reviewers...");
+            log::debug!("[process_relevance] review.provider() = {:?}", review.provider());
+            if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
+                add_bitbucket_reviewers(&prhunk, hunkmap, review, &access_token).await;
+            }
+            if review.provider().to_string() == ProviderEnum::Github.to_string() {
+                add_github_reviewers(review, &relevance_vec, &access_token).await;
+            }
+        }  
     }
-	log::debug!("[compare_relevance_vectors] all relevance vectors are same");
-    return false;
 }
 
 async fn add_github_reviewers(review: &Review, relevance_vec: &Vec<Relevance>, access_token: &str) {
