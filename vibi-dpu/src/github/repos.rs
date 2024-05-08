@@ -108,7 +108,7 @@ pub async fn get_user_github_repos_using_graphql_api(
         println!("Executing GraphQL query: {:?}", body);
         let graphql_request = client
           .post("https://api.github.com/graphql")
-          .header("Authorization", "Bearer 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") 
+          .header("Authorization", "Bearer YOUR ACCESS TOKEN") 
           .header("Content-Type", "application/json")
           .header("User-Agent", "vibi-dpu")
           .json(&body).build().unwrap();
