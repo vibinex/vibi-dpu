@@ -1,10 +1,47 @@
 use serde_json::Value;
+use reqwest::Client;
+use serde_json::json;
 
 use super::config::{get_api_paginated, github_base_url};
 use crate::core::utils::user_selected_repos;
 use crate::utils::repo::Repository;
 use crate::db::repo::save_repo_to_db;
 use crate::utils::user::ProviderEnum;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphQLResponse {
+    data: GraphQLData,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphQLData {
+    viewer: GraphQLViewer,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphQLViewer {
+    repositories: GraphQLRepositories,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GraphQLRepositories {
+    nodes: Vec<Repository>,
+    page_info: PageInfo,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Owner {
+    login: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PageInfo {
+    has_next_page: bool,
+    end_cursor: Option<String>,
+}
+
 
 pub async fn get_github_app_installed_repos(access_token: &str) -> Option<Vec<Repository>> {
 	let repos_url = format!("{}/installation/repositories", github_base_url());
@@ -48,6 +85,48 @@ pub async fn get_user_accessed_github_repos(access_token: &str) -> Option<Vec<Re
 	log::debug!("[get_user_accessed_github_repos] Fetched {:?} repositories from GitHub", &pat_repos);
 	return Some(pat_repos)
 }
+
+
+pub async fn get_user_github_repos_using_graphql_api(
+    access_token: &str,
+) {
+    let client = Client::new();
+    // let mut all_repositories = Vec::new();
+    let mut end_cursor: Option<String> = None;
+    let mut has_next_page = true;
+
+    // while has_next_page {
+        let access_token = "YOUR AUTH TOKEN";
+
+        let client = reqwest::Client::new();
+        
+        let query = "query { viewer { repositories(first: 100, affiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR], ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR]) { totalCount nodes { name id isPrivate sshUrl owner { login } } } } }";
+        let body = json!({
+          "query": query
+        });
+        
+        println!("Executing GraphQL query: {:?}", body);
+        let graphql_request = client
+          .post("https://api.github.com/graphql")
+          .header("Authorization", "Bearer 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") 
+          .header("Content-Type", "application/json")
+          .header("User-Agent", "vibi-dpu")
+          .json(&body).build().unwrap();
+        println!("Request Headers: {:?}", graphql_request.headers());
+        println!("Request URL: {:?}", graphql_request.url());
+        let response = client.execute(graphql_request)
+          .await
+          .expect("Failed to execute request");
+      
+      let status = response.status();
+      let resp_body = response.text().await.unwrap();
+      
+        // has_next_page = repos.page_info.has_next_page;
+        // end_cursor = repos.page_info.end_cursor.clone();
+    // }
+
+}
+
 
 fn deserialize_repos(repos_val: Vec<Value>) -> Vec<Repository> {
 	let mut all_repos = Vec::new();
