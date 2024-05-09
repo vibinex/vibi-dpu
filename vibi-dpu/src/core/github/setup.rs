@@ -128,8 +128,6 @@ async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access
 }
 
 pub async fn setup_self_host_user_repos_github(access_token: &str) {
-    let repo_provider = env::var("PROVIDER").expect("provider must be set").to_lowercase();
-
     let repos_opt = get_user_github_repos_using_graphql_api(&access_token).await;
     if repos_opt.is_none() {
         log::error!("[setup_self_host_user_repos_github] No repositories found for the user");
@@ -137,43 +135,31 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
     }
     let repos = repos_opt.expect("Empty repos option");
     
-    // log::debug!("[setup_self_host_user_repos_github] Got repos: {:?}", repos);
+    log::debug!("[setup_self_host_user_repos_github] Got repos: {:?}", repos);
 
-    // // Create a mapping between repo_owner and associated repo_names
-    // let mut repo_owner_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
-
-    // for repo in repos {
-    //     let mut repo_copy = repo.clone();
-    //     clone_git_repo(&mut repo_copy, access_token, &repo_provider).await;
-    //     let repo_name = repo.name();
-    //     let repo_owner = repo.owner();
-    //     repo_owner_map
-    //         .entry(repo_owner.to_string())
-    //         .or_insert_with(Vec::new)
-    //         .push(repo_name.to_string());
-    //     log::debug!(
-    //         "[setup_self_host_user_repos_github] Repo url git = {:?}",
-    //         &repo.clone_ssh_url()
-    //     );
-    //     log::debug!("[setup_self_host_user_repos_github] Repo name = {:?}", repo_name);
-    //     process_webhooks(repo_owner.to_string(), repo_name.to_string(), access_token.to_string())
-    //         .await;
-
-    //     let repo_name_async = repo_name.clone();
-    //     let repo_owner_async = repo_owner.clone();
-    //     let access_token_async = access_token.to_string().clone();
-    //     task::spawn(async move {
-    //         process_prs(&repo_owner_async, &repo_name_async, &access_token_async).await;
-    //     });
-    // }
-
-    // // Send a separate pubsub publish request for each unique repo_owner
-    // for (repo_owner, repo_names) in repo_owner_map {
-    //     let pubreq = SetupInfo {
-    //         provider: "github".to_owned(),
-    //         owner: repo_owner,
-    //         repos: repo_names,
-    //     };
-    //     send_setup_info(&vec![pubreq]).await;
-    // }
+    // Create a mapping between repo_owner and associated repo_names
+    let mut repo_owner_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    for repo in repos {
+        let repo_name = repo.name();
+        let repo_owner = repo.owner();
+        repo_owner_map
+        .entry(repo_owner.to_string())
+        .or_insert_with(Vec::new)
+        .push(repo_name.to_string());
+        log::debug!(
+            "[setup_self_host_user_repos_github] Repo url git = {:?}",
+            &repo.clone_ssh_url()
+        );
+    }
+    let mut pubreq_vec =  Vec::<SetupInfo>::new();
+    // Send a separate pubsub publish request for each unique repo_owner
+    for (repo_owner, repo_names) in repo_owner_map {
+        let pubreq = SetupInfo {
+            provider: "github".to_owned(),
+            owner: repo_owner,
+            repos: repo_names,
+        };
+        pubreq_vec.push(pubreq);
+    }
+    send_setup_info(&pubreq_vec).await;
 }
