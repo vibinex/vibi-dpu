@@ -123,7 +123,7 @@ pub async fn get_user_github_repos_using_graphql_api(
             return None;
         }
         let nodes_vec: Vec<Value> = nodes_vec_res.expect("Uncaught error in nodes_)vec_res");
-        let repos = deserialize_repos_object_graphql(&nodes_vec);
+        let repos = deserialize_and_save_repos_object_graphql(&nodes_vec);
         all_repositories.extend(repos);
 
         end_cursor = resp_val["data"]["viewer"]["repositories"]["pageInfo"]["endCursor"]
@@ -149,7 +149,7 @@ pub async fn get_user_github_repos_using_graphql_api(
     return Some(all_repositories);
 }
 
-fn deserialize_repos_object_graphql(repos_json: &Vec<Value>) -> Vec<Repository> {
+fn deserialize_and_save_repos_object_graphql(repos_json: &Vec<Value>) -> Vec<Repository> {
     let mut repos = Vec::<Repository>::new();
     for repo_json in repos_json {
         let is_private_res = repo_json["isPrivate"].as_bool();
@@ -177,6 +177,7 @@ fn deserialize_repos_object_graphql(repos_json: &Vec<Value>) -> Vec<Repository> 
             None,
             ProviderEnum::Github.to_string().to_lowercase(),
         );
+		save_repo_to_db(&repo);
         repos.push(repo);
     }
     return repos;

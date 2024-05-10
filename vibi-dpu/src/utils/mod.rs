@@ -16,3 +16,4 @@ pub mod setup_info;
 pub mod aliases;
 pub mod relevance;
 pub mod coverage;
+pub mod parsing;

@@ -27,27 +27,12 @@ pub fn save_repo_to_db(repo: &Repository) {
 }
 
 pub fn get_clone_url_clone_dir(repo_provider: &str, workspace_name: &str, repo_name: &str) -> Option<(String, String)> {
-	let db = get_db();
-	let key = format!("{}/{}/{}", repo_provider, workspace_name, repo_name);
-	let repo_res = db.get(IVec::from(key.as_bytes()));
-	if repo_res.is_err() {
-		let e = repo_res.expect_err("No error in repo_res");
-		log::error!("[get_clone_url_clone_dir] Unable to get repo from db: {:?}", e);
-		return None;
-	}
-	let repo_opt = repo_res.expect("Uncaught error in repo_res");
+	let repo_opt = get_repo_from_db(repo_provider, workspace_name, repo_name);
 	if repo_opt.is_none() {
 		log::error!("[get_clone_url_clone_dir] Empty repo_opt from db");
 		return None;
 	}
-	let repo_ivec = repo_opt.expect("Empty repo_opt");
-	let parse_res = serde_json::from_slice::<Repository>(&repo_ivec);
-	if parse_res.is_err() {
-		let e = parse_res.expect_err("No error in parse_res repo");
-		log::error!("[get_clone_url_clone_dir] error in deserializing repo from db: {:?}", e);
-		return None;
-	}
-	let repo: Repository = parse_res.expect("Uncaught error in parse_res");
+	let repo = repo_opt.expect("Empty repo_opt");
 	log::debug!("[get_clone_url_clone_dir] repo = {:?}", &repo);
 	let clone_dir_opt = repo.local_dir().to_owned();
 	if clone_dir_opt.is_none() {
@@ -57,4 +42,29 @@ pub fn get_clone_url_clone_dir(repo_provider: &str, workspace_name: &str, repo_n
 	let clone_dir = clone_dir_opt.expect("Empty clone_dir_opt");
 	let clone_url = repo.clone_ssh_url().to_string();
 	return Some((clone_url, clone_dir));
+}
+
+pub fn get_repo_from_db(repo_provider: &str, workspace_name: &str, repo_name: &str) -> Option<Repository> {
+	let db = get_db();
+	let key = format!("{}/{}/{}", repo_provider, workspace_name, repo_name);
+	let repo_res = db.get(IVec::from(key.as_bytes()));
+	if repo_res.is_err() {
+		let e = repo_res.expect_err("No error in repo_res");
+		log::error!("[get_repo_from_db] Unable to get repo from db: {:?}", e);
+		return None;
+	}
+	let repo_opt = repo_res.expect("Uncaught error in repo_res");
+	if repo_opt.is_none() {
+		log::error!("[get_repo_from_db] Empty repo_opt from db");
+		return None;
+	}
+	let repo_ivec = repo_opt.expect("Empty repo_opt");
+	let parse_res = serde_json::from_slice::<Repository>(&repo_ivec);
+	if parse_res.is_err() {
+		let e = parse_res.expect_err("No error in parse_res repo");
+		log::error!("[get_repo_from_db] error in deserializing repo from db: {:?}", e);
+		return None;
+	}
+	let repo: Repository = parse_res.expect("Uncaught error in parse_res");
+	return Some(repo);
 }

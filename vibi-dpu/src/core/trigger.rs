@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::{core::{review::{commit_check, process_review_changes, send_hunkmap}, utils::get_access_token}, db::{repo::get_clone_url_clone_dir, repo_config::save_repo_config_to_db, review::get_review_from_db}, github::prs::get_and_store_pr_info, utils::{repo_config::RepoConfig, review::Review, user::ProviderEnum}};
+use crate::{core::{review::{commit_check, process_review_changes, send_hunkmap}, utils::get_access_token}, db::{repo::get_clone_url_clone_dir, repo_config::save_repo_config_to_db, review::get_review_from_db}, github::prs::get_and_store_pr_info, utils::{parsing::parse_string_field_pubsub, repo_config::RepoConfig, review::Review, user::ProviderEnum}};
 
 #[derive(Debug)]
 struct TriggerReview {
@@ -53,21 +53,11 @@ pub async fn process_trigger(message_data: &Vec<u8>) {
 	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token, &None).await;
 }
 
-fn parse_field(field_name: &str, msg: &Value) -> Option<String> {
-	let field_val_opt = msg.get(field_name);
-	if field_val_opt.is_none() {
-		log::error!("[parse_field] {} not found in {}", field_name, msg);
-		return None;
-	}
-	let field_val = field_val_opt.expect("Empty field_val_opt");
-	return Some(field_val.to_string().trim_matches('"').to_string());
-}
-
 fn parse_message_fields(msg: &Value) -> Option<TriggerReview> {
-	let repo_provider_opt = parse_field("repo_provider", msg);
-	let repo_owner_opt = parse_field("repo_owner", msg);
-	let repo_name_opt = parse_field("repo_name", msg);
-	let pr_number_opt = parse_field("pr_number", msg);
+	let repo_provider_opt = parse_string_field_pubsub("repo_provider", msg);
+	let repo_owner_opt = parse_string_field_pubsub("repo_owner", msg);
+	let repo_name_opt = parse_string_field_pubsub("repo_name", msg);
+	let pr_number_opt = parse_string_field_pubsub("pr_number", msg);
 	if repo_provider_opt.is_none() || repo_owner_opt.is_none() 
 		|| repo_name_opt.is_none() || pr_number_opt.is_none() {
 		log::error!("[parse_message_fields] Could not parse {:?}, {:?}, {:?}, {:?}", 
