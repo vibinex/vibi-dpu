@@ -5,7 +5,6 @@ use tokio::task;
 
 use crate::core::utils::send_aliases;
 use crate::github::auth::fetch_access_token; use crate::github::prs::{list_prs_github, get_and_store_pr_info};
-use crate::github::repos::get_user_accessed_github_repos;
 use crate::github::repos::get_user_github_repos_using_graphql_api;
 use crate::utils::gitops::get_git_aliases;
 // Import shared utilities
