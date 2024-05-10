@@ -25,6 +25,7 @@ async fn main() {
 
 	let github_pat_res = env::var("GITHUB_PAT");
 	let provider_res = env::var("PROVIDER");
+	let mut is_pat = false;
 	if github_pat_res.is_err() {
 		log::info!("[main] GITHUB PAT env var must be set");
 	} else {
@@ -38,14 +39,14 @@ async fn main() {
 			log::info!("[main] PROVIDER: {}", provider);
 
 			if provider.eq_ignore_ascii_case("GITHUB") {
-				task::spawn(async move {
+				is_pat = true;
 					core::github::setup::setup_self_host_user_repos_github(&github_pat).await;
-					log::info!("[main] Github repos self host setup processed");
-				});
 			}
 		}
 	}
-	load_auth_from_previous_installation().await;
+	if !is_pat {
+		load_auth_from_previous_installation().await;
+	}
 	log::info!("[main] env vars = {}, {}", &gcp_credentials, &topic_name);
 	pubsub::listener::listen_messages(
 		&gcp_credentials, 
