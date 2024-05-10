@@ -201,7 +201,6 @@ fn parse_pat_repos(message_data: &[u8]) -> Option<Vec<Repository>> {
 		return None;
 	}
 	let deserialized_data = data_res.expect("Uncaught error in deserializing message_data");
-	log::debug!("[parse_trigger_msg] deserialized_data == {:?}", &deserialized_data);
 	let user_repos_opt = parse_user_repos(&deserialized_data);
 	if user_repos_opt.is_none() {
 		log::error!("[parse_pat_repos] Unable to parse message and get user repos");
@@ -230,7 +229,7 @@ fn parse_user_repos(msg: &Vec<Value>) -> Option<Vec<SetupInfo>> {
 		let repo_owner_opt = parse_string_field_pubsub("owner", owner_item);
 		let repo_names_res = serde_json::from_value::<Vec<String>>(owner_item["repos"].clone());
 		if repo_provider_opt.is_none() || repo_names_res.is_err() || repo_owner_opt.is_none() {
-			log::error!("Unable to parse item fields --> {:?}, {:?}, {:?}", &repo_provider_opt, repo_owner_opt, repo_names_res);
+			log::error!("[parse_user_repos] Unable to parse item fields --> {:?}, {:?}, {:?}", &repo_provider_opt, repo_owner_opt, repo_names_res);
 			continue;
 		}
 		let setup_info_item = SetupInfo {
