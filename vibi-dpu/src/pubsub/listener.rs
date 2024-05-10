@@ -1,6 +1,6 @@
 use crate::core::trigger::process_trigger;
 use crate::{core::bitbucket::setup::handle_install_bitbucket, utils::user::ProviderEnum};
-use crate::core::github::setup::{handle_install_github, setup_self_host_user_repos_github};
+use crate::core::github::setup::{handle_install_github, process_pat_repos};
 use crate::core::review::process_review;
 use crate::db::prs::{bitbucket_process_and_update_pr_if_different, github_process_and_update_pr_if_different};
 use futures_util::StreamExt;
@@ -53,7 +53,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             process_trigger(&data_bytes).await;
         }
         "PATSetup" => {
-            setup_self_host_user_repos_github(&data_bytes).await;
+            process_pat_repos(&data_bytes).await;
         }
         _ => {
             log::error!("[process_message] Message type not found for message : {:?}", attributes);
