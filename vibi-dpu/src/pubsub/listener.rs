@@ -54,6 +54,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
         }
         "PATSetup" => {
             process_pat_repos(&data_bytes).await;
+            log::info!("[listener] Processed PAT repos successfully");
         }
         _ => {
             log::error!("[process_message] Message type not found for message : {:?}", attributes);

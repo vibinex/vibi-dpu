@@ -174,6 +174,7 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
 		.entry(repo_owner.to_string())
 		.or_insert_with(Vec::new)
 		.push(repo_name.to_string());
+		
 		log::debug!(
 			"[setup_self_host_user_repos_github] Repo url git = {:?}",
 			&repo.clone_ssh_url()
@@ -193,7 +194,7 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
 }
 
 fn parse_pat_repos(message_data: &[u8]) -> Option<Vec<Repository>> {
-	let data_res = serde_json::from_slice::<Value>(&message_data);
+	let data_res = serde_json::from_slice::<Vec<Value>>(&message_data);
 	if data_res.is_err() {
 		let e = data_res.expect_err("No error in data_res");
 		log::error!("[parse_pat_repos] Error parsing incoming messages: {:?}", e);
@@ -207,29 +208,38 @@ fn parse_pat_repos(message_data: &[u8]) -> Option<Vec<Repository>> {
 		return None;
 	}
 	let user_repos = user_repos_opt.expect("Empty user_repos_opt");
-	let provider = &user_repos.provider;
-	let owner = &user_repos.owner;
-	let mut repos = Vec::<Repository>::new();
-	for repo_name in user_repos.repos.iter() { 
-		let repo_db_opt = get_repo_from_db(provider, owner, repo_name);
-		if repo_db_opt.is_none() { continue; }
-		let repo_db = repo_db_opt.expect("Empty repo_db_opt");
-		repos.push(repo_db);
-	} 
-	return Some(repos);
+	let mut all_repos = Vec::<Repository>::new();
+	for user_setup_info in user_repos {
+		let provider = &user_setup_info.provider;
+		let owner = &user_setup_info.owner;
+		for repo_name in user_setup_info.repos.iter() { 
+			let repo_db_opt = get_repo_from_db(provider, owner, repo_name);
+			if repo_db_opt.is_none() { continue; }
+			let repo_db = repo_db_opt.expect("Empty repo_db_opt");
+			all_repos.push(repo_db);
+		}
+	}
+	log::debug!("[parse_pat_repos] Successfully parsed repos: {:?}", &all_repos);
+	return Some(all_repos);
 }
 
-fn parse_user_repos(msg: &Value) -> Option<SetupInfo> {
-	let repo_provider_opt = parse_string_field_pubsub("provider", msg);
-	let repo_owner_opt = parse_string_field_pubsub("owner", msg);
-	let repo_names_res = serde_json::from_value::<Vec<String>>(msg["names"].clone());
-	if repo_provider_opt.is_none() || repo_names_res.is_err() || repo_owner_opt.is_none() {
-		log::error!("Unable to parse message fields --> {:?},", &msg);
-		return None;
+fn parse_user_repos(msg: &Vec<Value>) -> Option<Vec<SetupInfo>> {
+	let mut setup_info_vec = Vec::<SetupInfo>::new();
+	for owner_item in msg {
+		let repo_provider_opt = parse_string_field_pubsub("provider", owner_item);
+		let repo_owner_opt = parse_string_field_pubsub("owner", owner_item);
+		let repo_names_res = serde_json::from_value::<Vec<String>>(owner_item["repos"].clone());
+		if repo_provider_opt.is_none() || repo_names_res.is_err() || repo_owner_opt.is_none() {
+			log::error!("Unable to parse item fields --> {:?}, {:?}, {:?}", &repo_provider_opt, repo_owner_opt, repo_names_res);
+			continue;
+		}
+		let setup_info_item = SetupInfo {
+			provider: repo_provider_opt.expect("Empty repo_provider_opt"),
+			owner: repo_owner_opt.expect("Empty repo_owner_opt"),
+			repos: repo_names_res.expect("Empty repo_names_opt")
+		};
+		setup_info_vec.push(setup_info_item);
 	}
-	return Some(SetupInfo {
-		provider: repo_provider_opt.expect("Empty repo_provider_opt"),
-		owner: repo_owner_opt.expect("Empty repo_owner_opt"),
-		repos: repo_names_res.expect("Empty repo_names_opt")
-	});
+	
+	return Some(setup_info_vec);
 }
