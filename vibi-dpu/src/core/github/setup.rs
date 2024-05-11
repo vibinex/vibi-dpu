@@ -133,7 +133,7 @@ async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access
 pub async fn process_pat_repos(message_data: &[u8]) {
 	let repos_opt = parse_pat_repos(message_data);
 	let repo_provider = env::var("PROVIDER").expect("provider must be set").to_lowercase();
-	let access_token = env::var("GITHUB_PAT").expect("GITHUB_PAT must be set").to_lowercase();
+	let access_token = env::var("GITHUB_PAT").expect("GITHUB_PAT must be set");
 	if repos_opt.is_none() {
 		log::error!("[process_PAT_repos] Failed to parse PAT repos data");
 		return;
