@@ -20,23 +20,23 @@ async fn main() {
 
 	let logs_init_status = logger::init::init_logger();
 	if !logs_init_status {
-		log::error!("[main] Unable to file logger");
+		log::warn!("[main] Unable to create file logger");
 	}
-
+	log::info!("Setting up your Vibinex Data Processing Unit, sit back and relax...");
 	let github_pat_res = env::var("GITHUB_PAT");
 	let provider_res = env::var("PROVIDER");
 	let mut is_pat = false;
 	if github_pat_res.is_err() {
-		log::info!("[main] GITHUB PAT env var must be set");
+		log::debug!("[main] GITHUB PAT env var must be set");
 	} else {
 		let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
-		log::info!("[main] GITHUB PAT: [REDACTED]");
+		log::debug!("[main] GITHUB PAT: [{}]", &github_pat);
 
 		if provider_res.is_err() {
-			log::info!("[main] PROVIDER env var must be set");
+			log::debug!("[main] PROVIDER env var must be set");
 		} else {
 			let provider = provider_res.expect("Empty PROVIDER env var");
-			log::info!("[main] PROVIDER: {}", provider);
+			log::debug!("[main] PROVIDER: {}", provider);
 
 			if provider.eq_ignore_ascii_case("GITHUB") {
 				is_pat = true;
@@ -47,7 +47,7 @@ async fn main() {
 	if !is_pat {
 		load_auth_from_previous_installation().await;
 	}
-	log::info!("[main] env vars = {}, {}", &gcp_credentials, &topic_name);
+	log::debug!("[main] env vars = {}, {}", &gcp_credentials, &topic_name);
 	pubsub::listener::listen_messages(
 		&gcp_credentials, 
 		&topic_name,

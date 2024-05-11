@@ -79,6 +79,7 @@ pub async fn process_repos(access_token: &str, repo_provider: &str) {
 
 
 async fn process_webhooks(repo_owner: String, repo_name: String, access_token: String) {
+	log::info!("Processing webhooks for : {}...", &repo_name);
 	let webhooks_data_opt = get_webhooks_in_repo(&repo_owner, &repo_name, &access_token).await;
 	if webhooks_data_opt.is_none() {
 		log::error!("[process_webhooks] Unable to get webhooks for repo: {:?}, other params: {:?}, {:?}",
@@ -93,7 +94,7 @@ async fn process_webhooks(repo_owner: String, repo_name: String, access_token: S
 		.find(|w| w.url().to_string() == webhook_callback_url);
 	log::debug!("[process_webhooks] matching_webhook = {:?}", &matching_webhook);
 	if matching_webhook.is_none() {
-		log::info!("[process_webhooks] Adding new webhook...");
+		log::info!("Adding new webhook...");
 		let repo_name_async = repo_name.clone();
 		let workspace_slug_async = repo_owner.clone();
 		let access_token_async = access_token.clone();
@@ -106,14 +107,14 @@ async fn process_webhooks(repo_owner: String, repo_name: String, access_token: S
 		return;
 	}
 	let webhook = matching_webhook.expect("no matching webhook");
-	log::info!("[process_webhooks] Webhook already exists: {:?}", &webhook);
+	log::debug!("[process_webhooks] Webhook already exists: {:?}", &webhook);
 	save_webhook_to_db(&webhook);
 }
 
 async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access_token_async: &String) {
 	let pr_list_opt = list_prs_github(&repo_owner_async, &repo_name_async, &access_token_async, "OPEN").await;
 	if pr_list_opt.is_none() {
-		log::info!("[process_prs] No open pull requests found for processing.");
+		log::info!("Unable to get any open pull requests for processing.");
 		return;
 	}
 	let pr_list = pr_list_opt.expect("Empty pr_list_opt");
@@ -156,6 +157,7 @@ pub async fn process_pat_repos(message_data: &[u8]) {
 }
 
 pub async fn setup_self_host_user_repos_github(access_token: &str) {
+	log::info!("Getting all user's repositories...");
 	let repos_opt = get_user_github_repos_using_graphql_api(&access_token).await;
 	if repos_opt.is_none() {
 		log::error!("[setup_self_host_user_repos_github] No repositories found for the user");
@@ -190,6 +192,7 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
 		};
 		pubreq_vec.push(pubreq);
 	}
+	log::info!("Sending repo names to Vibinex...");
 	send_setup_info(&pubreq_vec).await;
 }
 

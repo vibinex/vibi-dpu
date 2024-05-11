@@ -53,8 +53,9 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
             process_trigger(&data_bytes).await;
         }
         "PATSetup" => {
+            log::info!("Setting up repositories...");
             process_pat_repos(&data_bytes).await;
-            log::info!("[listener] Processed PAT repos successfully");
+            log::info!("Processed repos successfully");
         }
         _ => {
             log::error!("[process_message] Message type not found for message : {:?}", attributes);
@@ -137,13 +138,14 @@ async fn setup_subscription(keypath: &str, topicname: &str) -> Subscription {
 pub async fn listen_messages(keypath: &str, topicname: &str) {
     let queue_cap = 100;
     let mut message_hashes = VecDeque::with_capacity(queue_cap);
+    log::info!("Streaming tasks...");
     let subscription = setup_subscription(keypath, topicname).await;
     let mut stream = subscription
         .subscribe(None)
         .await
         .expect("Unable to subscribe to messages");
     while let Some(message) = stream.next().await {
-        log::info!("[listen_messages] Listening for messages...");
+        log::info!("Recieved task, processing...");
         let attrmap: HashMap<String, String> =
             message.message.attributes.clone().into_iter().collect();
         let message_hash = digest(&*message.message.data);

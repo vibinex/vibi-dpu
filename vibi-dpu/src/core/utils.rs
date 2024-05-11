@@ -62,6 +62,10 @@ pub async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
         return;
     }
     let resp = post_res.expect("Uncaught error in post_res");
+    if !resp.status().is_success() {
+        log::error!("[send_setup_info] Unable to send setup info to server, status = {:?}", resp.status());
+        return;
+    }
     log::debug!("[send_setup_info] Response: {:?}", resp.text().await);
 }
 
