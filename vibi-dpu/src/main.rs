@@ -55,8 +55,8 @@ async fn main() {
 }
 
 async fn load_auth_from_previous_installation() {
+	log::info!("Loading auth...");
 	if let Some(access_token) = gh_access_token(&None).await {
-		log::info!("[load_auth_from_previous_installation] Loaded auth from file, processing repos..");
 		process_repos(&access_token, &ProviderEnum::Github.to_string()).await;
 	}
 }
