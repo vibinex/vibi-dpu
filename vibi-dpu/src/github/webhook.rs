@@ -11,7 +11,7 @@ use super::config::prepare_headers;
 
 pub async fn get_webhooks_in_repo(repo_owner: &str, repo_name: &str, access_token: &str) -> Option<Vec<Webhook>> {
     let url = format!("{}/repos/{}/{}/hooks", github_base_url(), repo_owner, repo_name);
-    log::info!("[get_webhooks_in_repo] Getting webhooks from {}", url);
+    log::debug!("[get_webhooks_in_repo] Getting webhooks from {}", url);
     let response_opt = get_api_paginated(&url, access_token, None).await;
     if response_opt.is_none() {
         log::error!("[get_webhooks_in_repo] Unable to call get api and get all webhooks");
