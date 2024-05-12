@@ -193,7 +193,6 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
 		};
 		pubreq_vec.push(pubreq);
 	}
-	log::info!("Sending repo names to Vibinex...");
 	send_setup_info(&pubreq_vec).await;
 }
 
