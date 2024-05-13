@@ -39,6 +39,7 @@ struct AliasResponseHandles {
 }
 
 pub async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
+    log::info!("Sending repo names and owners to Vibinex...");
     let installation_id = env::var("INSTALL_ID")
         .expect("INSTALL_ID must be set");
     log::debug!("[send_setup_info] install_id = {:?}", &installation_id);
@@ -70,6 +71,7 @@ pub async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
 }
 
 pub async fn send_aliases(repo: &Repository, aliases: &Vec<String>) {
+    log::info!("Sending alias list to Vibinex...");
     let base_url = env::var("SERVER_URL")
         .expect("SERVER_URL must be set");
     let body = AliasRequest {

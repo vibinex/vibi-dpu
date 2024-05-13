@@ -34,6 +34,7 @@ pub async fn handle_install_github(installation_code: &str) {
 }
 
 pub async fn process_repos(access_token: &str, repo_provider: &str) {
+	log::info!("Processing repos...");
 	let mut pubreqs: Vec<SetupInfo> = Vec::new();
 	let repos_opt = get_github_app_installed_repos(&access_token).await;
 	if repos_opt.is_none(){
@@ -94,7 +95,6 @@ async fn process_webhooks(repo_owner: String, repo_name: String, access_token: S
 		.find(|w| w.url().to_string() == webhook_callback_url);
 	log::debug!("[process_webhooks] matching_webhook = {:?}", &matching_webhook);
 	if matching_webhook.is_none() {
-		log::info!("Adding new webhook...");
 		let repo_name_async = repo_name.clone();
 		let workspace_slug_async = repo_owner.clone();
 		let access_token_async = access_token.clone();
@@ -112,9 +112,10 @@ async fn process_webhooks(repo_owner: String, repo_name: String, access_token: S
 }
 
 async fn process_prs(repo_owner_async: &String, repo_name_async: &String, access_token_async: &String) {
+	log::info!("Processing all open pull requests...");
 	let pr_list_opt = list_prs_github(&repo_owner_async, &repo_name_async, &access_token_async, "OPEN").await;
 	if pr_list_opt.is_none() {
-		log::info!("Unable to get any open pull requests for processing.");
+		log::warn!("Unable to get any open pull requests for processing.");
 		return;
 	}
 	let pr_list = pr_list_opt.expect("Empty pr_list_opt");
@@ -192,7 +193,6 @@ pub async fn setup_self_host_user_repos_github(access_token: &str) {
 		};
 		pubreq_vec.push(pubreq);
 	}
-	log::info!("Sending repo names to Vibinex...");
 	send_setup_info(&pubreq_vec).await;
 }
 

@@ -622,7 +622,7 @@ pub async fn clone_git_repo(repo: &mut Repository, access_token: &str, repo_prov
 
 pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
 	log::debug!("[get_git_aliases] repo = {:?}", &repo);
-	log::info!("[get_git_aliases] repo = {:?}", &repo);
+	log::info!("Getting all git aliases in {}...", repo.name());
 	let local_dir_opt = repo.local_dir().to_owned();
 	if local_dir_opt.is_none() {
 		log::error!("[get_git_aliases] Unable to get git aliases as local_dir is not set");
@@ -648,7 +648,7 @@ pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
 		return None;
 	}
 	let emails_str = emails_res.expect("Uncaught error in eails_res");
-	log::info!("[get_git_aliases] Extracted git aliases: {:?}", &emails_str);
+	log::debug!("[get_git_aliases] Extracted git aliases: {:?}", &emails_str);
 	let emails: Vec<String> = emails_str
             .lines()
             .map(|line| line.trim().to_string())
@@ -657,6 +657,6 @@ pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
     let mut unique_emails: Vec<String> = emails.into_iter().collect();
     unique_emails.sort();
     unique_emails.dedup();
-	log::info!("[get_git_aliases] Extracted unique git aliases: {:?}", &unique_emails);
+	log::debug!("[get_git_aliases] Extracted unique git aliases: {:?}", &unique_emails);
 	return Some(unique_emails);
 }
