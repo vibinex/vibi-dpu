@@ -31,7 +31,7 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	if hunk_already_exists(&review) {
 		return;
 	}
-	log::info!("[process_review] Processing PR : {}", &review.id());
+	log::info!("Parsed task for review no : {}...", &review.id());
 	let access_token_opt = get_access_token(&Some(review.clone()), review.provider()).await;
 
 	if access_token_opt.is_none() {
@@ -74,6 +74,7 @@ fn hunk_already_exists(review: &Review) -> bool {
 	return true;
 }
 pub async fn process_review_changes(review: &Review) -> Option<HunkMap>{
+	log::info!("Processing changes in code...");
 	let mut prvec = Vec::<PrHunkItem>::new();
 	let fileopt = get_excluded_files(&review);
 	log::debug!("[process_review_changes] fileopt = {:?}", &fileopt);
@@ -107,7 +108,7 @@ pub async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 pub async fn commit_check(review: &Review, access_token: &str) {
 	if !commit_exists(&review.base_head_commit(), &review.clone_dir()) 
 		|| !commit_exists(&review.pr_head_commit(), &review.clone_dir()) {
-		log::info!("[commit_check] Pulling repository {} for commit history", &review.repo_name());
+		log::info!("Executing git pull on repo {}...", &review.repo_name());
 		git_pull(review, access_token).await;
 	}
 }
@@ -164,7 +165,7 @@ fn publish_hunkmap(hunkmap: &HunkMap) {
 		.send()
 		.await {
 			Ok(_) => {
-				log::info!("[publish_hunkmap] Hunkmap published successfully for: {} !", &key_clone);
+				log::info!("Published code changes successfully: {} !", &key_clone);
 			},
 			Err(e) => {
 				log::error!("[publish_hunkmap] Failed to publish hunkmap: {} for: {}", e, &key_clone);

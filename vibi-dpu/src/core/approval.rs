@@ -24,7 +24,7 @@ pub async fn process_approval(deserialised_msg_data: &Value, repo_config_val: &V
 	log::debug!("[process_approval] repo_config = {:?}", &repo_config);
 	save_repo_config_to_db(&repo_config, repo_name, repo_owner, repo_provider);
     if !repo_config.comment() {
-        log::info!("[process_approval] Comment setting is turned off");
+        log::info!("Comment setting is turned off, not adding comment...");
         return;
     }
     let pr_head_commit = deserialised_msg_data["review"]["commit_id"]

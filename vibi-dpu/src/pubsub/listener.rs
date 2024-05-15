@@ -51,7 +51,9 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
 			} else { log::info!("No changes detected in PR, Webhook Callback Processed!");}
 		}
 		"manual_trigger" => {
+			log::info!("Processing trigger...");
 			process_trigger(&data_bytes).await;
+			log::info!("Trigger task processed!");
 		}
 		"PATSetup" => {
 			log::info!("Setting up repositories...");

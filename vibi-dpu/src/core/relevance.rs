@@ -7,7 +7,8 @@ use crate::utils::repo_config::RepoConfig;
 pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
 	repo_config: &mut RepoConfig, access_token: &str, old_review_opt: &Option<Review>,
 ) {
-	log::info!("[process_relevance] Process relevence for PR: {}, repo config: {:?}", review.id(), repo_config);
+	log::info!("Processing relevance of code authors...");
+    log::debug!("Process relevence for PR: {}, repo config: {:?}", review.id(), repo_config);
 	for prhunk in hunkmap.prhunkvec() {
 		// calculate number of hunks for each userid
 		let mut review_mut = review.clone();
@@ -20,7 +21,6 @@ pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
 		}
 		let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
 		if repo_config.comment() {
-			log::info!("[process_relevance] Inserting comment...");
 			// create comment text
 			let comment = comment_text(&relevance_vec, repo_config.auto_assign());
 			// add comment
@@ -28,15 +28,17 @@ pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
 				// TODO - add feature flag check
 				// TODO - add comment change check
 				if did_comment_change(&relevance_vec, &old_review_opt) {
+                    log::info!("Inserting comment on repo {}...", review.repo_name());
 					bitbucket::comment::add_comment(&comment, review, &access_token).await;
-				}
+				} else { log::info!("No changes in author relevance, not adding comment...");}
 			}
 			if review.provider().to_string() == ProviderEnum::Github.to_string() {
+                log::info!("Inserting comment on repo {}...", review.repo_name());
 				github::comment::add_comment(&comment, review, &access_token).await;
 			}
 		}
 		if repo_config.auto_assign() {
-			log::info!("[process_relevance] Auto assigning reviewers...");
+			log::info!("Auto assigning reviewers for repo {}...", review.repo_name());
 			log::debug!("[process_relevance] review.provider() = {:?}", review.provider());
 			if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
 				add_bitbucket_reviewers(&prhunk, hunkmap, review, &access_token).await;
@@ -50,13 +52,13 @@ pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
 
 fn did_comment_change(relevance_vec: &Vec<Relevance>, old_review_opt: &Option<Review>) -> bool {
 	if old_review_opt.is_none() {
-		log::info!("[did_comment_change] No review record found in db, inserting comment...");
+		log::debug!("[did_comment_change] No review record found in db, inserting comment...");
 		return true;
 	}
 	let old_review = old_review_opt.to_owned().expect("Empty old_review_opt");
 	let old_relevance_vec_opt = old_review.relevance();
 	if old_relevance_vec_opt.is_none() {
-		log::info!("[did_comment_change] No relevance found in db, inserting comment...");
+		log::debug!("[did_comment_change] No relevance found in db, inserting comment...");
 		return true;
 	}
 	let old_relevance_vec = old_relevance_vec_opt.to_owned()
@@ -195,7 +197,7 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
         let provider_id_opt = provider_ids.iter().next();
         if provider_id_opt.is_some() {
             let provider_id = provider_id_opt.expect("Empty provider_id_opt");
-            log::info!("[comment-text] provider_id: {:?}", provider_id);
+            log::debug!("[comment-text] provider_id: {:?}", provider_id);
             let formatted_relevance_value = format!("{:.2}", *relevance);
             comment += &format!("| {} | {}% |\n", provider_id, formatted_relevance_value);
         }

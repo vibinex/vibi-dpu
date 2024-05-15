@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::{core::{review::{commit_check, process_review_changes, send_hunkmap}, utils::get_access_token}, db::{repo::get_clone_url_clone_dir, repo_config::save_repo_config_to_db, review::get_review_from_db}, github::prs::get_and_store_pr_info, utils::{parsing::parse_string_field_pubsub, repo_config::RepoConfig, review::Review, user::ProviderEnum}};
+use crate::{core::{review::{commit_check, process_review_changes, send_hunkmap}, utils::get_access_token}, db::{repo::get_clone_url_clone_dir, repo_config::save_repo_config_to_db, review::get_review_from_db}, github::prs::get_and_store_pr_info, utils::{parsing::parse_string_field_pubsub, pr_info::PrInfo, repo_config::RepoConfig, review::Review, user::ProviderEnum}};
 
 #[derive(Debug)]
 struct TriggerReview {
@@ -19,7 +19,7 @@ pub async fn process_trigger(message_data: &Vec<u8>) {
 		return;
 	}
 	let (trigger_review, repo_config) = parse_res.expect("Empty parse_res");
-	log::info!("[process_trigger] Processing PR: {} in repo: {}", &trigger_review.pr_number, &trigger_review.repo_name);
+	log::info!("Processing PR: {} in repo: {}...", &trigger_review.pr_number, &trigger_review.repo_name);
 	// get access token
 	if trigger_review.repo_provider != ProviderEnum::Github.to_string().to_lowercase() {
 		log::error!("[process_trigger] Not implemented for non github providers");
@@ -39,7 +39,7 @@ pub async fn process_trigger(message_data: &Vec<u8>) {
 		log::error!("[process_trigger] Unable to get pr info from provider");
 		return;
 	}
-	let review_opt = get_review_obj(&trigger_review, &access_token).await;
+	let review_opt = get_review_obj(&trigger_review, &pr_info_opt).await;
 	if review_opt.is_none() {
 		log::error!("[process_trigger] Unable to get review details: {:?}", &trigger_review);
 		return;
@@ -96,13 +96,12 @@ fn parse_trigger_msg(message_data: &Vec<u8>) -> Option<(TriggerReview, RepoConfi
 	return Some((trigger_review, repo_config));
 }
 
-async fn get_review_obj(trigger_review: &TriggerReview, access_token: &str) -> Option<Review> {
-	let pr_info_opt = get_and_store_pr_info(&trigger_review.repo_owner, &trigger_review.repo_name, access_token, &trigger_review.pr_number).await;
+async fn get_review_obj(trigger_review: &TriggerReview, pr_info_opt: &Option<PrInfo>) -> Option<Review> {
 	if pr_info_opt.is_none() {
 		log::error!("[get_review_obj] Unable to get and store pr info: {:?}", &trigger_review);
 		return None;
 	}
-	let pr_info = pr_info_opt.expect("Empty pr_info_opt");
+	let pr_info = pr_info_opt.to_owned().expect("Empty pr_info_opt");
 	let clone_opt = get_clone_url_clone_dir(&trigger_review.repo_provider, &trigger_review.repo_owner, &trigger_review.repo_name);
 	if clone_opt.is_none() {
 		log::error!("[get_review_obj] Unable to get clone url and directory for bitbucket review");
