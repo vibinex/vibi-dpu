@@ -30,7 +30,6 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 	}
 	let authinfo = authinfo_opt.expect("Empty authinfo_opt");
 	log::debug!("[handle_install_bitbucket] AuthInfo: {:?}", authinfo);
-	// let auth_info = { "access_token": access_token, "expires_in": expires_in_formatted, "refresh_token": auth_info["refresh_token"] }; db.insert("auth_info", serde_json::to_string(&auth_info).unwrap());
 	let access_token = authinfo.access_token().clone();
 	let user_selected_repos_opt = user_selected_repos(&ProviderEnum::Bitbucket.to_string()).await;
 	let user_workspaces = get_bitbucket_workspaces(&access_token).await;
