@@ -37,7 +37,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 	let mut pubreqs: Vec<SetupInfo> = Vec::new();
 	for workspace in user_workspaces {
 		let workspace_slug = workspace.slug();
-		log::debug!("=========<{:?}>=======", workspace_slug);
+		log::debug!("[handle_install_bitbucket] Processing workspace: {:?}", workspace_slug);
 	
 		let repos_opt = get_workspace_repos(workspace.uuid(), 
 			&access_token).await;
