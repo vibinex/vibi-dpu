@@ -82,6 +82,7 @@ pub async fn update_access_token(auth_info: &BitbucketAuthInfo, review_opt: &Opt
         return Some(auth_info.to_owned());
     }
     // auth info has expired
+    log::info!("Updating expired authentication...");
     log::debug!("[update_access_token] auth info expired, expires_at = {}, now_secs = {}", expires_at, now_secs);
     let new_auth_info_opt = bitbucket_refresh_token(auth_info.refresh_token()).await;
     let mut new_auth_info = new_auth_info_opt.clone()

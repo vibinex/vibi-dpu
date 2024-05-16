@@ -31,10 +31,10 @@ pub fn get_hunk_from_db(review: &Review) -> Option<HunkMap> {
 }
 
 pub fn store_hunkmap_to_db(hunkmap: &HunkMap, review: &Review) {
-	log::info!("[store_hunkmap_to_db]: hunkmap: {:?}, review: {:?}", hunkmap, review);
+	log::debug!("[store_hunkmap_to_db]: hunkmap: {:?}, review: {:?}", hunkmap, review);
     let db = get_db();
 	let hunk_key = format!("hunk/{}/{}/{}", review.db_key(), review.base_head_commit(), review.pr_head_commit());
-	log::info!("[store_hunkmap_to_db] hunk_key = {}", hunk_key);
+	log::debug!("[store_hunkmap_to_db] hunk_key = {}", hunk_key);
 	let json = serde_json::to_vec(hunkmap).expect("Failed to serialize hunkmap");
   
     // Insert JSON into sled DB

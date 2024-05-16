@@ -124,7 +124,8 @@ pub async fn github_process_and_update_pr_if_different(webhook_data: &Value, rep
 	if event_action == "opened" {
 		// new PR opened
 		log::debug!("[github_process_and_update_pr_if_different|new_pr_opened] {:?}", pr_info_parsed);
-		update_pr_info_in_db(&repo_owner, &repo_owner, &pr_info_parsed, &pr_number, repo_provider).await;
+		update_pr_info_in_db(&repo_owner,
+			&repo_owner, &pr_info_parsed, &pr_number, repo_provider).await;
 		return true;
 	}
 	if event_action == "synchronize" {
@@ -135,6 +136,7 @@ pub async fn github_process_and_update_pr_if_different(webhook_data: &Value, rep
 	if event_action == "submitted" {
 		let event_review_status = webhook_data["review"]["state"].to_string().trim_matches('"').to_string();
 		if event_review_status == "approved" {
+			log::info!("Processing Approved PR event...");
 			log::debug!("[github_process_and_update_pr_if_different| pr has been approved] webhook data for pr {:?}", &webhook_data);
 			update_pr_info_in_db(&repo_owner, &repo_name, &pr_info_parsed, &pr_number, repo_provider).await;
 			process_approval(webhook_data, repo_config, repo_owner, repo_name, pr_number, repo_provider).await;
@@ -144,6 +146,7 @@ pub async fn github_process_and_update_pr_if_different(webhook_data: &Value, rep
 			return false; // event is not open or synchronize
 		}
 	} else {
+		log::info!("PR event is not recognized, skipping processing");
 		log::debug!("[github_process_and_update_pr_if_different | no update needed] event is not opened or synchronise or approved");
 		return false;
 	}

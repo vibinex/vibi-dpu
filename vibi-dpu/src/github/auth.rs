@@ -195,7 +195,7 @@ fn pat_access_token() -> Option<String> {
     }
     let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
     if github_pat.len() == 0 {
-        log::debug!("[pat_access_token] GITHUB PAT 0 length");
+        log::error!("[pat_access_token] GITHUB PAT 0 length");
         return None;
     }
     log::debug!("[pat_access_token] GITHUB PAT: [REDACTED], length = {}",
@@ -206,7 +206,7 @@ fn pat_access_token() -> Option<String> {
     }
     let provider = provider_res.expect("Empty PROVIDER env var");
     if provider.len() == 0 {
-        log::debug!("[pat_access_token] PROVIDER 0 length");
+        log::error!("[pat_access_token] PROVIDER 0 length");
         return None;
     }
     log::debug!("[pat_access_token] PROVIDER: {}", provider);

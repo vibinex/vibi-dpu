@@ -138,7 +138,7 @@ impl CoverageMap {
             let provider_id_opt = provider_ids.iter().next();
             if provider_id_opt.is_some() {
                 let provider_id_alias = provider_id_opt.expect("Empty provider_id_opt");
-                log::info!("[comment-text] provider_id: {:?}", provider_id_alias);
+                log::debug!("[comment-text] provider_id: {:?}", provider_id_alias);
                 let formatted_relevance_value = format!("{:.2}", *relevance);
                 if reviewer_handles.contains(provider_id_alias) {
                     comment += &format!("| {} | {}% | :white_check_mark: |\n", provider_id_alias, formatted_relevance_value);

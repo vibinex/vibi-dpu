@@ -20,7 +20,7 @@ pub async fn add_comment(comment_text: &str, review: &Review, access_token: &str
         return;
     }
     let response = response_res.expect("Error in getting response");
-    println!("[github/add_comment] response from comment post request = {:?}", &response);
+    log::debug!("[github/add_comment] response from comment post request = {:?}", &response);
 }
 
 fn prepare_add_comment_url(review: &Review) -> String {

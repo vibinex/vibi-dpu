@@ -60,7 +60,6 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 			let repo_name = repo.name();
 			reponames.push(repo_name.clone());
 			log::debug!("[handle_install_bitbucket] Repo url git = {:?}", &repo.clone_ssh_url());
-			log::info!("[handle_install_bitbucket] Repo url git = {:?}", &repo.clone_ssh_url());
 			log::debug!("[handle_install_bitbucket] Repo name = {:?}", repo_name);
 			process_webhooks(workspace_slug.to_string(),
 			repo_name.to_string(),
@@ -71,7 +70,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 			task::spawn(async move {
 				let pr_list_opt = list_prs_bitbucket(&workspace_slug_async, &repo_name_async, &access_token_async, "OPEN").await;
 				if pr_list_opt.is_none() {
-					log::info!("[handle_install_bitbucket] No open pull requests found for processing.");
+					log::debug!("[handle_install_bitbucket] No open pull requests found for processing.");
 					return;
 				}
 				let pr_list = pr_list_opt.expect("Empty pr_list_opt");
@@ -121,11 +120,12 @@ async fn process_webhooks(workspace_slug: String, repo_name: String, access_toke
 	let webhook_callback_url = format!("{}/api/bitbucket/callbacks/webhook", 
 		env::var("SERVER_URL").expect("SERVER_URL must be set"));
 	if webhooks_data.is_empty() {
-		log::info!("[process_webhooks] Adding new webhook...");
 		let repo_name_async = repo_name.clone();
 		let workspace_slug_async = workspace_slug.clone();
 		let access_token_async = access_token.clone();
 		task::spawn(async move {
+			log::info!("Adding new webhook for {}/{}...",
+				&workspace_slug_async, access_token_async);
 			add_webhook(
 				&workspace_slug_async, 
 				&repo_name_async, 
@@ -136,11 +136,12 @@ async fn process_webhooks(workspace_slug: String, repo_name: String, access_toke
 	let matching_webhook = webhooks_data.into_iter()
 		.find(|w| w.url().to_string() == webhook_callback_url);
 	if matching_webhook.is_none() {
-		log::info!("[process_webhooks] Adding new webhook...");
 		let repo_name_async = repo_name.clone();
 		let workspace_slug_async = workspace_slug.clone();
 		let access_token_async = access_token.clone();
 		task::spawn(async move {
+			log::info!("Adding new webhook for {}/{}...",
+				&workspace_slug_async, access_token_async);
 			add_webhook(
 				&workspace_slug_async, 
 				&repo_name_async, 
@@ -149,6 +150,6 @@ async fn process_webhooks(workspace_slug: String, repo_name: String, access_toke
 		return;
 	}
 	let webhook = matching_webhook.expect("no matching webhook");
-	log::info!("[process_webhooks] Webhook already exists: {:?}", &webhook);
+	log::info!("Not adding webhook, already exists: {:?}...", webhook.url());
 	save_webhook_to_db(&webhook);
 }
