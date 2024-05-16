@@ -27,7 +27,7 @@ pub async fn process_review(message_data: &Vec<u8>) {
 		return;
 	}
 	let (review, repo_config) = review_opt.expect("parse_opt is empty");
-	log::error!("[process_review] deserialized repo_config, review = {:?}, {:?}", &repo_config, &review);
+	log::debug!("[process_review] deserialized repo_config, review = {:?}, {:?}", &repo_config, &review);
 	if hunk_already_exists(&review) {
 		return;
 	}
@@ -65,7 +65,7 @@ pub async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review,
 fn hunk_already_exists(review: &Review) -> bool {
 	let hunk_opt = get_hunk_from_db(&review);
 	if hunk_opt.is_none() {
-		log::error!("[hunk_already_exists] No hunk from get_hunk_from_db");
+		log::debug!("[hunk_already_exists] No hunk from get_hunk_from_db");
 		return false;
 	}
 	let hunkmap = hunk_opt.expect("empty hunk from get_hunk_from_db");
