@@ -30,12 +30,12 @@ pub fn commit_exists(commit: &str, directory: &str) -> bool {
 		.output();
 	if output_res.is_err() {
 		let e = output_res.expect_err("No error in output_res");
-		log::error!("[commit_exists] Failed to start git rev-list: {:?}", e);
+		log::debug!("[commit_exists] Failed to start git rev-list: {:?}", e);
 		return false;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
 	if !output.status.success() {
-		log::error!("[commit_exists] git rev-list, exit code: {:?}",
+		log::debug!("[commit_exists] git rev-list, exit code: {:?}",
 			output.status.code());
 		// for debugging
 		match str::from_utf8(&output.stderr) {
@@ -115,7 +115,7 @@ fn set_git_url(git_url: &str, directory: &str, access_token: &str, repo_provider
 		Err(e) => {/* error handling */ log::error!("[set_git_url] stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => log::error!("[set_git_url] stdout = {:?}", v),
+		Ok(v) => log::debug!("[set_git_url] stdout = {:?}", v),
 		Err(e) => {/* error handling */ log::error!("[set_git_url] stdout error {}", e)}, 
 	};
 	log::debug!("[set_git_url] set_git_url output = {:?}, {:?}", &output.stdout, &output.stderr);

@@ -195,7 +195,7 @@ fn pat_access_token() -> Option<String> {
     }
     let github_pat = github_pat_res.expect("Empty GITHUB_PAT env var");
     if github_pat.len() == 0 {
-        log::error!("[pat_access_token] GITHUB PAT 0 length");
+        log::debug!("[pat_access_token] GITHUB PAT 0 length");
         return None;
     }
     log::debug!("[pat_access_token] GITHUB PAT: [REDACTED], length = {}",
@@ -222,5 +222,6 @@ pub async fn gh_access_token(review: &Option<Review>) -> Option<String> {
     if let Some(pat_token) = pat_token_opt {
         return Some(pat_token);
     }
+    if review.is_none() { return None; }
     return app_access_token(review).await;
 }
