@@ -174,7 +174,7 @@ fn update_condition_satisfied(expires_at: &str) -> bool{
     return expires_at_ts > now_ts;
 }
 
-async fn app_access_token(review: &Option<Review>) -> Option<String>{
+pub async fn app_access_token(review: &Option<Review>) -> Option<String>{
     let authinfo_opt = get_or_update_auth(review).await;
     log::debug!("[app_access_token] authinfo_opt = {:?}", &authinfo_opt);
     if authinfo_opt.is_none() {
@@ -222,6 +222,5 @@ pub async fn gh_access_token(review: &Option<Review>) -> Option<String> {
     if let Some(pat_token) = pat_token_opt {
         return Some(pat_token);
     }
-    if review.is_none() { return None; }
     return app_access_token(review).await;
 }
