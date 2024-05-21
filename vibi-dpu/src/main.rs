@@ -6,7 +6,7 @@ mod bitbucket;
 mod github;
 mod utils;
 mod logger;
-use github::auth::gh_access_token;
+use github::auth::app_access_token;
 use tokio::task;
 use crate::{core::github::setup::process_repos, utils::user::ProviderEnum};
 
@@ -55,7 +55,7 @@ async fn main() {
 }
 
 async fn load_auth_from_previous_installation() {
-	if let Some(access_token) = gh_access_token(&None).await {
+	if let Some(access_token) = app_access_token(&None).await {
 		log::info!("Using Stored Auth...");
 		process_repos(&access_token, &ProviderEnum::Github.to_string()).await;
 	}
