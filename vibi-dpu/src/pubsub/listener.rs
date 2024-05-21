@@ -1,4 +1,5 @@
 use crate::core::trigger::process_trigger;
+use crate::utils::reqwest_client::get_client;
 use crate::{core::bitbucket::setup::handle_install_bitbucket, utils::user::ProviderEnum};
 use crate::core::github::setup::{handle_install_github, process_pat_repos};
 use crate::core::review::process_review;
@@ -11,10 +12,11 @@ use google_cloud_pubsub::{
 	subscription::{Subscription, SubscriptionConfig},
 };
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use sha256::digest;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::env;
 use tokio::task;
 use tonic::Code;
 
@@ -60,10 +62,44 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
 			process_pat_repos(&data_bytes).await;
 			log::info!("Processed repos successfully");
 		}
+		"health_check" => {
+			log::info!("Sending Health Check Info to Vibinex...");
+			health_check().await;
+		}
 		_ => {
 			log::error!("[process_message] Message type not found for message : {:?}", attributes);
 		}
 	};
+}
+
+async fn health_check() {
+	let installation_id = env::var("INSTALL_ID")
+		.expect("INSTALL_ID must be set");
+	log::debug!("[health_check] install_id = {:?}", &installation_id);
+	let base_url = env::var("SERVER_URL")
+		.expect("SERVER_URL must be set");
+	let client = get_client();
+	let health_check_url = format!("{base_url}/api/dpu/healthCheck");
+	let body: Value = json!({"topicId": installation_id});
+	let post_res = client
+	  .post(&health_check_url)
+	  .json(&body)
+	  .send()
+	  .await;
+	if post_res.is_err() {
+		let e = post_res.expect_err("No error in post_res in health_check");
+		log::error!(
+			"[health_check] Error in health_check post_res: {:?}, url: {:?}", e, &health_check_url);
+		return;
+	}
+	let resp = post_res.expect("Uncaught error in post_res");
+	if !resp.status().is_success() {
+		log::error!(
+			"[health_check] Unable to send health_check info to server, status = {:?}", resp.status());
+		return;
+	}
+	log::debug!("[health_check] Response: {:?}", resp.text().await);
+	log::info!("Health Check Info Succesfully Sent!");
 }
 
 async fn process_install_callback(data_bytes: &[u8]) {
