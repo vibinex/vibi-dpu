@@ -27,7 +27,7 @@ pub fn init_logger() -> bool {
 	let log_level = env::var("LOG_LEVEL")
 		.ok()
 		.and_then(|s| s.parse().ok())
-		.unwrap_or(LevelFilter::Info);
+		.unwrap_or(LevelFilter::Debug);
 	// Chain the file configuration with the stdout configuration
 	let dispatcher_res = fern::Dispatch::new()
 		.format(|out, message, record| {
