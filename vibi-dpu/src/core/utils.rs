@@ -179,7 +179,7 @@ pub struct UserSelectedRepo {
 	pub repo_provider: String,
 }
 
-pub async fn user_selected_repos(provider: &str) -> Option<Vec<UserSelectedRepo>> {
+pub async fn user_selected_repos(provider: &str) -> Option<Vec<Repository>> {
 	let client = get_client();
 	let topic_name = env::var("INSTALL_ID").expect("INSTALL_ID must be set");
 	let server_prefix_url = env::var("SERVER_URL").expect("SERVER_URL must be set");
@@ -194,7 +194,7 @@ pub async fn user_selected_repos(provider: &str) -> Option<Vec<UserSelectedRepo>
 	return parse_repos_response(repos_response).await;
 }
 
-async fn parse_repos_response(response: Response) -> Option<Vec<UserSelectedRepo>>{
+async fn parse_repos_response(response: Response) -> Option<Vec<Repository>>{
 	let repos_value_res = response.json::<Value>().await;
 	if let Err(e) = &repos_value_res {
 		log::error!("[parse_repos_response] Unable to parse response {:?}", e);
@@ -212,6 +212,6 @@ async fn parse_repos_response(response: Response) -> Option<Vec<UserSelectedRepo
 		log::error!("[parse_repos_response] Unable to parse vec of UserSelectedRepo from response: {:?}", e);
 		return None;
 	}
-	let repolist_vec: Vec<UserSelectedRepo> = repolist_vec_res.expect("Uncaught error in repolist_vec_res");
+	let repolist_vec: Vec<Repository> = repolist_vec_res.expect("Uncaught error in repolist_vec_res");
 	return Some(repolist_vec);
 }

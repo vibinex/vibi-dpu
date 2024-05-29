@@ -96,7 +96,7 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 	send_setup_info(&pubreqs).await;
 }
 
-fn filter_user_selected_repos(all_repos: Vec<Repository>, user_selected_repos_opt: Option<Vec<UserSelectedRepo>>) -> Vec<Repository> {
+fn filter_user_selected_repos(all_repos: Vec<Repository>, user_selected_repos_opt: Option<Vec<Repository>>) -> Vec<Repository> {
 	if user_selected_repos_opt.as_ref().map_or(true,
 		|user_repos| user_repos.is_empty()) {
 		log::error!("[filter_user_selected_repos] No user selected repos found");
@@ -105,9 +105,9 @@ fn filter_user_selected_repos(all_repos: Vec<Repository>, user_selected_repos_op
 	let user_selected_repos = user_selected_repos_opt.expect("Empty user selected repos");
 	let filtered_repos: Vec<Repository> = all_repos.into_iter().filter(|repo| {
 		user_selected_repos.iter().any(|selected_repo| {
-			repo.name() == &selected_repo.repo_name &&
-			repo.provider() == &selected_repo.repo_provider &&
-			repo.owner() == &selected_repo.repo_owner
+			repo.name() == selected_repo.name() &&
+			repo.provider() == selected_repo.provider() &&
+			repo.owner() == selected_repo.owner()
 		})
 	})
 	.collect();
