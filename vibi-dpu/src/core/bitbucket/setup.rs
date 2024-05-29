@@ -38,11 +38,13 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 		let workspace_slug = workspace.slug();
 		log::debug!("[handle_install_bitbucket] Processing workspace: {:?}", workspace_slug);
 	
-		let repos_opt = get_workspace_repos(workspace.uuid(), 
-			&access_token).await;
 		get_and_save_workspace_users(workspace.uuid(), &access_token).await;
-		let all_repos = repos_opt.expect("Empty repos_opt");
-		let filtered_repos = filter_user_selected_repos(all_repos, user_selected_repos_opt.clone());
+		let filtered_repos_opt = filter_user_selected_repos(workspace_slug.to_string(), user_selected_repos_opt.clone());
+		if filtered_repos_opt.is_none() {
+			log::error!("[handle_install_bitbucket] No repos found for workspace {}", workspace_slug);
+			continue;
+		}
+		let filtered_repos = filtered_repos_opt.expect("Empty filtered_repos_opt");
 		let mut reponames: Vec<String> = Vec::new();
 		for repo in filtered_repos {
 			let token_copy = access_token.clone();
@@ -96,22 +98,18 @@ pub async fn handle_install_bitbucket(installation_code: &str) {
 	send_setup_info(&pubreqs).await;
 }
 
-fn filter_user_selected_repos(all_repos: Vec<Repository>, user_selected_repos_opt: Option<Vec<Repository>>) -> Vec<Repository> {
+fn filter_user_selected_repos(workspace_slug: String, user_selected_repos_opt: Option<Vec<Repository>>) -> Option<Vec<Repository>> {
 	if user_selected_repos_opt.as_ref().map_or(true,
 		|user_repos| user_repos.is_empty()) {
 		log::error!("[filter_user_selected_repos] No user selected repos found");
-		return all_repos;
+		return None;
 	}
 	let user_selected_repos = user_selected_repos_opt.expect("Empty user selected repos");
-	let filtered_repos: Vec<Repository> = all_repos.into_iter().filter(|repo| {
-		user_selected_repos.iter().any(|selected_repo| {
-			repo.name() == selected_repo.name() &&
-			repo.provider() == selected_repo.provider() &&
-			repo.owner() == selected_repo.owner()
-		})
+	let filtered_repos: Vec<Repository> = user_selected_repos.into_iter().filter(|repo| {
+			repo.owner() == &workspace_slug
 	})
 	.collect();
-	return filtered_repos;
+	return Some(filtered_repos);
 }
 
 async fn process_webhooks(workspace_slug: String, repo_name: String, access_token: String) {
