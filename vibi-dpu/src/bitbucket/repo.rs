@@ -25,6 +25,7 @@ pub async fn get_workspace_repos(workspace: &str, access_token: &str) -> Option<
                 clone_val["name".to_string()].as_str() == Some("ssh")
             }).collect::<Vec<&Value>>()[0]["href"].to_string().replace('\"',""),
             Some(repo_json["project"]["name"].to_string().trim_matches('"').to_string()),
+            Some(repo_json["project"]["type"].to_string().trim_matches('"').to_string()),
             repo_json["workspace"]["slug"].to_string().trim_matches('"').to_string(),
             None,
             "bitbucket".to_string(),
