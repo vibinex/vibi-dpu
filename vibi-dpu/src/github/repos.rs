@@ -170,6 +170,7 @@ fn deserialize_and_save_repos_object_graphql(repos_json: &Vec<Value>) -> Vec<Rep
                 .trim_matches('"')
                 .to_string(),
             None,
+            None,
             repo_json["owner"]["login"]
                 .to_string()
                 .trim_matches('"')
@@ -222,6 +223,7 @@ fn deserialize_repo_object(repo_json: &Value) -> Repository {
             .to_string()
             .trim_matches('"')
             .to_string(),
+        None,
         None,
         repo_json["owner"]["login"]
             .to_string()
