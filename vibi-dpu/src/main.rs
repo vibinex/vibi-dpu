@@ -19,11 +19,11 @@ async fn main() {
 	env::var("GCP_CREDENTIALS").expect("GCP_CREDENTIALS must be set");
 	let topic_name = //"rtapish-fromserver".to_owned();
 	env::var("INSTALL_ID").expect("INSTALL_ID must be set");
-	send_status_start().await;
 	let logs_init_status = logger::init::init_logger();
 	if !logs_init_status {
 		log::warn!("[main] Unable to create file logger");
 	}
+	send_status_start().await;
 	log::info!("Setting up your Vibinex Data Processing Unit, sit back and relax...");
 	let github_pat_res = env::var("GITHUB_PAT");
 	let provider_res = env::var("PROVIDER");
