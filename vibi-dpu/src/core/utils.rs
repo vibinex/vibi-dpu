@@ -8,6 +8,8 @@ use serde_json::Value;
 use crate::bitbucket;
 use crate::db::aliases::update_handles_in_db;
 use crate::github;
+use crate::health::status::send_status_failed;
+use crate::health::status::send_status_success;
 use crate::utils::repo::Repository;
 use crate::utils::reqwest_client::get_client;
 use crate::utils::review::Review;
@@ -77,14 +79,17 @@ pub async fn send_setup_info(setup_info: &Vec<SetupInfo>) {
 	if post_res.is_err() {
 		let e = post_res.expect_err("No error in post_res in send_setup_info");
 		log::error!("[send_setup_info] error in send_setup_info post_res: {:?}, url: {:?}", e, &setup_url);
+		send_status_failed().await;
 		return;
 	}
 	let resp = post_res.expect("Uncaught error in post_res");
 	if !resp.status().is_success() {
 		log::error!("[send_setup_info] Unable to send setup info to server, status = {:?}", resp.status());
+		send_status_failed().await;
 		return;
 	}
 	log::debug!("[send_setup_info] Response: {:?}", resp.text().await);
+	send_status_success().await;
 }
 
 pub async fn send_aliases(repo: &Repository, aliases: &Vec<String>) {
