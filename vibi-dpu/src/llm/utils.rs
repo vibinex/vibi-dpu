@@ -8,11 +8,9 @@ use crate::utils::reqwest_client::get_client;
 pub async fn call_llm_api(prompt: String) -> Option<String> {
     let client = get_client();
     let url = "https://your-llm-api-endpoint.com";
-    let token = "your_api_token";
 
     let response_res = client.post(url)
-        .bearer_auth(token)
-        .json(&serde_json::json!({"prompt": prompt}))
+        .json(&serde_json::json!({"model": "phind-codellama", "prompt": prompt}))
         .send()
         .await;
     if response_res.is_err() {
