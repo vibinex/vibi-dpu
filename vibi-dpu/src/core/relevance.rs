@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, utils::{aliases::get_login_handles, relevance::Relevance, hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}};
+use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, llm::utils::{call_llm_api, get_changed_files, read_files}, utils::{aliases::get_login_handles, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
@@ -22,7 +22,7 @@ pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
 		let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
 		if repo_config.comment() {
 			// create comment text
-			let comment = comment_text(&relevance_vec, repo_config.auto_assign());
+			let comment = comment_text(&relevance_vec, repo_config.auto_assign()).await;
 			// add comment
 			if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
 				// TODO - add feature flag check
@@ -184,7 +184,7 @@ async fn calculate_relevance(prhunk: &PrHunkItem, review: &mut Review) -> Option
     return Some(relevance_vec);
 }
 
-fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
+async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
     comment += "| Contributor Name/Alias  | Relevance |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
@@ -217,7 +217,40 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
     comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
 
+    if let Some(mermaid_text) = mermaid_comment().await {
+        comment += mermaid_text.as_str();
+    }
+
     return comment;
+}
+
+pub async fn mermaid_comment() -> Option<String> {
+    match get_changed_files().and_then(read_files) {
+        Some(file_contents) => {
+            let prompt = format!(
+                "Files changed:\n{}\nQuestion: Generate a mermaid diagram to represent the changes.",
+                file_contents
+            );
+
+            match call_llm_api(prompt).await {
+                Some(mermaid_response) => {
+                    let mermaid_comment = format!(
+                        "### Call Stack Diff\n```mermaid\n{}\n```",
+                        mermaid_response
+                    );
+                    return Some(mermaid_comment);
+                }
+                    None => {
+                        log::error!("[mermaid_comment] Failed to call LLM API");
+                        return None;
+                    }
+                }
+            }
+            None => {
+                log::error!("[mermaid_comment] Failed to read changed files:");
+                return None;
+            }
+        }
 }
 
 pub fn deduplicated_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {
