@@ -11,7 +11,7 @@ use crate::{
         review::{get_review_from_db, save_review_to_db},
     },
     utils::{
-        gitops::{commit_exists, generate_blame, generate_diff, get_excluded_files, git_pull, process_diffmap},
+        gitops::{commit_exists, generate_blame, generate_diff, get_excluded_files, git_pull, process_diffmap, StatItem},
         hunk::{HunkMap, PrHunkItem},
         repo_config::RepoConfig,
         reqwest_client::get_client,
@@ -45,20 +45,20 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token, &old_review_opt).await;
 }
 
-pub async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review,
+pub async fn send_hunkmap(hunkmap_opt: &Option<(HunkMap, Vec<StatItem>, Vec<StatItem>)>, review: &Review,
 	repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) {
 	if hunkmap_opt.is_none() {
 		log::error!("[send_hunkmap] Empty hunkmap in send_hunkmap");
 		return;
 	}
-	let hunkmap = hunkmap_opt.to_owned().expect("empty hunkmap_opt");
+	let (hunkmap, excluded_files, small_files) = hunkmap_opt.as_ref().expect("empty hunkmap_opt");
 	log::debug!("HunkMap = {:?}", &hunkmap);
 	store_hunkmap_to_db(&hunkmap, review);
 	publish_hunkmap(&hunkmap);
 	let hunkmap_async = hunkmap.clone();
 	let review_async = review.clone();
 	let mut repo_config_clone = repo_config.clone();
-	process_relevance(&hunkmap_async, &review_async,
+	process_relevance(&hunkmap_async, excluded_files, small_files, &review_async,
 		&mut repo_config_clone, access_token, old_review_opt).await;
 }
 
@@ -73,7 +73,7 @@ fn hunk_already_exists(review: &Review) -> bool {
 	log::debug!("[hunk_already_exists] Hunk already in db!");
 	return true;
 }
-pub async fn process_review_changes(review: &Review) -> Option<HunkMap>{
+pub async fn process_review_changes(review: &Review) -> Option<(HunkMap, Vec<StatItem>, Vec<StatItem>)>{
 	log::info!("Processing changes in code...");
 	let mut prvec = Vec::<PrHunkItem>::new();
 	let fileopt = get_excluded_files(&review);
@@ -82,7 +82,7 @@ pub async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 		log::error!("[process_review_changes] No files to review for PR {}", review.id());
 		return None;
 	}
-	let (_, smallfiles) = fileopt.expect("fileopt is empty");
+	let (excluded_files, smallfiles) = fileopt.expect("fileopt is empty");
 	let diffmap = generate_diff(&review, &smallfiles);
 	log::debug!("[process_review_changes] diffmap = {:?}", &diffmap);
 	let linemap = process_diffmap(&diffmap);
@@ -102,7 +102,7 @@ pub async fn process_review_changes(review: &Review) -> Option<HunkMap>{
 		format!("{}/hunkmap", review.db_key()),
 	);
 	log::debug!("[process_review_changes] hunkmap: {:?}", hunkmap);
-	return Some(hunkmap);
+	return Some((hunkmap, excluded_files, smallfiles));
 }
 
 pub async fn commit_check(review: &Review, access_token: &str) {

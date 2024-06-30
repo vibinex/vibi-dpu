@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, llm::utils::{call_llm_api, get_changed_files, read_files}, utils::{aliases::get_login_handles, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
+use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, llm::{gitops::get_changed_files, utils::{call_llm_api, parse_llm_response, read_file}}, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
-pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
+pub async fn process_relevance(hunkmap: &HunkMap, excluded_files: &Vec<StatItem>, small_files: &Vec<StatItem>, review: &Review,
 	repo_config: &mut RepoConfig, access_token: &str, old_review_opt: &Option<Review>,
 ) {
 	log::info!("Processing relevance of code authors...");
@@ -22,7 +22,8 @@ pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
 		let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
 		if repo_config.comment() {
 			// create comment text
-			let comment = comment_text(&relevance_vec, repo_config.auto_assign()).await;
+			let comment = comment_text(&relevance_vec, repo_config.auto_assign(),
+                excluded_files, small_files, review).await;
 			// add comment
 			if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
 				// TODO - add feature flag check
@@ -184,7 +185,8 @@ async fn calculate_relevance(prhunk: &PrHunkItem, review: &mut Review) -> Option
     return Some(relevance_vec);
 }
 
-async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
+async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool,
+    excluded_files: &Vec<StatItem>, small_files: &Vec<StatItem>, review: &Review) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
     comment += "| Contributor Name/Alias  | Relevance |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
@@ -208,6 +210,14 @@ async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> Stri
         comment += &format!("Missing profile handles for {} aliases. [Go to your Vibinex settings page](https://vibinex.com/settings) to map aliases to profile handles.", unmapped_aliases.len());
     }
 
+    if !excluded_files.is_empty() {
+        comment += "\n\n";
+        comment += "Ignoring following files due to large size: ";
+        for file_item in excluded_files {
+            comment += &format!("- {}\n", file_item.filepath.as_str());
+        }
+    }
+
     if auto_assign {
         comment += "\n\n";
         comment += "Auto assigning to relevant reviewers.";
@@ -217,40 +227,103 @@ async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> Stri
     comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
     comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
 
-    if let Some(mermaid_text) = mermaid_comment().await {
+    if let Some(mermaid_text) = mermaid_comment(small_files, review).await {
         comment += mermaid_text.as_str();
     }
 
     return comment;
 }
 
-pub async fn mermaid_comment() -> Option<String> {
-    match get_changed_files().and_then(read_files) {
-        Some(file_contents) => {
-            let prompt = format!(
-                "Files changed:\n{}\nQuestion: Generate a mermaid diagram to represent the changes.",
-                file_contents
-            );
-
-            match call_llm_api(prompt).await {
-                Some(mermaid_response) => {
-                    let mermaid_comment = format!(
-                        "### Call Stack Diff\n```mermaid\n{}\n```",
-                        mermaid_response
-                    );
-                    return Some(mermaid_comment);
-                }
-                    None => {
-                        log::error!("[mermaid_comment] Failed to call LLM API");
-                        return None;
-                    }
-                }
-            }
+pub async fn mermaid_comment(small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
+    let (file_lines_del_map, file_lines_add_map) = get_changed_files(small_files, review);
+    let files: Vec<String> = small_files.iter().map(|item| item.filepath.clone()).collect();
+    let system_prompt_opt = read_file("/app/prompt");
+    if system_prompt_opt.is_none() {
+        log::error!("[mermaid_comment] Unable to read system prompt");
+        return None;
+    }
+    let system_prompt = system_prompt_opt.expect("Empty system_prompt_opt");
+    for file in files {
+        let file_path = format!("{}/{}", review.clone_dir(), &file);
+        if !file.ends_with(".rs") {
+            log::debug!("[mermaid_comment] File extension not valid: {}", &file);
+            continue;
+        }
+        match read_file(&file_path) {
             None => {
                 log::error!("[mermaid_comment] Failed to read changed files:");
                 return None;
             }
+            Some(file_contents) => {
+                let numbered_content = file_contents
+                    .lines()
+                    .enumerate()
+                    .map(|(index, line)| format!("{} {}", index + 1, line))
+                    .collect::<Vec<String>>()
+                    .join("\n");
+                let call_stack_del_opt = process_call_stack_changes(&system_prompt,
+                    &numbered_content,
+                    &file_lines_del_map,
+                    &file
+                ).await;
+                // let call_stack_add_opt = process_call_stack_changes(&system_prompt,
+                //     &numbered_content,
+                //     &file_lines_add_map,
+                //     &file
+                // ).await;
+                // if call_stack_add_opt.is_none() || call_stack_del_opt.is_none() {
+                //     log::error!("[mermaid_comment] Unable to generate call stacks for added and deleted lines");
+                //     return None;
+                // }
+                let call_stack_del = call_stack_del_opt.expect("Empty call_stack_del_opt");
+                // let call_stack_add = call_stack_add_opt.expect("Empty call_stack_add");
+                let mermaid_comment = format!(
+                    "### Call Stack Diff\nDeletions - \n```mermaid\n{}\n```",
+                    call_stack_del,
+                    // call_stack_add
+                );
+                return Some(mermaid_comment);
+            }
         }
+    }
+    return None;
+}
+
+async fn process_call_stack_changes(system_prompt: &str,
+    numbered_content: &str,
+    file_lines_map: &HashMap<String, Vec<(usize, usize)>>,
+    file: &str
+) -> Option<String> {
+    let lines_vec = &file_lines_map[file];
+    log::debug!("[process_call_stack_changes] lines_vec = {:?}", &lines_vec);
+    for (line_start, line_end) in lines_vec {
+        log::debug!("[process_call_stack_changes] line start, end = {}, {}", &line_start, &line_end);
+        let prompt = format!(
+            "{}\n\n### User Message\nInput -\n{}\n{}\nLine Start - {}\nLine End - {}\n\nOutput -",
+            system_prompt,
+            &file,
+            numbered_content,
+            line_start,
+            line_end
+        );
+        match call_llm_api(prompt).await {
+            None => {
+                log::error!("[mermaid_comment] Failed to call LLM API");
+                return None;
+            }
+            Some(llm_response) => {
+                // let mermaid_response_opt = parse_llm_response(&llm_response);
+                // if mermaid_response_opt.is_none() {
+                //     log::error!("[process_call_stack_changes] Unable to parse llm response");
+                //     return None;
+                // }
+                // let mermaid_response = mermaid_response_opt.expect("Empty mermaid_response_opt"); 
+                // return Some(mermaid_response);
+                return None;
+            }
+        }   
+    }
+    return None;
 }
 
 pub fn deduplicated_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {

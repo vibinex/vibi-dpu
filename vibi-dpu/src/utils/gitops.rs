@@ -17,7 +17,7 @@ use crate::utils::repo::Repository;
 
 #[derive(Debug, Serialize, Default, Deserialize)]
 pub struct StatItem {
-	filepath: String,
+	pub filepath: String,
 	additions: i32,
 	deletions: i32,
 }
