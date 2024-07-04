@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -85,4 +85,23 @@ pub fn read_file(file: &str) -> Option<String> {
 
 pub fn parse_llm_response(llm_response: &str) -> Option<String> {
     return None;
+}
+
+pub fn get_specific_lines(line_numbers: Vec<(usize, usize)>, numbered_content: &str) -> String {
+    // Split the input content into lines and collect into a vector
+    let lines: Vec<&str> = numbered_content.lines().collect();
+    let mut result = String::new();
+    
+    // Iterate over each line number we are interested in
+    for (start, end) in line_numbers {
+        for line_number in start..=end {
+            // Check if the line_number is within the bounds of the vector
+            if line_number < lines.len() {
+                result.push_str(lines[line_number]);
+                result.push('\n');
+            }
+        }
+    }
+    
+    return result;
 }

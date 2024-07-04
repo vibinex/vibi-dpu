@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, llm::{gitops::get_changed_files, utils::{call_llm_api, parse_llm_response, read_file}}, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
+use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, llm::{function_info::{extract_function_calls, extract_function_import_path, extract_function_lines}, gitops::get_changed_files, utils::{call_llm_api, parse_llm_response, read_file}}, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
@@ -237,7 +237,7 @@ async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool,
 pub async fn mermaid_comment(small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
     let (file_lines_del_map, file_lines_add_map) = get_changed_files(small_files, review);
     let files: Vec<String> = small_files.iter().map(|item| item.filepath.clone()).collect();
-    let system_prompt_opt = read_file("/app/prompt");
+    let system_prompt_opt = read_file("/app/prompt_function_lines");
     if system_prompt_opt.is_none() {
         log::error!("[mermaid_comment] Unable to read system prompt");
         return None;
@@ -251,7 +251,7 @@ pub async fn mermaid_comment(small_files: &Vec<StatItem>, review: &Review) -> Op
         }
         match read_file(&file_path) {
             None => {
-                log::error!("[mermaid_comment] Failed to read changed files:");
+                log::error!("[mermaid_comment] Failed to read changed files:{}", &file_path);
                 return None;
             }
             Some(file_contents) => {
@@ -261,9 +261,37 @@ pub async fn mermaid_comment(small_files: &Vec<StatItem>, review: &Review) -> Op
                     .map(|(index, line)| format!("{} {}", index + 1, line))
                     .collect::<Vec<String>>()
                     .join("\n");
+                let flinemap_opt = extract_function_lines(
+                    &numbered_content,
+                    &system_prompt,
+                    &file
+                ).await;
+                if flinemap_opt.is_none() {
+                    log::debug!(
+                        "[mermaid_comment] Unable to generate function line map for file: {}", &file);
+                    continue;
+                }
+                let flinemap = flinemap_opt.expect("Empty flinemap_opt");
                 let call_stack_del_opt = process_call_stack_changes(&system_prompt,
                     &numbered_content,
                     &file_lines_del_map,
+                    &file
+                ).await;
+                // deleted lines
+                let del_lines = &file_lines_del_map[&file];
+                let called_funcs_opt = extract_function_calls(
+                    del_lines,
+                    &numbered_content,
+                    &file
+                ).await;
+                if called_funcs_opt.is_none() {
+                    log::error!("[mermaid_comment] Unable to get called functions for file: {}", &file);
+                    continue;
+                }
+                let called_funcs = called_funcs_opt.expect("Empty called_funcs_opt");
+                let called_func_paths = extract_function_import_path(
+                    &called_funcs,
+                    &numbered_content,
                     &file
                 ).await;
                 // let call_stack_add_opt = process_call_stack_changes(&system_prompt,
