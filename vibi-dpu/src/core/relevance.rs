@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, llm::{function_info::{extract_function_calls, extract_function_import_path, extract_function_lines}, gitops::get_changed_files, utils::{call_llm_api, parse_llm_response, read_file}}, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
+use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, llm::mermaid_elements::generate_mermaid_flowchart, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
@@ -235,123 +235,17 @@ async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool,
 }
 
 pub async fn mermaid_comment(small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
-    let (file_lines_del_map, file_lines_add_map) = get_changed_files(small_files, review);
-    let files: Vec<String> = small_files.iter().map(|item| item.filepath.clone()).collect();
-    let system_prompt_opt = read_file("/app/prompt_function_lines");
-    if system_prompt_opt.is_none() {
-        log::error!("[mermaid_comment] Unable to read system prompt");
+    let flowchart_str_opt = generate_mermaid_flowchart(small_files, review).await;
+    if flowchart_str_opt.is_none() {
+        log::error!("[mermaid_comment] Unable to generate flowchart for review: {}", review.id());
         return None;
     }
-    let system_prompt = system_prompt_opt.expect("Empty system_prompt_opt");
-    for file in files {
-        let file_path = format!("{}/{}", review.clone_dir(), &file);
-        if !file.ends_with(".rs") {
-            log::debug!("[mermaid_comment] File extension not valid: {}", &file);
-            continue;
-        }
-        match read_file(&file_path) {
-            None => {
-                log::error!("[mermaid_comment] Failed to read changed files:{}", &file_path);
-                return None;
-            }
-            Some(file_contents) => {
-                let numbered_content = file_contents
-                    .lines()
-                    .enumerate()
-                    .map(|(index, line)| format!("{} {}", index + 1, line))
-                    .collect::<Vec<String>>()
-                    .join("\n");
-                let flinemap_opt = extract_function_lines(
-                    &numbered_content,
-                    &system_prompt,
-                    &file
-                ).await;
-                if flinemap_opt.is_none() {
-                    log::debug!(
-                        "[mermaid_comment] Unable to generate function line map for file: {}", &file);
-                    continue;
-                }
-                let flinemap = flinemap_opt.expect("Empty flinemap_opt");
-                let call_stack_del_opt = process_call_stack_changes(&system_prompt,
-                    &numbered_content,
-                    &file_lines_del_map,
-                    &file
-                ).await;
-                // deleted lines
-                let del_lines = &file_lines_del_map[&file];
-                let called_funcs_opt = extract_function_calls(
-                    del_lines,
-                    &numbered_content,
-                    &file
-                ).await;
-                if called_funcs_opt.is_none() {
-                    log::error!("[mermaid_comment] Unable to get called functions for file: {}", &file);
-                    continue;
-                }
-                let called_funcs = called_funcs_opt.expect("Empty called_funcs_opt");
-                let called_func_paths = extract_function_import_path(
-                    &called_funcs,
-                    &numbered_content,
-                    &file
-                ).await;
-                // let call_stack_add_opt = process_call_stack_changes(&system_prompt,
-                //     &numbered_content,
-                //     &file_lines_add_map,
-                //     &file
-                // ).await;
-                // if call_stack_add_opt.is_none() || call_stack_del_opt.is_none() {
-                //     log::error!("[mermaid_comment] Unable to generate call stacks for added and deleted lines");
-                //     return None;
-                // }
-                let call_stack_del = call_stack_del_opt.expect("Empty call_stack_del_opt");
-                // let call_stack_add = call_stack_add_opt.expect("Empty call_stack_add");
-                let mermaid_comment = format!(
-                    "### Call Stack Diff\nDeletions - \n```mermaid\n{}\n```",
-                    call_stack_del,
-                    // call_stack_add
-                );
-                return Some(mermaid_comment);
-            }
-        }
-    }
-    return None;
-}
-
-async fn process_call_stack_changes(system_prompt: &str,
-    numbered_content: &str,
-    file_lines_map: &HashMap<String, Vec<(usize, usize)>>,
-    file: &str
-) -> Option<String> {
-    let lines_vec = &file_lines_map[file];
-    log::debug!("[process_call_stack_changes] lines_vec = {:?}", &lines_vec);
-    for (line_start, line_end) in lines_vec {
-        log::debug!("[process_call_stack_changes] line start, end = {}, {}", &line_start, &line_end);
-        let prompt = format!(
-            "{}\n\n### User Message\nInput -\n{}\n{}\nLine Start - {}\nLine End - {}\n\nOutput -",
-            system_prompt,
-            &file,
-            numbered_content,
-            line_start,
-            line_end
-        );
-        match call_llm_api(prompt).await {
-            None => {
-                log::error!("[mermaid_comment] Failed to call LLM API");
-                return None;
-            }
-            Some(llm_response) => {
-                // let mermaid_response_opt = parse_llm_response(&llm_response);
-                // if mermaid_response_opt.is_none() {
-                //     log::error!("[process_call_stack_changes] Unable to parse llm response");
-                //     return None;
-                // }
-                // let mermaid_response = mermaid_response_opt.expect("Empty mermaid_response_opt"); 
-                // return Some(mermaid_response);
-                return None;
-            }
-        }   
-    }
-    return None;
+    let flowchart_str = flowchart_str_opt.expect("Empty flowchart_str_opt");
+    let mermaid_comment = format!(
+        "### Call Stack Diff\n```mermaid\n{}\n```",
+        flowchart_str,
+    );
+    return Some(mermaid_comment);
 }
 
 pub fn deduplicated_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {

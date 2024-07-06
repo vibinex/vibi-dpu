@@ -4,10 +4,10 @@ use super::utils::{call_llm_api, get_specific_lines, read_file};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionLineMap {
-    name: String,
-    line_start: i32,
-    line_end: i32,
-    inside: String
+    pub name: String,
+    pub line_start: i32,
+    pub line_end: i32,
+    pub inside: String
 }
 
 impl FunctionLineMap {
@@ -21,7 +21,13 @@ impl FunctionLineMap {
     }
 }
 
-pub async fn extract_function_lines(numbered_content: &str, system_prompt: &str, file_name: &str) -> Option<Vec<FunctionLineMap>> {
+pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> Option<Vec<FunctionLineMap>> {
+    let system_prompt_opt = read_file("/app/prompt_function_lines");
+    if system_prompt_opt.is_none() {
+        log::error!("[mermaid_comment] Unable to read system prompt");
+        return None;
+    }
+    let system_prompt = system_prompt_opt.expect("Empty system_prompt_opt");
     let mut flines = Vec::<FunctionLineMap>::new();
     // split numbered content and start for loop
     // Split the numbered_content into lines
@@ -92,8 +98,8 @@ fn process_flinemap_response(flines: &Vec<FunctionLineMap>) -> Vec<FunctionLineM
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct CalledFunction {
-    name: String,
-    line: usize
+    pub name: String,
+    pub line: usize
 }
 
 pub async fn extract_function_calls(hunk_lines: &Vec<(usize, usize)>, numbered_content: &str, file_name: &str) -> Option<Vec<CalledFunction>> {
@@ -136,7 +142,8 @@ pub async fn extract_function_calls(hunk_lines: &Vec<(usize, usize)>, numbered_c
 
 #[derive(Debug, Default, Deserialize, Clone)]
 pub struct CalledFunctionPath {
-    path: String,
+    pub path: String,
+    pub function_name: String,
     line: u32
 }
 pub async fn extract_function_import_path(called_funcs: &Vec<CalledFunction>, numbered_content: &str, file_name: &str) -> Option<Vec<CalledFunctionPath>> {
