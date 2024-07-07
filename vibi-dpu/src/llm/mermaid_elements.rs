@@ -21,7 +21,7 @@ pub async fn generate_mermaid_flowchart(small_files: &Vec<StatItem>, review: &Re
 async fn generate_flowchart_elements(small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
     let (file_lines_del_map, file_lines_add_map) = get_changed_files(small_files, review);
     let mut subgraph_map = HashMap::<String, MermaidSubgraph>::new();
-    let mut edges_vec = MermaidEdges::new(Vec::<MermaidEdge>::new());
+    let mut edges = MermaidEdges::new(Vec::<MermaidEdge>::new());
     let files: Vec<String> = small_files.iter().map(|item| item.filepath.clone()).collect();
     for file in files {
         generate_mermaid_content(
@@ -30,11 +30,16 @@ async fn generate_flowchart_elements(small_files: &Vec<StatItem>, review: &Revie
             &file,
             &file_lines_del_map,
             &file_lines_add_map,
-            &mut edges_vec,
+            &mut edges,
         ).await;
     }
     // Render content string
-    return None;
+    let subgraphs_str = subgraph_map.values().map(
+        |subgraph| subgraph.render_subgraph()
+    ).collect::<Vec<String>>().join("\n");
+    let edges_str = edges.render_edges();
+    let content_str = format!("{}\n{}", &subgraphs_str, &edges_str);
+    return Some(content_str);
 }
 
 async fn generate_mermaid_content(
