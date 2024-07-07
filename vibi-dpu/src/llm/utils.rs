@@ -4,6 +4,8 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs;
+use rand::Rng;
+
 
 use crate::utils::reqwest_client::get_client;
 
@@ -104,4 +106,16 @@ pub fn get_specific_lines(line_numbers: Vec<(usize, usize)>, numbered_content: &
     }
     
     return result;
+}
+
+pub fn generate_random_string(length: usize) -> String {
+    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
+    let mut rng = rand::thread_rng();
+    let random_string: String = (0..length)
+        .map(|_| {
+            let idx = rng.gen_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect();
+    random_string
 }
