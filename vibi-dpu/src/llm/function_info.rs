@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 use super::utils::{call_llm_api, get_specific_lines, read_file};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
+struct LlmFunctionLineMapResponse {
+    functions: Vec<FunctionLineMap>
+}
+
+#[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionLineMap {
     pub name: String,
     pub line_start: i32,
@@ -52,18 +57,23 @@ pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> 
                 return None;
             }
             Some(llm_response) => {
+                let mut unparsed_res = llm_response;
                 // parse response to FunctionLineMap
-                let flinemap_res = serde_json::from_str(&llm_response);
+                if unparsed_res.contains("```json") {
+                    unparsed_res = extract_json_from_llm_response(&unparsed_res);
+                }
+                let flinemap_res = serde_json::from_str(&unparsed_res);
+                log::debug!("[extract_function_lines] flinemap_res {:?} ", &flinemap_res);
                 if flinemap_res.is_err() {
                     let e = flinemap_res.expect_err("Empty error in flinemap_res");
                     log::error!(
                         "[extract_function_lines] Unable to deserialize llm response: {:?}, error - {:?}",
-                        &llm_response, e);
+                        &unparsed_res, e);
                     continue;
                 }
-                let flinemap = flinemap_res.expect("Uncaught error in flinemap_res");
+                let flinemapresp: LlmFunctionLineMapResponse = flinemap_res.expect("Uncaught error in flinemap_res");
                 // add to vec
-                flines.push(flinemap);
+                flines.extend(flinemapresp.functions);
             }
         }   
     }
@@ -75,7 +85,20 @@ pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> 
     return Some(parsed_flines);
 }
 
+fn extract_json_from_llm_response(llm_response: &str) -> String {
+    let start_delim = "```json"; 
+    let end_delim = "```";
+    // Find the starting index of the JSON part
+    let start_index = llm_response.find(start_delim).expect("find operation failed for ```json");
+    // Find the ending index of the JSON part
+    let end_index = llm_response[start_index + start_delim.len()..].find(end_delim).expect("find for ``` failed");
+
+    // Extract the JSON part
+    llm_response[start_index + start_delim.len()..start_index + start_delim.len() + end_index].trim().to_string()
+}
+
 fn process_flinemap_response(flines: &Vec<FunctionLineMap>) -> Vec<FunctionLineMap> {
+    log::debug!("[process_flinemap_response] flines = {:?}", &flines);
     let mut resolved_flines = vec![];
     let mut unfinished_function = FunctionLineMap::new("", 0, 0, "");
     for flinemap in flines {
@@ -92,7 +115,7 @@ fn process_flinemap_response(flines: &Vec<FunctionLineMap>) -> Vec<FunctionLineM
         }
         resolved_flines.push(flinemap.to_owned());
     }
-
+    log::debug!("[process_flinemap_response] resolved_flines = {:?}", &resolved_flines);
     return resolved_flines;
 }
 
