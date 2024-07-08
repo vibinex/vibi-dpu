@@ -199,9 +199,6 @@ pub async fn extract_function_import_path(called_funcs: &Vec<CalledFunction>, nu
 
 fn find_first_occurence(lines: &Vec<&str>, func_name: &str, hunk_line: usize) -> Option<String> {
     for (idx, line) in lines.iter().enumerate() {
-        if idx+1 > hunk_line { // assumption - import info would be above function use
-            return None;
-        }
         if idx+1 != hunk_line && line.contains(func_name) {
             return Some(line.to_owned().to_owned());
         }
