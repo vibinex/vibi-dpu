@@ -22,7 +22,7 @@ impl FunctionLineMap {
 }
 
 pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> Option<Vec<FunctionLineMap>> {
-    let system_prompt_opt = read_file("/app/prompt_function_lines");
+    let system_prompt_opt = read_file("/app/prompts/prompt_function_lines");
     if system_prompt_opt.is_none() {
         log::error!("[mermaid_comment] Unable to read system prompt");
         return None;
@@ -107,7 +107,7 @@ pub async fn extract_function_calls(hunk_lines: &Vec<(usize, usize)>, numbered_c
     let user_prompt = get_specific_lines(
         hunk_lines.to_owned(), numbered_content);
     // prepare prompt and call llm api
-    let system_prompt_opt = read_file("/app/prompt_function_calls");
+    let system_prompt_opt = read_file("/app/prompts/prompt_function_calls");
     if system_prompt_opt.is_none() {
         log::error!("[extract_function_calls] Unable to read system prompt /app/prompt_function_calls");
         return None;
@@ -144,10 +144,10 @@ pub async fn extract_function_calls(hunk_lines: &Vec<(usize, usize)>, numbered_c
 pub struct CalledFunctionPath {
     pub path: String,
     pub function_name: String,
-    line: u32
+    import_line: u32
 }
 pub async fn extract_function_import_path(called_funcs: &Vec<CalledFunction>, numbered_content: &str, file_name: &str) -> Option<Vec<CalledFunctionPath>> {
-    let system_prompt_opt = read_file("/app/prompt_function_call_path");
+    let system_prompt_opt = read_file("/app/prompts/prompt_function_call_path");
     if system_prompt_opt.is_none() {
         log::error!("[extract_function_calls] Unable to read system prompt /app/prompt_function_calls");
         return None;
@@ -158,7 +158,7 @@ pub async fn extract_function_import_path(called_funcs: &Vec<CalledFunction>, nu
     let numbered_lines: Vec<&str> = numbered_content.lines().collect();
     for called_func in called_funcs {
         // extract hunk lines from numbered content or get it as input
-        let first_occurence_line_opt = find_first_occurence(&numbered_lines, &called_func.name);
+        let first_occurence_line_opt = find_first_occurence(&numbered_lines, &called_func.name, called_func.line);
         if first_occurence_line_opt.is_none() {
             log::debug!("[extract_function_import_path] No first occurence found for: {}", &called_func.name);
             continue;
@@ -197,9 +197,12 @@ pub async fn extract_function_import_path(called_funcs: &Vec<CalledFunction>, nu
     // optional - paginate
 }
 
-fn find_first_occurence(lines: &Vec<&str>, func_name: &str) -> Option<String> {
-    for line in lines {
-        if line.contains(func_name) {
+fn find_first_occurence(lines: &Vec<&str>, func_name: &str, hunk_line: usize) -> Option<String> {
+    for (idx, line) in lines.iter().enumerate() {
+        if idx+1 > hunk_line { // assumption - import info would be above function use
+            return None;
+        }
+        if idx+1 != hunk_line && line.contains(func_name) {
             return Some(line.to_owned().to_owned());
         }
     }

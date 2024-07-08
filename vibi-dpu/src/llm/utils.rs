@@ -85,10 +85,6 @@ pub fn read_file(file: &str) -> Option<String> {
     Some(content)
 }
 
-pub fn parse_llm_response(llm_response: &str) -> Option<String> {
-    return None;
-}
-
 pub fn get_specific_lines(line_numbers: Vec<(usize, usize)>, numbered_content: &str) -> String {
     // Split the input content into lines and collect into a vector
     let lines: Vec<&str> = numbered_content.lines().collect();
