@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, thread, time::Duration};
 
 use serde_json::Value;
 
@@ -109,6 +109,7 @@ pub async fn commit_check(review: &Review, access_token: &str) {
 	if !commit_exists(&review.base_head_commit(), &review.clone_dir()) 
 		|| !commit_exists(&review.pr_head_commit(), &review.clone_dir()) {
 		log::info!("Executing git pull on repo {}...", &review.repo_name());
+		thread::sleep(Duration::from_secs(1));
 		git_pull(review, access_token).await;
 	}
 }

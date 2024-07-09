@@ -62,16 +62,15 @@ pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> 
                 if unparsed_res.contains("```json") {
                     unparsed_res = extract_json_from_llm_response(&unparsed_res);
                 }
-                let flinemap_res = serde_json::from_str(&unparsed_res);
-                log::debug!("[extract_function_lines] flinemap_res {:?} ", &flinemap_res);
-                if flinemap_res.is_err() {
-                    let e = flinemap_res.expect_err("Empty error in flinemap_res");
+                let flinemap_opt = clean_and_deserialize(&unparsed_res);
+                log::debug!("[extract_function_lines] flinemap_res {:?} ", &flinemap_opt);
+                if flinemap_opt.is_none() {
                     log::error!(
-                        "[extract_function_lines] Unable to deserialize llm response: {:?}, error - {:?}",
-                        &unparsed_res, e);
+                        "[extract_function_lines] Unable to clean and deserialize llm response: {:?}",
+                        &unparsed_res);
                     continue;
                 }
-                let flinemapresp: LlmFunctionLineMapResponse = flinemap_res.expect("Uncaught error in flinemap_res");
+                let flinemapresp: LlmFunctionLineMapResponse = flinemap_opt.expect("Uncaught error in flinemap_res");
                 // add to vec
                 if flinemapresp.functions.is_some() {
                     flines.extend(flinemapresp.functions.expect("Empty functions"));
@@ -83,8 +82,22 @@ pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> 
         log::error!("[extract_function_lines] No functions extracted");
         return None;
     }
-    let parsed_flines = process_flinemap_response(&flines);
+    let parsed_flines = process_flinemap_response(&flines, lines.len());
     return Some(parsed_flines);
+}
+
+fn clean_and_deserialize(json_str: &str) -> Option<LlmFunctionLineMapResponse> {
+    let mut cleaned_str = json_str.to_string();
+    while !cleaned_str.is_empty() {
+        match serde_json::from_str(&cleaned_str) {
+            Ok(parsed) => return Some(parsed),
+            Err(e) if e.to_string().contains("trailing characters") => {
+                cleaned_str.pop(); // Remove the last character and try again
+            }
+            Err(e) => return None,
+        }
+    }
+    None
 }
 
 fn extract_json_from_llm_response(llm_response: &str) -> String {
@@ -99,7 +112,7 @@ fn extract_json_from_llm_response(llm_response: &str) -> String {
     llm_response[start_index + start_delim.len()..start_index + start_delim.len() + end_index].trim().to_string()
 }
 
-fn process_flinemap_response(flines: &Vec<FunctionLineMap>) -> Vec<FunctionLineMap> {
+fn process_flinemap_response(flines: &Vec<FunctionLineMap>, total_lines: usize) -> Vec<FunctionLineMap> {
     log::debug!("[process_flinemap_response] flines = {:?}", &flines);
     let mut resolved_flines: Vec<FunctionLineMap> = vec![];
     for flinemap in flines {
@@ -112,9 +125,16 @@ fn process_flinemap_response(flines: &Vec<FunctionLineMap>) -> Vec<FunctionLineM
         }
         resolved_flines.push(flinemap.to_owned());
     }
+    if let Some(last_flinemap) = resolved_flines.last() {
+        if last_flinemap.line_end == -1 {
+            let fline_len = resolved_flines.len();
+            resolved_flines[fline_len - 1].line_end = total_lines as i32;
+        }
+    }
     log::debug!("[process_flinemap_response] resolved_flines = {:?}", &resolved_flines);
     return resolved_flines;
 }
+
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 struct LlmCalledFunctionResponse {
     functions: Option<Vec<CalledFunction>>

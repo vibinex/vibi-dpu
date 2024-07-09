@@ -28,6 +28,12 @@ impl MermaidSubgraph {
     }
 
     pub fn add_node(&mut self, node: MermaidNode) {
+        if self.nodes.contains_key(node.function_name()) {
+            log::error!(
+                "[add_node] Node already exists: old - {:#?}, new - {:#?}",
+                &self.nodes[node.function_name()], &node);
+            return;
+        }
         self.nodes.insert(node.function_name.to_string(), node);
     }
 
@@ -150,7 +156,7 @@ impl MermaidEdge {
     }
 }
 
-
+#[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct MermaidEdges {
     all_edges: Vec<MermaidEdge>,
 }

@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{borrow::BorrowMut, collections::HashMap};
 
-use crate::utils::{gitops::StatItem, review::Review};
+use crate::utils::{gitops::{git_checkout_commit, StatItem}, review::Review};
 
 use super::{elements::{MermaidEdge, MermaidEdges, MermaidNode, MermaidSubgraph}, function_info::{extract_function_calls, extract_function_import_path, extract_function_lines, CalledFunction, CalledFunctionPath, FunctionLineMap}, gitops::get_changed_files, utils::read_file};
 
@@ -23,16 +23,32 @@ async fn generate_flowchart_elements(small_files: &Vec<StatItem>, review: &Revie
     let mut subgraph_map = HashMap::<String, MermaidSubgraph>::new();
     let mut edges = MermaidEdges::new(Vec::<MermaidEdge>::new());
     let files: Vec<String> = small_files.iter().map(|item| item.filepath.clone()).collect();
-    for file in files {
-        generate_mermaid_content(
-            &mut subgraph_map,
-            review,
-            &file,
-            &file_lines_del_map,
-            &file_lines_add_map,
-            &mut edges,
-        ).await;
+    for file in files.iter() {
+        if file_lines_add_map.contains_key(file) {
+            generate_mermaid_content(
+                &mut subgraph_map,
+                review,
+                file,
+                &file_lines_add_map,
+                &mut edges,
+                "green"
+            ).await;
+        }
     }
+    git_checkout_commit(review, review.base_head_commit());
+    for file in files.iter() {
+        if file_lines_del_map.contains_key(file) {
+            generate_mermaid_content(
+                &mut subgraph_map,
+                review,
+                file,
+                &file_lines_del_map,
+                &mut edges,
+                "red"
+            ).await;
+        }
+    }
+    log::debug!("[generate_flowchart_elements] subgraph_map = {:#?}", &subgraph_map);
     // Render content string
     let subgraphs_str = subgraph_map.values().map(
         |subgraph| subgraph.render_subgraph()
@@ -44,9 +60,9 @@ async fn generate_flowchart_elements(small_files: &Vec<StatItem>, review: &Revie
 
 async fn generate_mermaid_content(
     subgraph_map: &mut HashMap<String,MermaidSubgraph>, review: &Review, file: &str,
-    file_lines_del_map: &HashMap<String, Vec<(usize, usize)>>,
-    file_lines_add_map: &HashMap<String, Vec<(usize, usize)>>,
-    edges: &mut MermaidEdges
+    file_lines_map: &HashMap<String, Vec<(usize, usize)>>,
+    edges: &mut MermaidEdges,
+    color: &str
 ) {
     if !file.ends_with(".rs") {
         log::debug!("[mermaid_comment] File extension not valid: {}", &file);
@@ -66,73 +82,45 @@ async fn generate_mermaid_content(
         .map(|(index, line)| format!("{} {}", index, line))
         .collect::<Vec<String>>()
         .join("\n");
-    // let flinemap_opt = extract_function_lines(
-    //     &numbered_content,
-    //     file
-    // ).await;
-    // if flinemap_opt.is_none() {
-    //     log::debug!(
-    //         "[generate_mermaid_content] Unable to generate function line map for file: {}", file);
-    //     return;
-    // }
-    // let flinemap = flinemap_opt.expect("Empty flinemap_opt");
-    let flinemap = vec![
-        FunctionLineMap::new("unknown", -1, 30, "devprofiler/src/main.rs"),
-        FunctionLineMap::new("UserAlias", 34, 36, "devprofiler/src/main.rs"),
-        FunctionLineMap::new("process_repos", 38, 67, "devprofiler/src/main.rs"),
-        FunctionLineMap::new("process_aliases", 78, 116, "devprofiler/src/main.rs"),
-        FunctionLineMap::new("main", 119, 195, "devprofiler/src/main.rs"),
-    ];
+    let flinemap_opt = extract_function_lines(
+        &numbered_content,
+        file
+    ).await;
+    if flinemap_opt.is_none() {
+        log::debug!(
+            "[generate_mermaid_content] Unable to generate function line map for file: {}", file);
+        return;
+    }
+    let flinemap = flinemap_opt.expect("Empty flinemap_opt");
     // deleted lines
     let called_info_del_opt = generate_called_function_info(
-        file_lines_del_map, &numbered_content, file).await;
+        file_lines_map, &numbered_content, file).await;
     if called_info_del_opt.is_none() {
         log::error!("[generate_mermaid_content] Unable to generate called functions info");
         return;
     }
     let (called_funcs_del, called_func_paths_del) = called_info_del_opt.expect("Empty called_info_opt");
     generate_callee_nodes(&called_func_paths_del, subgraph_map);
-    let file_subgraph = MermaidSubgraph::new(
-        file.to_string(), HashMap::<String,MermaidNode>::new());
     generate_caller_elements(
         subgraph_map,
-        &file_lines_del_map[file],
+        &file_lines_map[file],
         &flinemap,
         &called_funcs_del,
         &called_func_paths_del,
-        &file_subgraph,
         edges,
-        "red");
-    // added lines
-    let called_info_add_opt = generate_called_function_info(
-        file_lines_add_map, &numbered_content, file).await;
-    if called_info_add_opt.is_none() {
-        log::error!("[generate_mermaid_content] Unable to generate called functions info");
-        return;
-    }
-    let (called_funcs_add, called_func_paths_add) = called_info_add_opt.expect("Empty called_info_opt");
-    generate_callee_nodes(&called_func_paths_add, subgraph_map);
-    generate_caller_elements(
-        subgraph_map,
-        &file_lines_add_map[file],
-        &flinemap,
-        &called_funcs_add,
-        &called_func_paths_add,
-        &file_subgraph,
-        edges,
-        "green");
-    subgraph_map.insert(file.to_string(), file_subgraph);
+        &file,
+        color);
     return;
 }
 
-fn generate_caller_elements(subgraph_map: &HashMap<String,MermaidSubgraph>,
+fn generate_caller_elements(subgraph_map: &mut HashMap<String, MermaidSubgraph>,
     hunk_lines: &Vec<(usize, usize)>,
     flinemap: &Vec<FunctionLineMap>,
     called_funcs: &Vec<CalledFunction>,
     called_funcs_path: &Vec<CalledFunctionPath>,
-    file_subgraph: &MermaidSubgraph,
-    edges: &mut MermaidEdges, 
-    color: &str) 
+    edges: &mut MermaidEdges,
+    filename: &str,
+    color: &str)
 {
     for cf in called_funcs {
         let func_name_opt = get_func_from_line(cf.line, flinemap);
@@ -141,26 +129,51 @@ fn generate_caller_elements(subgraph_map: &HashMap<String,MermaidSubgraph>,
             continue;
         }
         let func_name = func_name_opt.expect("Empty func_name_opt");
-        let caller_node = match file_subgraph.nodes().get(&func_name) {
-            Some(node) => node.to_owned(),
-            None => MermaidNode::new(func_name.clone())
-        };
+        let caller_node;
+        
+        // Borrow subgraph_map mutably to either retrieve or insert the subgraph
+        let subgraph = subgraph_map.entry(filename.to_string()).or_insert_with(|| {
+            MermaidSubgraph::new(filename.to_string(), HashMap::new())
+        });
+        
+        // Borrow subgraph mutably to either retrieve or insert the node
+        if let Some(node) = subgraph.nodes().get(&func_name) {
+            caller_node = node.to_owned();
+        } else {
+            caller_node = MermaidNode::new(func_name.clone());
+            subgraph.add_node(caller_node.clone());
+        }
+
+        log::debug!("[generate_caller_elements] subgraph_map = {:#?}", subgraph_map);
+        
         for cfp in called_funcs_path {
             if cf.name == cfp.function_name {
-                edges.add_edge(MermaidEdge::new(
-                    cf.line,
-                    caller_node.to_owned(),
-                    subgraph_map[&cfp.import_path].nodes()[&cf.name].to_owned(),
-                    color.to_string()
-                ));
+                // Ensure we do not have an immutable borrow of subgraph_map while we borrow it immutably here
+                if let Some(import_subgraph) = subgraph_map.get(&cfp.import_path) {
+                    if let Some(called_node) = import_subgraph.nodes().get(&cf.name) {
+                        edges.add_edge(MermaidEdge::new(
+                            cf.line,
+                            caller_node.clone(),
+                            called_node.to_owned(),
+                            color.to_string()
+                        ));
+                    }
+                }
             }
-        }        
+        }
+        log::debug!("[generate_caller_elements] edges = {:#?}", &edges);      
     }
 }
 
+
 fn get_func_from_line(line: usize, flinemaps: &[FunctionLineMap]) -> Option<String> {
     for flinemap in flinemaps {
+        log::debug!("[get_func_from_line] flinemap = {:#?}, line: {}", &flinemap, line);
+        log::debug!(
+            "[get_func_from_line] condition = {:?}",
+            (flinemap.line_start <= line as i32 && flinemap.line_end >= line as i32));
         if flinemap.line_start <= line as i32 && flinemap.line_end >= line as i32 {
+            log::debug!("[get_func_from_line] inside if");
             return Some(flinemap.name.to_string());
         }
     }
@@ -197,10 +210,6 @@ async fn generate_called_function_info(file_lines_map: &HashMap<String, Vec<(usi
 )
     -> Option<(Vec<CalledFunction>, Vec<CalledFunctionPath>)>
 {
-    if !file_lines_map.contains_key(filename) {
-        log::error!("[generate_called_function_info] Unable to find file: {} in map", &filename);
-        return None;
-    }
     let del_lines = &file_lines_map[filename];
     let called_funcs_opt = extract_function_calls(
         del_lines,

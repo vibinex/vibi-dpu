@@ -89,6 +89,29 @@ pub async fn git_pull(review: &Review, access_token: &str) {
 	};
 }
 
+pub fn git_checkout_commit(review: &Review, commit_id: &str) {
+	let directory = review.clone_dir();
+	let output_res = Command::new("git")
+		.arg("checkout")
+		.arg(commit_id)
+		.current_dir(directory)
+		.output();
+	if output_res.is_err() {
+		let e = output_res.expect_err("No error in output_res");
+		log::error!("[git_pull] failed to execute git pull: {:?}", e);
+		return;
+	}
+	let output = output_res.expect("Uncaught error in output_res");
+	match str::from_utf8(&output.stderr) {
+		Ok(v) => log::debug!("[git_pull] git pull stderr = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[git_pull] git pull stderr error {}", e)}, 
+	};
+	match str::from_utf8(&output.stdout) {
+		Ok(v) => log::debug!("[git_pull] git pull stdout = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[git_pull] git pull stdout error {}", e)}, 
+	};
+}
+
 fn set_git_url(git_url: &str, directory: &str, access_token: &str, repo_provider: &str) {
     let clone_url_opt = create_clone_url(git_url, access_token, repo_provider);
 	if clone_url_opt.is_none(){
