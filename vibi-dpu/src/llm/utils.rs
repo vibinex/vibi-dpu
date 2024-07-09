@@ -50,7 +50,6 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
         start = end + 1;
     }
 
-    log::debug!("[call_llm_api] chunks = {:?}", &chunks);
     for chunk in chunks {
         let parsed_chunk_res = serde_json::from_str(&chunk);
         if parsed_chunk_res.is_err() {
@@ -89,9 +88,13 @@ pub fn get_specific_lines(line_numbers: Vec<(usize, usize)>, numbered_content: &
     // Split the input content into lines and collect into a vector
     let lines: Vec<&str> = numbered_content.lines().collect();
     let mut result = String::new();
-    
     // Iterate over each line number we are interested in
-    for (start, end) in line_numbers {
+    for (mut start, mut end) in line_numbers {
+        if start > end {
+            let xchng = start;
+            start = end;
+            end = xchng;
+        }
         for line_number in start..=end {
             // Check if the line_number is within the bounds of the vector
             if line_number < lines.len() {
@@ -100,7 +103,6 @@ pub fn get_specific_lines(line_numbers: Vec<(usize, usize)>, numbered_content: &
             }
         }
     }
-    
     return result;
 }
 

@@ -37,7 +37,7 @@ impl MermaidSubgraph {
             all_nodes.push(node.render_node());
         }
         let subgraph_str = format!(
-            "\tsubgraph {} [{}]\n{}\t\tend\n",
+            "\tsubgraph {} [{}]\n{}\nend\n",
             self.mermaid_id,
             self.name,
             all_nodes.join("\n")

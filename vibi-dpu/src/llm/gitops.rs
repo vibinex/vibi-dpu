@@ -71,7 +71,7 @@ pub fn get_changed_files(small_files: &Vec<StatItem>, review: &Review) -> (HashM
             del_hunks_map.insert(filepath.to_string(), del_hunks);
         }
     }
-    (add_hunks_map, del_hunks_map)
+    (del_hunks_map, add_hunks_map)
 }
 
 fn parse_hunk_range(hunk: &str) -> Option<(usize, usize)> {
@@ -84,6 +84,9 @@ fn parse_hunk_range(hunk: &str) -> Option<(usize, usize)> {
         }
     } else if parts.len() == 2 {
         if let (Ok(start), Ok(len)) = (parts[0].parse::<usize>(), parts[1].parse::<usize>()) {
+            if len == 0 {
+                return None;
+            }
             return Some((start, len));
         }
     }
