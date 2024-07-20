@@ -40,14 +40,21 @@ pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> 
     
     // Determine the batch size
     let batch_size = 30;
-    
+    let mut prev_state: Option<FunctionLineMap> = None;
     // Iterate over the lines in chunks of batch_size
     for chunk in lines.chunks(batch_size) {
         // create prompt
         // call llm api
+        let mut prev_state_str = "{}".to_string();
+        if prev_state.is_some() {
+            if let Ok(res_str) = serde_json::to_string(&prev_state) {
+                prev_state_str = res_str;
+            }
+        }
         let prompt = format!(
-            "{}\n\n### User Message\nInput -\n{}\n{}\n\nOutput -",
+            "{}\n\n### User Message\nInput -\nprev_state ={}\n{}\n{}\n\nOutput -",
             system_prompt,
+            prev_state_str,
             file_name,
             chunk.join("\n")
         );
@@ -73,7 +80,15 @@ pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> 
                 let flinemapresp: LlmFunctionLineMapResponse = flinemap_opt.expect("Uncaught error in flinemap_res");
                 // add to vec
                 if flinemapresp.functions.is_some() {
-                    flines.extend(flinemapresp.functions.expect("Empty functions"));
+                    let functions_arr = flinemapresp.functions.expect("Empty functions");
+                    if !functions_arr.is_empty() {
+                        if let Some(func_obj) = functions_arr.last() {
+                            if func_obj.line_end == -1 {
+                                prev_state = Some(func_obj.clone());
+                            }
+                        }
+                        flines.extend(functions_arr);
+                    }
                 }
             }
         }   
