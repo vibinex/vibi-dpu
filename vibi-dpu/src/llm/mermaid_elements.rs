@@ -2,9 +2,16 @@ use std::{borrow::BorrowMut, collections::HashMap};
 
 use crate::utils::{gitops::{git_checkout_commit, StatItem}, review::Review};
 
-use super::{elements::{MermaidEdge, MermaidEdges, MermaidNode, MermaidSubgraph}, function_info::{extract_function_calls, extract_function_import_path, extract_function_lines, CalledFunction, CalledFunctionPath, FunctionLineMap}, gitops::get_changed_files, utils::read_file};
+use super::{elements::{MermaidEdge, MermaidEdges, MermaidNode, MermaidSubgraph}, function_info::{extract_function_calls, extract_function_import_path, extract_function_lines, CalledFunction, CalledFunctionPath, FunctionLineMap}, function_line_range::generate_function_map, gitops::get_changed_files, utils::read_file};
 
 pub async fn generate_mermaid_flowchart(small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
+    let function_map_opt = generate_function_map(review).await;
+    if function_map_opt.is_none() {
+        log::error!("[generate_mermaid_flowchart] Unable to generate function map");
+        return None;
+    }
+    let function_map = function_map_opt.expect("Empty function_map_opt");
+    log::debug!("[generate_mermaid_flowchart] func map = {:?}", &function_map);
     let flowchart_content_res = generate_flowchart_elements(small_files, review).await;
     if flowchart_content_res.is_none() {
         log::error!("[generate_mermaid_flowchart] Unable to generate flowchart content, review: {}", review.id());
