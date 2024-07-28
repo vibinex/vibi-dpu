@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use walkdir::WalkDir;
 
 use crate::utils::review::Review;
 
@@ -71,48 +72,38 @@ pub async fn generate_function_map(review: &Review) -> Option<AllFileFunctions> 
     let mut all_file_functions = AllFileFunctions { func_map: HashMap::new() };
     let system_prompt_opt = read_file("/app/prompts/prompt_function_lines");
     if system_prompt_opt.is_none() {
-        log::error!("[mermaid_comment] Unable to read system prompt");
+        log::error!("[mermaid_comment] Unable to read prompt_function_lines");
         return None;
     }
     let system_prompt_lines = system_prompt_opt.expect("Empty system_prompt");
-    let system_prompt_end_opt = read_file("/app/prompts/prompt_function_lines_end");
+    let system_prompt_end_opt = read_file("/app/prompts/prompt_function_boundary");
     if system_prompt_end_opt.is_none() {
-        log::error!("[mermaid_comment] Unable to read system prompt");
+        log::error!("[mermaid_comment] Unable to read prompt_function_boundary");
         return None;
     }
     let system_prompt_lines_end = system_prompt_end_opt.expect("Empty system_prompt");
-    let entries_res = std::fs::read_dir(dir);
-    if entries_res.is_err() {
-        let e = entries_res.expect_err("Empty error in entry_res");
-        log::error!(
-            "[generate_function_map] Error reading dir: {} error = {:?}", dir, e);
-        return None;
-    }
-    let entries = entries_res.expect("Empty error in entry_res");
-    for entry_res in entries {
-        if entry_res.is_err() {
-            let e = entry_res.expect_err("Empty error in entry_res");
-            log::error!(
-                "[generate_function_map] Error reading, skipping directory entry, error = {:?}", e);
-            continue;
-        }
-        let entry = entry_res.expect("Empty entry_res");
+    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
+        log::debug!("[generate_function_map] path = {:?}", path);
+        let ext = path.extension().and_then(|ext| ext.to_str());
+        log::debug!("[generate_function_map] extension = {:?}", &ext);
         if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            let content = std::fs::read_to_string(path.clone()).ok()?;
+            let file_contents = std::fs::read_to_string(path).ok()?;
+            let lines = file_contents
+                .lines()
+                .enumerate()
+                .map(|(index, line)| format!("{} {}", index+1, line))
+                .collect::<Vec<String>>();
             let mut function_map = FunctionFileMap {
                 file_name: path.to_str().unwrap().to_string(),
                 functions: Vec::new(),
             };
-
-            // Divide content into chunks of 30 lines
-            let lines: Vec<&str> = content.lines().collect();
             // TODO - convert lines to numbered content
             let chunks = lines.chunks(50);
 
             for chunk in chunks {
                 let chunk_str = chunk.join("\n");
-                let function_defs_opt = get_function_defs_in_chunk(&chunk_str, &system_prompt_lines_end).await;
+                let function_defs_opt = get_function_defs_in_chunk(&chunk_str, &system_prompt_lines).await;
                 if function_defs_opt.is_none() {
                     log::error!("[get_function_defs_in_chunk] Unable to get functions from llm");
                     continue;
@@ -132,6 +123,7 @@ pub async fn generate_function_map(review: &Review) -> Option<AllFileFunctions> 
                     });
                 }
             }
+            log::debug!("[generate_function_map] func_map = {:#?}", &function_map);
             all_file_functions.func_map.insert(path.to_str().unwrap().to_string(), function_map);
         }
     }
@@ -152,33 +144,35 @@ async fn get_function_defs_in_chunk(chunk: &str, system_prompt: &str) -> Option<
     }
     let llm_req_prompt = llm_req_res.expect("Uncaught error in llm_req_res"); 
     let prompt = format!("{}\n\n### User Message\nInput -\n{}\nOutput -", system_prompt, llm_req_prompt);
-    match call_llm_api(prompt).await {
-        None => {
-            log::error!("[mermaid_comment] Failed to call LLM API");
-            return None;
-        }
-        Some(llm_response) => {
-            let funcdefs_res = serde_json::from_str(&llm_response);
-            if funcdefs_res.is_err() {
-                log::error!(
-                    "[get_function_defs_in_chunk] funcdefs error: {}",
-                    funcdefs_res.expect_err("Empty error in funcdefs_res"));
-                    return None;
-            }
-            let funcdefs: LlmFuncDefResponse = funcdefs_res.expect("Uncaught error in funcdefs_res");
-            return Some(funcdefs);
-        }
-    }
+    // match call_llm_api(prompt).await {
+    //     None => {
+    //         log::error!("[mermaid_comment] Failed to call LLM API");
+    //         return None;
+    //     }
+    //     Some(llm_response) => {
+    //         // let funcdefs_res = serde_json::from_str(&llm_response);
+    //         // if funcdefs_res.is_err() {
+    //         //     log::error!(
+    //         //         "[get_function_defs_in_chunk] funcdefs error: {}",
+    //         //         funcdefs_res.expect_err("Empty error in funcdefs_res"));
+    //         //         return None;
+    //         // }
+    //         // let funcdefs: LlmFuncDefResponse = funcdefs_res.expect("Uncaught error in funcdefs_res");
+    //         return Some(funcdefs);
+    //     }
+    // }
+    let funcdefs = LlmFuncDefResponse{ functions: vec![LlmFuncDef{ name: "main".to_string(), line_num: 18, parent: "".to_string() }] };
+    return Some(funcdefs);
 }
 
-async fn get_function_boundaries_in_chunk(file_lines_numbered: &Vec<&str>, func_def_line_num: usize, system_prompt: &str) -> Option<LlmFuncBoundaryResponse> {
+async fn get_function_boundaries_in_chunk(file_lines_numbered: &Vec<String>, func_def_line_num: usize, system_prompt: &str) -> Option<LlmFuncBoundaryResponse> {
     // divide lines into chunks and call with each chunk until line_end is found or files is empty
     let chunk_size = 70;
     let mut start = func_def_line_num;
     
     while start < file_lines_numbered.len() {
         let end = std::cmp::min(start + chunk_size, file_lines_numbered.len());
-        let chunk: Vec<&str> = file_lines_numbered[start..end].to_vec();
+        let chunk: Vec<String> = file_lines_numbered[start..end].to_vec();
         let chunk_str = chunk.join("\n");
         
         let input = LlmFuncBoundaryInput {
@@ -194,27 +188,32 @@ async fn get_function_boundaries_in_chunk(file_lines_numbered: &Vec<&str>, func_
         }
         let llm_req_prompt = llm_req_res.expect("Uncaught error in llm_req_res"); 
         let prompt = format!("{}\n\n### User Message\nInput -\n{}\nOutput -", system_prompt, llm_req_prompt);
-        match call_llm_api(prompt).await {
-            None => {
-                log::error!("[mermaid_comment] Failed to call LLM API");
-                return None;
-            }
-            Some(llm_response) => {
-                let func_resp_res = serde_json::from_str(&llm_response);
-                if func_resp_res.is_err() {
-                    let e = func_resp_res.expect_err("Empty error func_resp_res");
-                    log::error!("[get_function_boundaries_in_chunk] Unable to deserialize response");
-                    return None;
-                }
-                let func_resp: LlmFuncBoundaryResponse = func_resp_res.expect("Uncaught error in func_resp_res");
-                if func_resp.function_boundary == -1 {
-                    start += chunk_size;
-                    continue;
-                }
-                return Some(func_resp);
-            }
+        // match call_llm_api(prompt).await {
+        //     None => {
+        //         log::error!("[mermaid_comment] Failed to call LLM API");
+        //         return None;
+        //     }
+        //     Some(llm_response) => {
+        //         let func_resp_res = serde_json::from_str(&llm_response);
+        //         if func_resp_res.is_err() {
+        //             let e = func_resp_res.expect_err("Empty error func_resp_res");
+        //             log::error!("[get_function_boundaries_in_chunk] Unable to deserialize response");
+        //             return None;
+        //         }
+        //         let func_resp: LlmFuncBoundaryResponse = func_resp_res.expect("Uncaught error in func_resp_res");
+        //         if func_resp.function_boundary == -1 {
+        //             start += chunk_size;
+        //             continue;
+        //         }
+        //         return Some(func_resp);
+        //     }
+        // }
+        let func_resp = LlmFuncBoundaryResponse { function_boundary: 79 };
+        if func_resp.function_boundary == -1 {
+            start += chunk_size;
+            continue;
         }
+        return Some(func_resp);
     }
-
     return None;
 }
