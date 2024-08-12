@@ -38,7 +38,7 @@ pub fn get_review_from_db(repo_name: &str, repo_owner: &str,
     let review_res = serde_json::from_slice(&ivec);
     if let Err(e) = review_res {
         log::error!(
-            "[get_handles_from_db] Failed to deserialize review from json: {:?}",
+            "[get_review_from_db] Failed to deserialize review from json: {:?}",
             e
         );
         return None;

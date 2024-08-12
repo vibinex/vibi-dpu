@@ -7,6 +7,7 @@ use sha256::digest;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use tokio::fs;
+use tokio::task;
 use std::io::ErrorKind;
 
 use super::hunk::BlameItem;
@@ -15,7 +16,7 @@ use super::lineitem::LineItem;
 use crate::db::repo::save_repo_to_db;
 use crate::utils::repo::Repository;
 
-#[derive(Debug, Serialize, Default, Deserialize)]
+#[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct StatItem {
 	pub filepath: String,
 	additions: i32,

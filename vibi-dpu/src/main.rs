@@ -7,7 +7,7 @@ mod github;
 mod utils;
 mod logger;
 mod health;
-mod llm;
+mod graph;
 use github::auth::app_access_token;
 use health::status::send_status_start;
 use tokio::task;

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, llm::mermaid_elements::generate_mermaid_flowchart, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
+use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, graph::mermaid_elements::generate_mermaid_flowchart, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
@@ -226,16 +226,20 @@ async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool,
     comment += "If you are a relevant reviewer, you can use the [Vibinex browser extension](https://chromewebstore.google.com/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc) to see parts of the PR relevant to you\n";  // Added a newline at the end
     comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
     comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
-
-    if let Some(mermaid_text) = mermaid_comment(small_files, review).await {
+    let all_diff_files: Vec<StatItem> = excluded_files
+        .iter()
+        .chain(small_files.iter())
+        .cloned()  // Clone the StatItem instances since `iter` returns references
+        .collect(); // Collect into a new vector
+    if let Some(mermaid_text) = mermaid_comment(&all_diff_files, review).await {
         comment += mermaid_text.as_str();
     }
 
     return comment;
 }
 
-pub async fn mermaid_comment(small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
-    let flowchart_str_opt = generate_mermaid_flowchart(small_files, review).await;
+pub async fn mermaid_comment(diff_files: &Vec<StatItem>, review: &Review) -> Option<String> {
+    let flowchart_str_opt = generate_mermaid_flowchart(diff_files, review).await;
     if flowchart_str_opt.is_none() {
         log::error!("[mermaid_comment] Unable to generate flowchart for review: {}", review.id());
         return None;

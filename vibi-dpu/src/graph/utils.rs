@@ -1,13 +1,14 @@
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::{Path, PathBuf}, slice::Chunks};
 
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use walkdir::WalkDir;
 use std::fs;
 use rand::Rng;
 
 
-use crate::utils::reqwest_client::get_client;
+use crate::utils::{gitops::StatItem, reqwest_client::get_client, review::Review};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 struct LlmResponse {
@@ -19,7 +20,7 @@ struct LlmResponse {
 
 pub async fn call_llm_api(prompt: String) -> Option<String> {
     let client = get_client();
-    let url = "http://35.244.9.107/api/generate";
+    let url = "http://host.docker.internal:11434/api/generate";
     log::debug!("[call_llm_api] Prompt = {:?}", &prompt);
     let response_res = client.post(url)
         .json(&json!({"model": "phind-codellama", "prompt": prompt}))
@@ -68,11 +69,11 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
 }
 
 pub fn read_file(file: &str) -> Option<String> {
-    log::error!("[read_file] file name = {}", &file);
+    log::debug!("[read_file] file name = {}", &file);
     let path = Path::new(file);
     let content_res = fs::read_to_string(path);
     if !path.exists() {
-        log::error!("[read_file] Path does not exist: {:?}", &path);
+        log::error!("[read_file] File does not exist: {:?}", &path);
         return None;
     }
     if content_res.is_err() {
@@ -116,4 +117,45 @@ pub fn generate_random_string(length: usize) -> String {
         })
         .collect();
     random_string
+}
+
+pub fn all_code_files(dir: &str) -> Option<Vec<PathBuf>> {
+    let mut code_files = Vec::<PathBuf>::new();
+    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path().to_owned();
+        log::debug!("[generate_function_map] path = {:?}", path);
+        let ext = path.extension().and_then(|ext| ext.to_str());
+        log::debug!("[generate_function_map] extension = {:?}", &ext);
+        if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+            code_files.push(path);
+        }
+    }
+    if code_files.is_empty() {
+        return None;
+    }
+    return Some(code_files);
+}
+
+pub fn source_diff_files(diff_files: &Vec<StatItem>) -> Option<Vec<PathBuf>> {
+    let mut code_files = Vec::<PathBuf>::new();
+    for stat_item in diff_files {
+        let filepath_str = &stat_item.filepath;
+        let filepath = Path::new(filepath_str);
+        if filepath.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+            code_files.push(filepath.to_path_buf());
+        }
+    }
+    if code_files.is_empty() {
+        return None;
+    }
+    return Some(code_files);
+}
+
+pub fn numbered_content(file_contents: String) -> Vec<String> {
+    let lines = file_contents
+        .lines()
+        .enumerate()
+        .map(|(index, line)| format!("{} {}", index+1, line))
+        .collect::<Vec<String>>();
+    return lines;
 }

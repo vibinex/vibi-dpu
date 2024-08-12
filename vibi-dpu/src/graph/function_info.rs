@@ -42,7 +42,7 @@ pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> 
     let batch_size = 30;
     let mut prev_state: Option<FunctionLineMap> = None;
     // Iterate over the lines in chunks of batch_size
-    for chunk in lines.chunks(batch_size) {
+    for (chunk_idx, chunk) in lines.chunks(batch_size).enumerate() {
         // create prompt
         // call llm api
         let mut prev_state_str = "{}".to_string();
@@ -52,12 +52,13 @@ pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> 
             }
         }
         let prompt = format!(
-            "{}\n\n### User Message\nInput -\nprev_state ={}\n{}\n{}\n\nOutput -",
+            "{}\n\n### User Message\nInput -\nprev_state = {}\n{}\n{}\n\nOutput -",
             system_prompt,
-            prev_state_str,
+            &prev_state_str,
             file_name,
             chunk.join("\n")
         );
+        log::debug!("[extract_function_lines] prev_state_str = {}", &prev_state_str);
         match call_llm_api(prompt).await {
             None => {
                 log::error!("[mermaid_comment] Failed to call LLM API");
@@ -83,7 +84,11 @@ pub async fn extract_function_lines(numbered_content: &str, file_name: &str) -> 
                     let functions_arr = flinemapresp.functions.expect("Empty functions");
                     if !functions_arr.is_empty() {
                         if let Some(func_obj) = functions_arr.last() {
-                            if func_obj.line_end == -1 {
+                            let last_line_chunk = ((batch_size * (chunk_idx + 1)) - 1) as i32;
+                            log::debug!(
+                                "[extract_function_lines] last_line_chunk = {}, func_obj.line_end = {} ",
+                                last_line_chunk, func_obj.line_end);
+                            if func_obj.line_end == last_line_chunk {
                                 prev_state = Some(func_obj.clone());
                             }
                         }

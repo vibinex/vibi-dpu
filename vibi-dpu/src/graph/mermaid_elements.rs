@@ -1,18 +1,14 @@
-use std::{borrow::BorrowMut, collections::HashMap};
+use std::{borrow::{Borrow, BorrowMut}, collections::HashMap};
 
-use crate::utils::{gitops::{git_checkout_commit, StatItem}, review::Review};
+use crate::{graph::{file_imports::get_import_lines, graph_info::{generate_diff_graph, generate_diff_info, generate_full_graph}}, utils::{gitops::{git_checkout_commit, StatItem}, review::Review}};
 
-use super::{elements::{MermaidEdge, MermaidEdges, MermaidNode, MermaidSubgraph}, function_info::{extract_function_calls, extract_function_import_path, extract_function_lines, CalledFunction, CalledFunctionPath, FunctionLineMap}, function_line_range::generate_function_map, gitops::get_changed_files, utils::read_file};
+use super::{elements::{MermaidEdge, MermaidEdges, MermaidNode, MermaidSubgraph}, function_line_range::generate_function_map, gitops::get_changed_files, graph_info::GraphInfo, utils::read_file};
 
-pub async fn generate_mermaid_flowchart(small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
-    let function_map_opt = generate_function_map(review).await;
-    if function_map_opt.is_none() {
-        log::error!("[generate_mermaid_flowchart] Unable to generate function map");
-        return None;
-    }
-    let function_map = function_map_opt.expect("Empty function_map_opt");
-    log::debug!("[generate_mermaid_flowchart] func map = {:?}", &function_map);
-    let flowchart_content_res = generate_flowchart_elements(small_files, review).await;
+pub async fn generate_mermaid_flowchart(diff_files: &Vec<StatItem>, review: &Review) -> Option<String> {
+
+    
+    // generate graph using AllFileFunctions, ImportLines and ImportPath
+    let flowchart_content_res = generate_flowchart_elements(diff_files, review).await;
     if flowchart_content_res.is_none() {
         log::error!("[generate_mermaid_flowchart] Unable to generate flowchart content, review: {}", review.id());
         return None;
@@ -25,11 +21,35 @@ pub async fn generate_mermaid_flowchart(small_files: &Vec<StatItem>, review: &Re
     return Some(flowchart_str);
 }
 
-async fn generate_flowchart_elements(small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
-    let (file_lines_del_map, file_lines_add_map) = get_changed_files(small_files, review);
+async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review) -> Option<String> {
+    // generate full graph for base commit id
+    git_checkout_commit(review, review.base_head_commit());
+    let full_graph_opt = generate_full_graph(&review.clone_dir(), 
+    &review.db_key(), &review.base_head_commit()).await;
+    if full_graph_opt.is_none() {
+        log::error!(
+            "[generate_flowchart_elements] Unable to generate full graph for review: {}",
+            review.id());
+        return None;
+    }
+    let full_graph = full_graph_opt.expect("Empty full_graph_opt");
+    // generate diff graph for head commit id
+    git_checkout_commit(review, review.pr_head_commit());
+    let diff_graph_opt = generate_diff_graph(diff_files).await;
+    if diff_graph_opt.is_none() {
+        log::error!(
+            "[generate_flowchart_elements] Unable to generate diff graph for review: {}",
+            review.id());
+        return None;
+    }
+    let diff_graph = diff_graph_opt.expect("Empty diff_graph_opt");
+    let diff_info = generate_diff_info(&full_graph, &diff_graph); 
+    
+    
+    let (file_lines_del_map, file_lines_add_map) = get_changed_files(diff_files, review);
     let mut subgraph_map = HashMap::<String, MermaidSubgraph>::new();
     let mut edges = MermaidEdges::new(Vec::<MermaidEdge>::new());
-    let files: Vec<String> = small_files.iter().map(|item| item.filepath.clone()).collect();
+    let files: Vec<String> = diff_files.iter().map(|item| item.filepath.clone()).collect();
     for file in files.iter() {
         if file_lines_add_map.contains_key(file) {
             generate_mermaid_content(
