@@ -71,20 +71,20 @@ pub async fn generate_full_graph(repo_dir: &str, review_key: &str, commit_id: &s
     return Some(graph_info);
 }
 
-pub async fn generate_diff_graph(diff_files: &Vec<StatItem>) -> Option<GraphInfo> {
-    let diff_code_files_opt = source_diff_files(diff_files);
+pub async fn generate_diff_graph(diff_files: &Vec<StatItem>) -> (Option<GraphInfo>, Option<Vec<PathBuf>>) {
+    let (diff_code_files_opt, deleted_files_opt) = source_diff_files(diff_files);
     if diff_code_files_opt.is_none() {
         log::error!("[generate_diff_graph] Unable to get file paths for: {:#?}", diff_files);
-        return None;
+        return (None, deleted_files_opt);
     }
     let diff_code_files = diff_code_files_opt.expect("Empty diff_code_files_opt");
     let graph_info_opt = generate_graph_info(&diff_code_files).await;
     if graph_info_opt.is_none() {
         log::error!("[generate_diff_graph] Unable to generate diff graph");
-        return None;
+        return (None, deleted_files_opt);
     }
     let graph_info = graph_info_opt.expect("Empty graph_info_opt");
-    return Some(graph_info);
+    return (Some(graph_info), deleted_files_opt);
 }
 
 fn added_functions_diff(full_graph: &GraphInfo, diff_graph: &GraphInfo) -> Option<HashMap<String, Vec<FuncDefInfo>>> {

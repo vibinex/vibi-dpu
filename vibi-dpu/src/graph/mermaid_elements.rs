@@ -35,7 +35,7 @@ async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review
     let full_graph = full_graph_opt.expect("Empty full_graph_opt");
     // generate diff graph for head commit id
     git_checkout_commit(review, review.pr_head_commit());
-    let diff_graph_opt = generate_diff_graph(diff_files).await;
+    let (diff_graph_opt, deleted_files_opt) = generate_diff_graph(diff_files).await;
     if diff_graph_opt.is_none() {
         log::error!(
             "[generate_flowchart_elements] Unable to generate diff graph for review: {}",

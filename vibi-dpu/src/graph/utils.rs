@@ -136,19 +136,28 @@ pub fn all_code_files(dir: &str) -> Option<Vec<PathBuf>> {
     return Some(code_files);
 }
 
-pub fn source_diff_files(diff_files: &Vec<StatItem>) -> Option<Vec<PathBuf>> {
+pub fn source_diff_files(diff_files: &Vec<StatItem>) -> (Option<Vec<PathBuf>>, Option<Vec<PathBuf>>) {
     let mut code_files = Vec::<PathBuf>::new();
+    let mut deleted_files = Vec::<PathBuf>::new();
     for stat_item in diff_files {
         let filepath_str = &stat_item.filepath;
         let filepath = Path::new(filepath_str);
         if filepath.extension().and_then(|ext| ext.to_str()) == Some("rs") {
             code_files.push(filepath.to_path_buf());
         }
+        if !filepath.exists() {
+            deleted_files.push(filepath.to_path_buf());
+        }
     }
-    if code_files.is_empty() {
-        return None;
+    let mut code_files_retval = None;
+    let mut deleted_files_retval = None;
+    if !code_files.is_empty() {
+        code_files_retval = Some(code_files);
     }
-    return Some(code_files);
+    if !deleted_files.is_empty() {
+        deleted_files_retval = Some(deleted_files);
+    }
+    return (code_files_retval, deleted_files_retval);
 }
 
 pub fn numbered_content(file_contents: String) -> Vec<String> {
