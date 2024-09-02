@@ -41,8 +41,20 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	}
 	let access_token = access_token_opt.expect("Empty access_token_opt");
 	commit_check(&review, &access_token).await;
-	let hunkmap_opt = process_review_changes(&review).await;
-	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token, &old_review_opt).await;
+	process_review_changes(&review, &repo_config, &access_token, &old_review_opt).await;
+}
+
+pub async fn process_review_changes(review: &Review, repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) -> Option<(HunkMap, Vec<StatItem>, Vec<StatItem>)>{
+	log::info!("Processing changes in code...");
+	let (excluded_files, smallfiles) = get_included_and_excluded_files(&review).await;
+	if repo_config.comment() || repo_config.auto_assign() {
+		let hunkmap_opt = calculate_hunkmap(&review, &smallfiles).await;
+		send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token, &old_review_opt).await;
+	}
+	
+	if let Some(mermaid_graph) = generate_mermaid_graph(&excluded_files, &small_files, &review).await {
+		send_mermaid_graph(&mermaid_graph, &review, &access_token).await;
+	}
 }
 
 pub async fn send_hunkmap(hunkmap_opt: &Option<(HunkMap, Vec<StatItem>, Vec<StatItem>)>, review: &Review,
@@ -73,9 +85,8 @@ fn hunk_already_exists(review: &Review) -> bool {
 	log::debug!("[hunk_already_exists] Hunk already in db!");
 	return true;
 }
-pub async fn process_review_changes(review: &Review) -> Option<(HunkMap, Vec<StatItem>, Vec<StatItem>)>{
-	log::info!("Processing changes in code...");
-	let mut prvec = Vec::<PrHunkItem>::new();
+
+fn get_included_and_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatItem>)> {
 	let fileopt = get_excluded_files(&review);
 	log::debug!("[process_review_changes] fileopt = {:?}", &fileopt);
 	if fileopt.is_none() {
@@ -83,6 +94,11 @@ pub async fn process_review_changes(review: &Review) -> Option<(HunkMap, Vec<Sta
 		return None;
 	}
 	let (excluded_files, smallfiles) = fileopt.expect("fileopt is empty");
+	return Some(( excluded_files, smallfiles));
+}
+
+async fn calculate_hunkmap(review: &Review, smallfiles: Vec<StatItem>) -> Option<HunkMap> {
+	let mut prvec = Vec::<PrHunkItem>::new();
 	let diffmap = generate_diff(&review, &smallfiles);
 	log::debug!("[process_review_changes] diffmap = {:?}", &diffmap);
 	let linemap = process_diffmap(&diffmap);
@@ -102,7 +118,17 @@ pub async fn process_review_changes(review: &Review) -> Option<(HunkMap, Vec<Sta
 		format!("{}/hunkmap", review.db_key()),
 	);
 	log::debug!("[process_review_changes] hunkmap: {:?}", hunkmap);
-	return Some((hunkmap, excluded_files, smallfiles));
+	return Some(hunkmap);
+}
+
+async fn generate_mermaid_graph(excluded_files: &Vec<StatItem>, small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
+    let all_diff_files: Vec<StatItem> = excluded_files
+        .iter()
+        .chain(small_files.iter())
+        .cloned()
+        .collect();
+    
+    mermaid_comment(&all_diff_files, review).await
 }
 
 pub async fn commit_check(review: &Review, access_token: &str) {
