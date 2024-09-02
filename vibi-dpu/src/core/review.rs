@@ -3,7 +3,7 @@ use std::{env, thread, time::Duration};
 use serde_json::Value;
 
 use crate::{
-    core::{relevance::process_relevance, utils::get_access_token},
+    core::{relevance::process_relevance, diff_graph::send_diff_graph, utils::get_access_token},
     db::{
         hunk::{get_hunk_from_db, store_hunkmap_to_db},
         repo::get_clone_url_clone_dir,
@@ -44,33 +44,36 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	process_review_changes(&review, &repo_config, &access_token, &old_review_opt).await;
 }
 
-pub async fn process_review_changes(review: &Review, repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) -> Option<(HunkMap, Vec<StatItem>, Vec<StatItem>)>{
+pub async fn process_review_changes(review: &Review, repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) {
 	log::info!("Processing changes in code...");
-	let (excluded_files, smallfiles) = get_included_and_excluded_files(&review).await;
-	if repo_config.comment() || repo_config.auto_assign() {
-		let hunkmap_opt = calculate_hunkmap(&review, &smallfiles).await;
-		send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token, &old_review_opt).await;
-	}
-	
-	if let Some(mermaid_graph) = generate_mermaid_graph(&excluded_files, &small_files, &review).await {
-		send_mermaid_graph(&mermaid_graph, &review, &access_token).await;
+	if let Some((excluded_files, smallfiles)) = get_included_and_excluded_files(review) {
+		if repo_config.comment() || repo_config.auto_assign() {
+			let hunkmap_opt = calculate_hunkmap(review, &smallfiles).await;
+			send_hunkmap(&hunkmap_opt, &excluded_files, review, repo_config, access_token, old_review_opt).await;
+		}
+		
+		if repo_config.diff_graph() {
+			send_diff_graph(review, &excluded_files, &smallfiles, access_token).await;
+		}
+	} else {
+		log::error!("Failed to get included and excluded files");
 	}
 }
 
-pub async fn send_hunkmap(hunkmap_opt: &Option<(HunkMap, Vec<StatItem>, Vec<StatItem>)>, review: &Review,
+pub async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, excluded_files: &Vec<StatItem>, review: &Review,
 	repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) {
 	if hunkmap_opt.is_none() {
 		log::error!("[send_hunkmap] Empty hunkmap in send_hunkmap");
 		return;
 	}
-	let (hunkmap, excluded_files, small_files) = hunkmap_opt.as_ref().expect("empty hunkmap_opt");
+	let hunkmap = hunkmap_opt.to_owned().expect("empty hunkmap_opt");
 	log::debug!("HunkMap = {:?}", &hunkmap);
 	store_hunkmap_to_db(&hunkmap, review);
 	publish_hunkmap(&hunkmap);
 	let hunkmap_async = hunkmap.clone();
 	let review_async = review.clone();
 	let mut repo_config_clone = repo_config.clone();
-	process_relevance(&hunkmap_async, excluded_files, small_files, &review_async,
+	process_relevance(&hunkmap_async, &excluded_files, &review_async,
 		&mut repo_config_clone, access_token, old_review_opt).await;
 }
 
@@ -97,7 +100,7 @@ fn get_included_and_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Ve
 	return Some(( excluded_files, smallfiles));
 }
 
-async fn calculate_hunkmap(review: &Review, smallfiles: Vec<StatItem>) -> Option<HunkMap> {
+async fn calculate_hunkmap(review: &Review, smallfiles: &Vec<StatItem>) -> Option<HunkMap> {
 	let mut prvec = Vec::<PrHunkItem>::new();
 	let diffmap = generate_diff(&review, &smallfiles);
 	log::debug!("[process_review_changes] diffmap = {:?}", &diffmap);
@@ -119,16 +122,6 @@ async fn calculate_hunkmap(review: &Review, smallfiles: Vec<StatItem>) -> Option
 	);
 	log::debug!("[process_review_changes] hunkmap: {:?}", hunkmap);
 	return Some(hunkmap);
-}
-
-async fn generate_mermaid_graph(excluded_files: &Vec<StatItem>, small_files: &Vec<StatItem>, review: &Review) -> Option<String> {
-    let all_diff_files: Vec<StatItem> = excluded_files
-        .iter()
-        .chain(small_files.iter())
-        .cloned()
-        .collect();
-    
-    mermaid_comment(&all_diff_files, review).await
 }
 
 pub async fn commit_check(review: &Review, access_token: &str) {
