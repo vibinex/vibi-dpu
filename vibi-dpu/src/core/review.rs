@@ -47,10 +47,8 @@ pub async fn process_review(message_data: &Vec<u8>) {
 pub async fn process_review_changes(review: &Review, repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) {
 	log::info!("Processing changes in code...");
 	if let Some((excluded_files, smallfiles)) = get_included_and_excluded_files(review) {
-		if repo_config.comment() || repo_config.auto_assign() {
-			let hunkmap_opt = calculate_hunkmap(review, &smallfiles).await;
-			send_hunkmap(&hunkmap_opt, &excluded_files, review, repo_config, access_token, old_review_opt).await;
-		}
+		let hunkmap_opt = calculate_hunkmap(review, &smallfiles).await;
+		send_hunkmap(&hunkmap_opt, &excluded_files, review, repo_config, access_token, old_review_opt).await;
 		
 		if repo_config.diff_graph() {
 			send_diff_graph(review, &excluded_files, &smallfiles, access_token).await;
