@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, graph::mermaid_elements::generate_mermaid_flowchart, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
+use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
-pub async fn process_relevance(hunkmap: &HunkMap, excluded_files: &Vec<StatItem>, small_files: &Vec<StatItem>, review: &Review,
+pub async fn process_relevance(hunkmap: &HunkMap, excluded_files: &Vec<StatItem>, review: &Review,
 	repo_config: &mut RepoConfig, access_token: &str, old_review_opt: &Option<Review>,
 ) {
 	log::info!("Processing relevance of code authors...");
@@ -22,8 +22,7 @@ pub async fn process_relevance(hunkmap: &HunkMap, excluded_files: &Vec<StatItem>
 		let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
 		if repo_config.comment() {
 			// create comment text
-			let comment = comment_text(&relevance_vec, repo_config.auto_assign(),
-                excluded_files, small_files, review).await;
+			let comment = relevant_reviewers_comment_text(&relevance_vec, repo_config.auto_assign(), excluded_files).await;
 			// add comment
 			if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
 				// TODO - add feature flag check
@@ -185,8 +184,8 @@ async fn calculate_relevance(prhunk: &PrHunkItem, review: &mut Review) -> Option
     return Some(relevance_vec);
 }
 
-async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool,
-    excluded_files: &Vec<StatItem>, small_files: &Vec<StatItem>, review: &Review) -> String {
+async fn relevant_reviewers_comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool,
+    excluded_files: &Vec<StatItem>) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
     comment += "| Contributor Name/Alias  | Relevance |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
@@ -226,30 +225,7 @@ async fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool,
     comment += "If you are a relevant reviewer, you can use the [Vibinex browser extension](https://chromewebstore.google.com/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc) to see parts of the PR relevant to you\n";  // Added a newline at the end
     comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
     comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
-    let all_diff_files: Vec<StatItem> = excluded_files
-        .iter()
-        .chain(small_files.iter())
-        .cloned()  // Clone the StatItem instances since `iter` returns references
-        .collect(); // Collect into a new vector
-    if let Some(mermaid_text) = mermaid_comment(&all_diff_files, review).await {
-        comment += mermaid_text.as_str();
-    }
-
     return comment;
-}
-
-pub async fn mermaid_comment(diff_files: &Vec<StatItem>, review: &Review) -> Option<String> {
-    let flowchart_str_opt = generate_mermaid_flowchart(diff_files, review).await;
-    if flowchart_str_opt.is_none() {
-        log::error!("[mermaid_comment] Unable to generate flowchart for review: {}", review.id());
-        return None;
-    }
-    let flowchart_str = flowchart_str_opt.expect("Empty flowchart_str_opt");
-    let mermaid_comment = format!(
-        "### Call Stack Diff\n```mermaid\n{}\n```",
-        flowchart_str,
-    );
-    return Some(mermaid_comment);
 }
 
 pub fn deduplicated_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {

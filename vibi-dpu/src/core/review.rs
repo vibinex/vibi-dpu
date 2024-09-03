@@ -3,7 +3,7 @@ use std::{env, thread, time::Duration};
 use serde_json::Value;
 
 use crate::{
-    core::{relevance::process_relevance, utils::get_access_token},
+    core::{relevance::process_relevance, diff_graph::send_diff_graph, utils::get_access_token},
     db::{
         hunk::{get_hunk_from_db, store_hunkmap_to_db},
         repo::get_clone_url_clone_dir,
@@ -41,24 +41,37 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	}
 	let access_token = access_token_opt.expect("Empty access_token_opt");
 	commit_check(&review, &access_token).await;
-	let hunkmap_opt = process_review_changes(&review).await;
-	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token, &old_review_opt).await;
+	process_review_changes(&review, &repo_config, &access_token, &old_review_opt).await;
 }
 
-pub async fn send_hunkmap(hunkmap_opt: &Option<(HunkMap, Vec<StatItem>, Vec<StatItem>)>, review: &Review,
+pub async fn process_review_changes(review: &Review, repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) {
+	log::info!("Processing changes in code...");
+	if let Some((excluded_files, smallfiles)) = get_included_and_excluded_files(review) {
+		let hunkmap_opt = calculate_hunkmap(review, &smallfiles).await;
+		send_hunkmap(&hunkmap_opt, &excluded_files, review, repo_config, access_token, old_review_opt).await;
+		
+		if repo_config.diff_graph() {
+			send_diff_graph(review, &excluded_files, &smallfiles, access_token).await;
+		}
+	} else {
+		log::error!("Failed to get included and excluded files");
+	}
+}
+
+pub async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, excluded_files: &Vec<StatItem>, review: &Review,
 	repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) {
 	if hunkmap_opt.is_none() {
 		log::error!("[send_hunkmap] Empty hunkmap in send_hunkmap");
 		return;
 	}
-	let (hunkmap, excluded_files, small_files) = hunkmap_opt.as_ref().expect("empty hunkmap_opt");
+	let hunkmap = hunkmap_opt.to_owned().expect("empty hunkmap_opt");
 	log::debug!("HunkMap = {:?}", &hunkmap);
 	store_hunkmap_to_db(&hunkmap, review);
 	publish_hunkmap(&hunkmap);
 	let hunkmap_async = hunkmap.clone();
 	let review_async = review.clone();
 	let mut repo_config_clone = repo_config.clone();
-	process_relevance(&hunkmap_async, excluded_files, small_files, &review_async,
+	process_relevance(&hunkmap_async, &excluded_files, &review_async,
 		&mut repo_config_clone, access_token, old_review_opt).await;
 }
 
@@ -73,9 +86,8 @@ fn hunk_already_exists(review: &Review) -> bool {
 	log::debug!("[hunk_already_exists] Hunk already in db!");
 	return true;
 }
-pub async fn process_review_changes(review: &Review) -> Option<(HunkMap, Vec<StatItem>, Vec<StatItem>)>{
-	log::info!("Processing changes in code...");
-	let mut prvec = Vec::<PrHunkItem>::new();
+
+fn get_included_and_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatItem>)> {
 	let fileopt = get_excluded_files(&review);
 	log::debug!("[process_review_changes] fileopt = {:?}", &fileopt);
 	if fileopt.is_none() {
@@ -83,6 +95,11 @@ pub async fn process_review_changes(review: &Review) -> Option<(HunkMap, Vec<Sta
 		return None;
 	}
 	let (excluded_files, smallfiles) = fileopt.expect("fileopt is empty");
+	return Some(( excluded_files, smallfiles));
+}
+
+async fn calculate_hunkmap(review: &Review, smallfiles: &Vec<StatItem>) -> Option<HunkMap> {
+	let mut prvec = Vec::<PrHunkItem>::new();
 	let diffmap = generate_diff(&review, &smallfiles);
 	log::debug!("[process_review_changes] diffmap = {:?}", &diffmap);
 	let linemap = process_diffmap(&diffmap);
@@ -102,7 +119,7 @@ pub async fn process_review_changes(review: &Review) -> Option<(HunkMap, Vec<Sta
 		format!("{}/hunkmap", review.db_key()),
 	);
 	log::debug!("[process_review_changes] hunkmap: {:?}", hunkmap);
-	return Some((hunkmap, excluded_files, smallfiles));
+	return Some(hunkmap);
 }
 
 pub async fn commit_check(review: &Review, access_token: &str) {
