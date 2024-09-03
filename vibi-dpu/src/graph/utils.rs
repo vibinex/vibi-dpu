@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::{Path, PathBuf}, slice::Chunks};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use strsim::jaro_winkler;
 use walkdir::WalkDir;
 use std::fs;
 use rand::Rng;
@@ -136,13 +137,13 @@ pub fn all_code_files(dir: &str) -> Option<Vec<PathBuf>> {
     return Some(code_files);
 }
 
-pub fn source_diff_files(diff_files: &Vec<StatItem>) -> Option<Vec<PathBuf>> {
-    let mut code_files = Vec::<PathBuf>::new();
+pub fn source_diff_files(diff_files: &Vec<StatItem>) -> Option<Vec<StatItem>> {
+    let mut code_files = Vec::<StatItem>::new();
     for stat_item in diff_files {
         let filepath_str = &stat_item.filepath;
-        let filepath = Path::new(filepath_str);
+        let filepath = Path::new(filepath_str);   
         if filepath.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            code_files.push(filepath.to_path_buf());
+            code_files.push(stat_item.clone());
         }
     }
     if code_files.is_empty() {
@@ -158,4 +159,12 @@ pub fn numbered_content(file_contents: String) -> Vec<String> {
         .map(|(index, line)| format!("{} {}", index+1, line))
         .collect::<Vec<String>>();
     return lines;
+}
+
+pub fn match_overlap(str1: &str, str2: &str, similarity_threshold: f64) -> bool {
+    let similarity = jaro_winkler(str1, str2);
+    if similarity >= similarity_threshold {
+        return true;
+    }
+    return false;
 }

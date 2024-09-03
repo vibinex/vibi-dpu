@@ -38,4 +38,5 @@ jsonwebtoken = "8.3.0" # MIT
 fern = "0.6.2" # MIT
 log = "0.4.20" # MIT/Apache2
 walkdir = "2.5.0" # Unlicence/MIT
+strsim = "0.11.1" #MIT
 # todo - check all lib licences
