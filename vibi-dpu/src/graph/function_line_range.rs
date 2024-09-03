@@ -5,7 +5,7 @@ use walkdir::WalkDir;
 
 use crate::{graph::utils::numbered_content, utils::review::Review};
 
-use super::utils::{all_code_files, call_llm_api, read_file};
+use super::{gitops::HunkDiffLines, utils::{all_code_files, call_llm_api, read_file}};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FuncDefInfo {
@@ -18,6 +18,20 @@ pub struct FuncDefInfo {
 impl PartialEq for FuncDefInfo {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.line_start == other.line_start
+    }
+}
+
+impl FuncDefInfo {
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn line_start(&self) -> usize {
+        self.line_start
+    }
+
+    pub fn line_end(&self) -> usize {
+        self.line_end
     }
 }
 
@@ -36,6 +50,41 @@ impl FunctionFileMap {
 
     pub fn is_func_in_file(&self, func: &FuncDefInfo) -> bool {
         self.functions.contains(func)
+    }
+
+    pub fn func_def(&self, func_name: &str) -> Option<&FuncDefInfo> {
+        self.functions.iter().find(|f| f.name == func_name)
+    }
+
+    pub fn func_at_line(&self, line_num: usize) -> Option<&FuncDefInfo> {
+        self.functions.iter().find(
+            |f| f.line_start <= line_num && line_num <= f.line_end)
+    }
+
+    pub fn funcs_in_hunk(&self, hunk: &HunkDiffLines) -> Vec<FuncDefInfo> {
+        self.functions
+            .iter()
+            .filter(|func| {
+                // Check if the function's start or end line falls within the hunk's start and end line range
+                (func.line_start() >= hunk.start_line() && func.line_start() <= hunk.end_line()) ||
+                (func.line_end() >= hunk.start_line() && func.line_end() <= hunk.end_line()) ||
+                // Additionally check if the function completely spans over the hunk range
+                (func.line_start() <= hunk.start_line() && func.line_end() >= hunk.end_line())
+            }).cloned()
+            .collect()
+    }
+
+    pub fn funcs_for_lines(&self, lines: &Vec<usize>) -> HashMap<usize, FuncDefInfo> {
+        let mut line_funcdef_map = HashMap::new();
+
+        for line in lines {
+            for func in &self.functions {
+                if func.line_start <= *line && *line <= func.line_end {
+                    line_funcdef_map.entry(*line).or_insert(func.clone());
+                }
+            }
+        }
+        return line_funcdef_map;
     }
 }
 

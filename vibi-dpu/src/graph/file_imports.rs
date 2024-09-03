@@ -46,7 +46,17 @@ impl PartialEq for ImportPath {
     fn eq(&self, other: &Self) -> bool {
         self.import_line == other.import_line && self.import_path == other.import_path && self.imported == other.imported
     } 
-} 
+}
+
+impl ImportPath {
+    pub fn import_path(&self) -> &String {
+        &self.import_path
+    }
+
+    pub fn imported(&self) -> &String {
+        &self.imported
+    }
+}
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct ChunkImportInfo {
@@ -98,6 +108,10 @@ impl AllFileImportInfo {
     pub fn file_import_info(&self, filename: &str) -> Option<&FileImportInfo> {
         self.file_import_map.get(filename)
     }
+
+    pub fn file_import_map(&self) -> &HashMap<String, FileImportInfo> {
+        &self.file_import_map
+    }
 }
 
 pub async fn get_import_lines(file_paths: &Vec<PathBuf>) -> Option<AllFileImportInfo> {
@@ -116,6 +130,7 @@ pub async fn get_import_lines(file_paths: &Vec<PathBuf>) -> Option<AllFileImport
     let system_prompt_path = system_prompt_path_opt.expect("Empty system_prompt");
     for path in file_paths {
         log::debug!("[get_import_lines] path = {:?}", path);
+        // FIXME TODO "ok()?"
         let file_contents = std::fs::read_to_string(path.clone()).ok()?;
         let numbered_content = numbered_content(file_contents);
         let chunks = numbered_content.chunks(50);
