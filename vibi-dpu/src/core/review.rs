@@ -231,7 +231,7 @@ fn create_and_save_github_review_object(deserialized_data: &Value) -> Option<Rev
 	let repo_provider = ProviderEnum::Github.to_string().to_lowercase();
 	let clone_opt = get_clone_url_clone_dir(&repo_provider, &repo_owner, &repo_name);
 	if clone_opt.is_none() {
-		log::error!("[create_and_save_github_review_object] Unable to get clone url and directory for bitbucket review");
+		log::error!("[create_and_save_github_review_object] Unable to get clone url and directory for github review");
 		return None;
 	}
 	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");

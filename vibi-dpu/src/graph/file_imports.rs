@@ -130,8 +130,13 @@ pub async fn get_import_lines(file_paths: &Vec<PathBuf>) -> Option<AllFileImport
     let system_prompt_path = system_prompt_path_opt.expect("Empty system_prompt");
     for path in file_paths {
         log::debug!("[get_import_lines] path = {:?}", path);
-        // FIXME TODO "ok()?"
-        let file_contents = std::fs::read_to_string(path.clone()).ok()?;
+        let file_contents_res = std::fs::read_to_string(path.clone());
+        if file_contents_res.is_err() {
+            let e = file_contents_res.expect_err("Empty error in file_content_res");
+            log::error!("[get_import_lines] Unable to read file: {:?}, error: {:?}", path, e);
+            continue;
+        }
+        let file_contents = file_contents_res.expect("Uncaught error in file_content_res");
         let numbered_content = numbered_content(file_contents);
         let chunks = numbered_content.chunks(50);
         let path_str = path.to_str().expect("Empty path");

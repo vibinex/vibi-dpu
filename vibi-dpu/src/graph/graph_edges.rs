@@ -155,7 +155,6 @@ fn match_import_condition(dest_filename: &str, import_obj: &ImportPath, dest_fun
 }
 
 async fn outgoing_edges(diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
-    // TODO - git checkout
     for (source_filename, func_calls) in diff_graph.diff_func_calls() {
         for source_func_call in func_calls.added_calls() {
             let dest_filename = source_func_call.import_info().import_path();
