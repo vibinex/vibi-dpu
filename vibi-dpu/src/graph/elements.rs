@@ -78,12 +78,52 @@ impl MermaidSubgraph {
             all_nodes.push(node.render_node(review, subgraph_map));
         }
         let subgraph_str = format!(
-            "\tsubgraph {} [{}]\n{}\nend\n",
+            "\tsubgraph {} [{}]\n{}\n\tend\n{}\n",
             self.mermaid_id,
             self.name,
-            all_nodes.join("\n")
+            all_nodes.join("\n"),
+            self.render_subgraph_style()
         );
         subgraph_str
+    }
+
+    fn render_subgraph_style(&self) -> String {
+        let mut class_str = "";
+        for (_, node) in self.nodes() {
+            match node.color().as_str() {
+                "yellow" => {
+                    class_str = "modified";
+                    break;
+                },
+                "red" => {
+                    match class_str {
+                        "green" | "yellow" => {
+                            class_str = "modified";
+                            break;
+                        },
+                        "" | "red" | _ => {
+                            class_str = "red";
+                        }
+                    }
+                },
+                "green" => {
+                    match class_str {
+                        "red" | "yellow" => {
+                            class_str = "modified";
+                            break;
+                        },
+                        "" | "green" | _ => {
+                            class_str = "green";
+                        }
+                    }
+                }
+                "" | _ => ()
+            }
+        }
+        if class_str != "" {
+            return format!("\tclass {} {}", self.mermaid_id(), class_str);
+        }
+        return "".to_string();
     }
 }
 
@@ -126,11 +166,6 @@ impl MermaidNode {
         self.color = color.to_string()
     }
 
-    // Setter for function_name
-    pub fn set_function_name(&mut self, function_name: String) {
-        self.function_name = function_name;
-    }
-
     pub fn compare_and_change_color(&mut self, node_color: &str) {
         if (self.color() == "red" && node_color == "green") ||
         (self.color() == "green" && node_color == "red") {
@@ -139,8 +174,7 @@ impl MermaidNode {
     }
 
     pub fn render_node(&self, review: &Review, subgraph_map: &HashMap<String, MermaidSubgraph>) -> String {
-        // TODO FIXME - get line num or funcdef obj
-        let url_str = format!("click {} href \"{}\" _blank",
+        let url_str = format!("\tclick {} href \"{}\" _blank",
             self.mermaid_id(), self.get_node_str(review, subgraph_map));
         let class_str = self.get_style_class();
         let node_str = format!("\t{}[{}]", &self.mermaid_id, &self.function_name);
@@ -150,30 +184,40 @@ impl MermaidNode {
     fn get_node_str(&self, review: &Review, subgraph_map: &HashMap<String, MermaidSubgraph>) -> String {
         if let Some(subgraph) = subgraph_map.get(self.parent_id()) {
             let file_hash = sha256::digest(subgraph.name());
-            let mut diff_side_str = "";
-            if self.color != "" {
-                if self.color == "green" || self.color == "yellow" {
-                    diff_side_str = "R";
-                } else if self.color == "red" {
-                    diff_side_str = "L";
+            return match self.color.as_str() {
+                "green" | "yellow" => {
+                    let diff_side_str = "R";
+                    format!(
+                        "https://github.com/{}/{}/pull/{}/files#diff-{}{}{}",
+                        review.repo_owner(),
+                        review.repo_name(),
+                        review.id(),
+                        &file_hash,
+                        diff_side_str,
+                        self.def_line
+                    )
                 }
-                return format!("https://github.com/{}/{}/pull/{}/files#diff-{}{}{}",
-                    review.repo_owner(),
-                    review.repo_name(),
-                    review.id(),
-                    &file_hash,
-                    diff_side_str,
-                    self.def_line
-                );
-            } else {
-                return format!("https://github.com/{}/{}/blob/{}/{}#L{}",
+                "red" => {
+                    let diff_side_str = "L";
+                    format!(
+                        "https://github.com/{}/{}/pull/{}/files#diff-{}{}{}",
+                        review.repo_owner(),
+                        review.repo_name(),
+                        review.id(),
+                        &file_hash,
+                        diff_side_str,
+                        self.def_line
+                    )
+                }
+                "" | _ => format!(
+                    "https://github.com/{}/{}/blob/{}/{}#L{}",
                     review.repo_owner(),
                     review.repo_name(),
                     review.base_head_commit(),
                     subgraph.name(),
                     self.def_line
-            );
-            }
+                ),
+            };
         }
         return "".to_string();
     }
@@ -181,10 +225,10 @@ impl MermaidNode {
     fn get_style_class(&self) -> String {
         let class_str_prefix = format!("class {}", self.mermaid_id());
         match self.color.as_str() {
-            "green"  => format!("{} added", &class_str_prefix),
-            "red" => format!("{} deleted", &class_str_prefix),
-            "yellow" => format!("{} modified", &class_str_prefix),
-            _ => "".to_string()
+            "green"  => format!("\t{} added", &class_str_prefix),
+            "red" => format!("\t{} deleted", &class_str_prefix),
+            "yellow" => format!("\t{} modified", &class_str_prefix),
+            "" | _ => "".to_string()
         }
     }
 }
@@ -394,11 +438,20 @@ impl MermaidGraphElements {
     }
 
     fn render_subgraphs(&self, review: &Review) -> String {
-        self.subgraphs
-            .values()
-            .map(|subgraph| subgraph.render_subgraph(review, &self.subgraphs))
-            .collect::<Vec<String>>()
-            .join("\n")
+        format!("{}\n{}",
+            self.subgraphs
+                .values()
+                .map(|subgraph| subgraph.render_subgraph(review, &self.subgraphs))
+                .collect::<Vec<String>>()
+                .join("\n"),
+            self.subgraph_style_defs())
+    }
+
+    fn subgraph_style_defs(&self) -> String {
+        let modified_class_def = "\tclassDef modified stroke:black,fill:yellow";
+        let added_class_def = "\tclassDef added stroke:black,fill:#b7e892,color:black";
+        let deleted_class_def = "\tclassDef deleted stroke:black,fill:red";
+        format!("{}\n{}\n{}", modified_class_def, added_class_def, deleted_class_def)
     }
 
     pub fn render_elements(&self, review: &Review) -> String {
