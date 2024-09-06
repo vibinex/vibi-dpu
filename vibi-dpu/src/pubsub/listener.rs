@@ -204,7 +204,7 @@ async fn process_and_update_pr_if_different(deserialised_msg_data: &Value) -> bo
 	}
 	if repo_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
 		let workspace_slug = deserialised_msg_data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
-		let repo_slug = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
+		let repo_slug = deserialised_msg_data["eventPayload"]["repository"]["name"].to_string().to_lowercase().trim_matches('"').to_string();
 		let pr_number = deserialised_msg_data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
 		let event_type = deserialised_msg_data["eventType"].to_string().trim_matches('"').to_string();
 		let if_process_pr = bitbucket_process_and_update_pr_if_different(&deserialised_msg_data["eventPayload"],&workspace_slug,&repo_slug,&pr_number,&repo_provider,
