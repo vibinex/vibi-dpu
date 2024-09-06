@@ -177,7 +177,7 @@ fn publish_hunkmap(hunkmap: &HunkMap) {
 fn create_and_save_bitbucket_review_object(deserialized_data: &Value) -> (Option<Review>, Option<Review>) {
 	log::debug!("[create_and_save_bitbucket_review_object] deserialised_data {}", deserialized_data);
 	let workspace_name = deserialized_data["eventPayload"]["repository"]["workspace"]["slug"].to_string().trim_matches('"').to_string();
-	let repo_name = deserialized_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
+	let repo_name = deserialized_data["eventPayload"]["repository"]["name"].to_string().to_lowercase().trim_matches('"').to_string();
 	let repo_provider = ProviderEnum::Bitbucket.to_string().to_lowercase();
 	let pr_id = deserialized_data["eventPayload"]["pullrequest"]["id"].to_string().trim_matches('"').to_string();
 	let old_review_opt = get_review_from_db(&repo_name, &workspace_name,
