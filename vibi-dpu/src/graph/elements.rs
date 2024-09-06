@@ -424,11 +424,11 @@ impl MermaidGraphElements {
     }
 
     pub fn render_elements(&self, review: &Review) -> String {
-        let all_elements_str = format!("{}\n{}", &self.render_subgraphs(review), &self.render_edges());
+        let all_elements_str = format!("{}\n{}", &self.render_subgraphs(review), &self.render_edges(review));
         all_elements_str
     }
 
-    fn render_edges(&self) -> String {
+    fn render_edges(&self, review: &Review) -> String {
         let mut edge_defs = Vec::<String>::new();
         let mut default_edge_styles = Vec::<String>::new();
         let mut green_edge_styles = Vec::<String>::new();
@@ -437,7 +437,33 @@ impl MermaidGraphElements {
         for (_, edge) in &self.edges {
             let src_node_id = self.subgraphs[edge.src_subgraph_key()].nodes()[edge.src_func_key()].mermaid_id();
             let dest_node_id = self.subgraphs[edge.dest_subgraph_key()].nodes()[edge.dest_func_key()].mermaid_id();
-            let edge_def_str = format!("\t{} ==\"Line {}\" =====>{}", src_node_id, edge.line(), dest_node_id);
+            let file_hash = sha256::digest(edge.src_subgraph_key());
+            let edge_link_str = match edge.color().as_str() {
+                "red" => format!("https://github.com/{}/{}/pull/{}/files#diff-{}L{}", 
+                    review.repo_owner(),
+                    review.repo_name(),
+                    review.id(),
+                    &file_hash,
+                    edge.line()
+                ),
+                "green" | "yellow" => format!("https://github.com/{}/{}/pull/{}/files#diff-{}R{}", 
+                    review.repo_owner(),
+                    review.repo_name(),
+                    review.id(),
+                    &file_hash,
+                    edge.line()
+                ),
+                "" | _ => format!("https://github.com/{}/{}/blob/{}/{}#L{}", 
+                    review.repo_owner(),
+                    review.repo_name(),
+                    review.base_head_commit(),
+                    edge.src_subgraph_key(),
+                    edge.line()
+                )
+            };
+            let edge_def_str = format!(
+                "\t{} ==\"<a target='_blank' href='{}'>Line {}</a>\" =====>{}",
+                src_node_id, edge_link_str, edge.line(), dest_node_id);
             edge_defs.push(edge_def_str);
             match edge.color().as_str() {
                 "red" => red_edge_styles.push((edge_defs.len() - 1).to_string()),
