@@ -6,6 +6,8 @@ use std::{
 use serde::{Serialize, Deserialize};
 // TODO, FIXME - remove all unwraps
 
+use crate::utils::review::Review;
+
 use super::utils::generate_random_string;
 
 #[derive(Debug, Default, Clone)]
@@ -70,10 +72,10 @@ impl MermaidSubgraph {
         self.nodes.get_mut(func_name)
     }
 
-    pub fn render_subgraph(&self) -> String {
+    pub fn render_subgraph(&self, review: &Review, subgraph_map: &HashMap<String, MermaidSubgraph>) -> String {
         let mut all_nodes = Vec::new();
         for (_, node) in self.nodes() {
-            all_nodes.push(node.render_node());
+            all_nodes.push(node.render_node(review, subgraph_map));
         }
         let subgraph_str = format!(
             "\tsubgraph {} [{}]\n{}\nend\n",
@@ -90,18 +92,20 @@ pub struct MermaidNode {
     function_name: String,
     mermaid_id: String,
     parent_id: String,
-    color: String
+    color: String,
+    def_line: usize
 }
 
 impl MermaidNode {
     // Constructor
-    pub fn new(function_name: String, parent_id: String) -> Self {
+    pub fn new(function_name: String, parent_id: String, def_line: usize) -> Self {
         let mermaid_id = generate_random_string(4);
         Self {
             mermaid_id,
             function_name,
             parent_id,
-            color: "".to_string()
+            color: "".to_string(),
+            def_line
         }
     }
 
@@ -134,10 +138,54 @@ impl MermaidNode {
         }
     }
 
-    pub fn render_node(&self) -> String {
+    pub fn render_node(&self, review: &Review, subgraph_map: &HashMap<String, MermaidSubgraph>) -> String {
         // TODO FIXME - get line num or funcdef obj
+        let url_str = format!("click {} href \"{}\" _blank",
+            self.mermaid_id(), self.get_node_str(review, subgraph_map));
+        let class_str = self.get_style_class();
         let node_str = format!("\t{}[{}]", &self.mermaid_id, &self.function_name);
-        node_str
+        return format!("{}\n{}\n{}", &node_str, &class_str, &url_str);
+    }
+    
+    fn get_node_str(&self, review: &Review, subgraph_map: &HashMap<String, MermaidSubgraph>) -> String {
+        if let Some(subgraph) = subgraph_map.get(self.parent_id()) {
+            let file_hash = sha256::digest(subgraph.name());
+            let mut diff_side_str = "";
+            if self.color != "" {
+                if self.color == "green" || self.color == "yellow" {
+                    diff_side_str = "R";
+                } else if self.color == "red" {
+                    diff_side_str = "L";
+                }
+                return format!("https://github.com/{}/{}/pull/{}/files#diff-{}{}{}",
+                    review.repo_owner(),
+                    review.repo_name(),
+                    review.id(),
+                    &file_hash,
+                    diff_side_str,
+                    self.def_line
+                );
+            } else {
+                return format!("https://github.com/{}/{}/blob/{}/{}#L{}",
+                    review.repo_owner(),
+                    review.repo_name(),
+                    review.base_head_commit(),
+                    subgraph.name(),
+                    self.def_line
+            );
+            }
+        }
+        return "".to_string();
+    }
+    
+    fn get_style_class(&self) -> String {
+        let class_str_prefix = format!("class {}", self.mermaid_id());
+        match self.color.as_str() {
+            "green"  => format!("{} added", &class_str_prefix),
+            "red" => format!("{} deleted", &class_str_prefix),
+            "yellow" => format!("{} modified", &class_str_prefix),
+            _ => "".to_string()
+        }
     }
 }
 
@@ -283,10 +331,12 @@ impl MermaidGraphElements {
         source_file: &str,
         dest_file: &str,
         source_color: &str,
-        dest_color: &str
+        dest_color: &str,
+        source_def_line: usize,
+        dest_def_line: usize
     ) {        
-        self.create_node(source_file, source_func_name, source_color);
-        self.create_node(dest_file, dest_func_name, dest_color);
+        self.create_node(source_file, source_func_name, source_color, source_def_line);
+        self.create_node(dest_file, dest_func_name, dest_color, dest_def_line);
         let edge = MermaidEdge::new(
             calling_line_num,
             source_func_name.to_string(),
@@ -297,20 +347,20 @@ impl MermaidGraphElements {
         self.add_edge_to_edges(edge);
     }
 
-    fn create_node(&mut self, subgraph_key: &str, node_func_name: &str, node_color: &str) {
+    fn create_node(&mut self, subgraph_key: &str, node_func_name: &str, node_color: &str, def_line: usize) {
         if let Some(subgraph) = self.subgraphs.get_mut(subgraph_key) {
             if let Some(node) = subgraph.get_mut_node(node_func_name) {
                 node.compare_and_change_color(node_color);
             } else {
                 let mut node = MermaidNode::new(node_func_name.to_string(),
-                subgraph.mermaid_id().to_string());
+                subgraph.name().to_string(), def_line);
                 node.set_color(node_color);
                 subgraph.add_node(node);
             }
         } else {
             let mut subgraph = MermaidSubgraph::new(subgraph_key.to_string());
             let mut node = MermaidNode::new(node_func_name.to_string(),
-            subgraph.mermaid_id().to_string());
+            subgraph.name().to_string(), def_line);
             node.set_color(node_color);
             subgraph.add_node(node);
             self.add_subgraph(subgraph);
@@ -343,16 +393,16 @@ impl MermaidGraphElements {
         all_edges_str
     }
 
-    fn render_subgraphs(&self) -> String {
+    fn render_subgraphs(&self, review: &Review) -> String {
         self.subgraphs
             .values()
-            .map(|subgraph| subgraph.render_subgraph())
+            .map(|subgraph| subgraph.render_subgraph(review, &self.subgraphs))
             .collect::<Vec<String>>()
             .join("\n")
     }
 
-    pub fn render_elements(&self) -> String {
-        let all_elements_str = format!("{}\n{}", &self.render_subgraphs(), &self.render_edges());
+    pub fn render_elements(&self, review: &Review) -> String {
+        let all_elements_str = format!("{}\n{}", &self.render_subgraphs(review), &self.render_edges());
         all_elements_str
     }
 }

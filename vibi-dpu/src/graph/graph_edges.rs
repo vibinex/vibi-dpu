@@ -33,7 +33,9 @@ async fn incoming_edges(review: &Review, all_import_info: &AllFileImportInfo, di
                                         &source_filename,
                                         dest_filename,
                                         "",
-                                        "green"
+                                        "green",
+                                        source_func_def.line_start(),
+                                        dest_func.line_start()
                                     );
                                 }
                             }
@@ -63,7 +65,9 @@ async fn incoming_edges(review: &Review, all_import_info: &AllFileImportInfo, di
                                         &source_filename,
                                         dest_filename,
                                         "",
-                                        "green"
+                                        "green",
+                                        source_func_def.line_start(),
+                                        dest_func.line_start()
                                     );
                                 }
                             }
@@ -95,7 +99,9 @@ async fn incoming_edges(review: &Review, all_import_info: &AllFileImportInfo, di
                                         &source_filename,
                                         dest_filename,
                                         "",
-                                        "red"
+                                        "red",
+                                        source_func_def.line_start(),
+                                        dest_func.line_start()
                                     );
                                 }
                             }
@@ -124,7 +130,9 @@ async fn incoming_edges(review: &Review, all_import_info: &AllFileImportInfo, di
                                         &source_filename,
                                         dest_filename,
                                         "",
-                                        "red"
+                                        "red",
+                                        source_func_def.line_start(),
+                                        dest_func.line_start()
                                     );
                                 }
                             }
@@ -169,7 +177,9 @@ async fn outgoing_edges(diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphEl
                                 source_filename,
                                 dest_filename,
                                 "green",
-                                ""
+                                "",
+                                source_func_def.line_start(),
+                                dest_func_def.line_start()
                             );
                         }
                     }
@@ -192,7 +202,9 @@ async fn outgoing_edges(diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphEl
                                     source_filename,
                                     dest_filename,
                                     "green",
-                                    ""
+                                    "",
+                                    source_func_def.line_start(),
+                                    dest_func_def.line_start()
                                 );
                             }
                         }
@@ -219,7 +231,9 @@ async fn outgoing_edges(diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphEl
                                 source_filename,
                                 dest_filename,
                                 "red",
-                                ""
+                                "",
+                                source_func_def.line_start(),
+                                dest_func_def.line_start()
                             );
                         }
                     }
@@ -242,7 +256,9 @@ async fn outgoing_edges(diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphEl
                                     source_filename,
                                     dest_filename,
                                     "red",
-                                    ""
+                                    "",
+                                    source_func_def.line_start(),
+                                    dest_func_def.line_start()
                                 );
                             }
                         }

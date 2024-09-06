@@ -89,7 +89,7 @@ async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review
     // }
     // log::debug!("[generate_flowchart_elements] subgraph_map = {:#?}", &subgraph_map);
     // Render content string
-    let elems_str = graph_elems.render_elements();
+    let elems_str = graph_elems.render_elements(review);
     // let subgraphs_str = subgraph_map.values().map(
     //     |subgraph| subgraph.render_subgraph()
     // ).collect::<Vec<String>>().join("\n");
