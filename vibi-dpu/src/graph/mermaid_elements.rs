@@ -12,7 +12,16 @@ pub async fn generate_mermaid_flowchart(diff_files: &Vec<StatItem>, review: &Rev
     }
     let flowchart_content = flowchart_content_res.expect("Empty flowchart_content_res");
     let flowchart_str = format!(
-        "%%{{init: {{\"flowchart\": {{\"htmlLabels\": false}}}} }}%%\nflowchart LR\n{}\n",
+        "%%{{init: {{ \
+            'theme': 'neutral', \
+            'themeVariables': {{ \
+                'fontSize': '20px' \
+            }}, \
+            'flowchart': {{ \
+                'nodeSpacing': 100, \
+                'rankSpacing': 100 \
+            }} \
+        }} }}%%\n{}",
         &flowchart_content
     );
     return Some(flowchart_str);

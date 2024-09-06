@@ -53,15 +53,15 @@ impl MermaidSubgraph {
     }
 
     pub fn add_node(&mut self, node: MermaidNode) {
-        if self.nodes.contains_key(node.mermaid_id()) {
+        if self.nodes.contains_key(node.function_name()) {
             log::error!(
                 "[add_node] Node already exists: old - {:#?}, new - {:#?}",
-                &self.nodes[node.mermaid_id()],
+                &self.nodes[node.function_name()],
                 node
             );
             return;
         }
-        self.nodes.insert(node.mermaid_id().to_string(), node.to_owned());
+        self.nodes.insert(node.function_name().to_string(), node.to_owned());
     }
 
     pub fn get_node(&self, func_name: &str) -> Option<&MermaidNode> {
@@ -151,6 +151,10 @@ impl MermaidNode {
 
     pub fn color(&self) -> &String {
         &self.color
+    }
+
+    pub fn function_name(&self) -> &String {
+        &self.function_name
     }
 
     // Getter for mermaid_id
@@ -317,39 +321,6 @@ impl MermaidEdge {
         );
         return edge_key;
     }
-
-    pub fn render_edge_definition(&self, subgraph_map: &HashMap<String, MermaidSubgraph>) -> String {
-        let src_subgraph_opt = subgraph_map.get(&self.src_subgraph_key);
-        if src_subgraph_opt.is_none() {
-            log::debug!("[render_edge_definition] Unable to get subgraph: {}", &self.src_subgraph_key);
-            return "".to_string();
-        }
-        let src_node_opt = src_subgraph_opt.expect("Empty src_subgraph_opt").nodes().get(&self.src_func_key);
-        if src_node_opt.is_none() {
-            log::debug!("[render_edge_definition] Unable to get node: {} in subgraph: {}", &self.src_func_key, &self.src_subgraph_key);
-            return "".to_string();
-        }
-        let src_node = src_node_opt.expect("Empty src_node_opt");
-
-        let dest_subgraph_opt = subgraph_map.get(&self.dest_subgraph_key);
-        if dest_subgraph_opt.is_none() {
-            log::debug!("[render_edge_definition] Unable to get subgraph: {}", &self.dest_subgraph_key);
-            return "".to_string();
-        }
-        let dest_node_opt = dest_subgraph_opt.expect("Empty src_subgraph_opt").nodes().get(&self.dest_func_key);
-        if dest_node_opt.is_none() {
-            log::debug!("[render_edge_definition] Unable to get node: {} in subgraph: {}", &self.dest_func_key, &self.dest_subgraph_key);
-            return "".to_string();
-        }
-        let dest_node = dest_node_opt.expect("Empty src_node_opt");
-        let edge_str = format!("\t{} -- Line {} --> {}\n", src_node.mermaid_id(), self.line, dest_node.mermaid_id());
-        edge_str
-    }
-
-    pub fn render_edge_style(&self) -> String {
-        let style_str = format!("stroke:{},stroke-width:4px;", self.color());
-        style_str
-    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -426,16 +397,16 @@ impl MermaidGraphElements {
         self.edges.insert(edge_key, edge);
     }
 
-    fn render_edges(&self) -> String {
-        let mut all_edges = Vec::<String>::new();
-        let mut all_edges_style = Vec::<String>::new();
-        for (idx, (_, edge)) in self.edges.iter().enumerate() {
-            all_edges.push(edge.render_edge_definition(&self.subgraphs));
-            all_edges_style.push(format!("\tlinkStyle {} {}", idx, edge.render_edge_style()));
-        }
-        let all_edges_str = format!("{}{}", all_edges.join("\n"), all_edges_style.join("\n"));
-        all_edges_str
-    }
+    // fn render_edges(&self) -> String {
+    //     let mut all_edges = Vec::<String>::new();
+    //     let mut all_edges_style = Vec::<String>::new();
+    //     for (idx, (_, edge)) in self.edges.iter().enumerate() {
+    //         all_edges.push(edge.render_edge_definition(&self.subgraphs));
+    //         all_edges_style.push(format!("\tlinkStyle {} {}", idx, edge.render_edge_style()));
+    //     }
+    //     let all_edges_str = format!("{}{}", all_edges.join("\n"), all_edges_style.join("\n"));
+    //     all_edges_str
+    // }
 
     fn render_subgraphs(&self, review: &Review) -> String {
         format!("{}\n{}",
@@ -457,5 +428,52 @@ impl MermaidGraphElements {
     pub fn render_elements(&self, review: &Review) -> String {
         let all_elements_str = format!("{}\n{}", &self.render_subgraphs(review), &self.render_edges());
         all_elements_str
+    }
+
+    fn render_edges(&self) -> String {
+        let mut edge_defs = Vec::<String>::new();
+        let mut default_edge_styles = Vec::<String>::new();
+        let mut green_edge_styles = Vec::<String>::new();
+        let mut red_edge_styles = Vec::<String>::new();
+        let mut yellow_edge_styles = Vec::<String>::new();
+        for (_, edge) in &self.edges {
+            let src_node_id = self.subgraphs[edge.src_subgraph_key()].nodes()[edge.src_func_key()].mermaid_id();
+            let dest_node_id = self.subgraphs[edge.dest_subgraph_key()].nodes()[edge.dest_func_key()].mermaid_id();
+            let edge_def_str = format!("\t{} ==\"Line {}\" =====>{}", src_node_id, edge.line(), dest_node_id);
+            edge_defs.push(edge_def_str);
+            match edge.color().as_str() {
+                "red" => red_edge_styles.push((edge_defs.len() - 1).to_string()),
+                "green" => green_edge_styles.push((edge_defs.len() - 1).to_string()),
+                "yellow" => yellow_edge_styles.push((edge_defs.len() - 1).to_string()),
+                "" | _ => default_edge_styles.push((edge_defs.len() - 1).to_string())
+            }
+        }
+        if !edge_defs.is_empty() {
+            let default_edges_str = match default_edge_styles.is_empty() {
+                true => "".to_string(),
+                false => format!("\tlinkStyle {} stroke-width:1", default_edge_styles.join(",")) 
+            };
+            let green_edges_str = match green_edge_styles.is_empty() {
+                true => "".to_string(),
+                false => format!("\tlinkStyle {} stroke:green,stroke-width:8", green_edge_styles.join(",")) 
+            };
+            let red_edges_str = match red_edge_styles.is_empty() {
+                true => "".to_string(),
+                false => format!("\tlinkStyle {} stroke:red,stroke-width:10", red_edge_styles.join(",")) 
+            };
+            let yellow_edges_str = match yellow_edge_styles.is_empty() {
+                true => "".to_string(),
+                false => format!("\tlinkStyle {} stroke:#ffe302,stroke-width:10", yellow_edge_styles.join(",")) 
+            };
+            return format!("{}\n{}\n{}\n{}\n{}",
+                edge_defs.join("\n"),
+                &default_edges_str,
+                &green_edges_str,
+                &red_edges_str,
+                &yellow_edges_str
+            );
+        }
+
+        return "".to_string();
     }
 }
