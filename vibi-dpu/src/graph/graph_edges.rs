@@ -1,14 +1,14 @@
 use std::{path::{Path, PathBuf}, str::FromStr};
 use crate::utils::{gitops::git_checkout_commit, review::Review};
 
-use super::{elements::MermaidGraphElements, file_imports::{AllFileImportInfo, ImportPath}, function_call::function_calls_in_file, function_line_range::{generate_function_map, FuncDefInfo, FunctionFileMap}, graph_info::DiffGraph, utils::match_overlap};
+use super::{elements::MermaidGraphElements, file_imports::{FilesImportInfo, ImportPath}, function_call::function_calls_in_file, function_line_range::{generate_function_map, FuncDefInfo, FunctionFileMap}, graph_info::DiffGraph, utils::match_overlap};
 
-pub async fn graph_edges(review: &Review, all_import_info: &AllFileImportInfo, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
-    outgoing_edges(diff_graph, graph_elems).await;
+pub async fn graph_edges(review: &Review, all_import_info: &FilesImportInfo, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
+    outgoing_edges(diff_graph, graph_elems, review).await;
     incoming_edges(review, all_import_info, diff_graph, graph_elems).await;
 }
 
-async fn incoming_edges(review: &Review, all_import_info: &AllFileImportInfo, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
+async fn incoming_edges(review: &Review, all_import_info: &FilesImportInfo, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
     for (dest_filename, func_defs) in diff_graph.diff_func_defs() {
         for dest_func in func_defs.added_func_defs() {
             git_checkout_commit(review, review.pr_head_commit());
@@ -154,7 +154,7 @@ fn match_import_condition(dest_filename: &str, import_obj: &ImportPath, dest_fun
         0.5)
 }
 
-async fn outgoing_edges(diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
+async fn outgoing_edges(diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements, review: &Review) {
     for (source_filename, func_calls) in diff_graph.diff_func_calls() {
         for source_func_call in func_calls.added_calls() {
             let dest_filename = source_func_call.import_info().import_path();
@@ -185,7 +185,8 @@ async fn outgoing_edges(diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphEl
                 }
             }
             // search in full graph
-            let dest_filepath = PathBuf::from_str(dest_filename).expect("Unable to get path");
+            let mut dest_filepath = PathBuf::from_str(review.clone_dir()).expect("Unable to get path");
+            dest_filepath.push(dest_filename);
             if let Some(all_file_funcdefs) = generate_function_map(&vec![dest_filepath]).await {
                 // identify this particular func
                 if let Some(func_defs) = all_file_funcdefs.functions_in_file(dest_filename) {

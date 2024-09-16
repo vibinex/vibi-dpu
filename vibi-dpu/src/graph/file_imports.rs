@@ -37,7 +37,7 @@ struct LlmImportPathRequest {
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct ImportPath {
-    import_line: String,
+    import_line: usize,
     import_path: String,
     imported: String
 }
@@ -55,6 +55,17 @@ impl ImportPath {
 
     pub fn imported(&self) -> &String {
         &self.imported
+    }
+}
+
+#[derive(Debug, Serialize, Default, Deserialize, Clone)]
+pub struct ImportPaths {
+    imports: Vec<ImportPath>,
+}
+
+impl ImportPaths {
+    pub fn imports(&self) -> &Vec<ImportPath> {
+        &self.imports
     }
 }
 
@@ -92,11 +103,11 @@ impl FileImportInfo {
 }
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
-pub struct AllFileImportInfo {
+pub struct FilesImportInfo {
     file_import_map: HashMap<String, FileImportInfo>
 }
 
-impl AllFileImportInfo {
+impl FilesImportInfo {
     pub fn files(&self) -> Vec<&String> {
         self.file_import_map.keys().collect()
     }
@@ -114,7 +125,7 @@ impl AllFileImportInfo {
     }
 }
 
-pub async fn get_import_lines(file_paths: &Vec<PathBuf>) -> Option<AllFileImportInfo> {
+pub async fn get_import_lines(file_paths: &Vec<PathBuf>) -> Option<FilesImportInfo> {
     let mut all_import_info = HashMap::<String, FileImportInfo>::new();
     let system_prompt_opt = read_file("/app/prompts/prompt_import_lines");
     if system_prompt_opt.is_none() {
@@ -138,7 +149,7 @@ pub async fn get_import_lines(file_paths: &Vec<PathBuf>) -> Option<AllFileImport
         }
         let file_contents = file_contents_res.expect("Uncaught error in file_content_res");
         let numbered_content = numbered_content(file_contents);
-        let chunks = numbered_content.chunks(50);
+        let chunks = numbered_content.chunks(20);
         let path_str = path.to_str().expect("Empty path");
         let mut chunks_import_vec = Vec::<ChunkImportInfo>::new();
         for chunk in chunks {
@@ -164,7 +175,7 @@ pub async fn get_import_lines(file_paths: &Vec<PathBuf>) -> Option<AllFileImport
     if all_import_info.is_empty() {
         return None;
     }
-    return Some(AllFileImportInfo { file_import_map: all_import_info });
+    return Some(FilesImportInfo { file_import_map: all_import_info });
 }
 
 async fn get_import_lines_chunk(system_prompt_lines: &str, chunk_str: &str, file_path: &str) -> Option<FileImportLines> {
@@ -175,7 +186,7 @@ async fn get_import_lines_chunk(system_prompt_lines: &str, chunk_str: &str, file
             chunk: chunk_str.to_string() } };
     let llm_req_res = serde_json::to_string(&llm_req);
     if llm_req_res.is_err() {
-        log::error!("[get_function_defs_in_chunk] Error in serializing llm req: {}", llm_req_res.expect_err("Empty error in llm_req_res"));
+        log::error!("[get_import_lines_chunk] Error in serializing llm req: {}", llm_req_res.expect_err("Empty error in llm_req_res"));
         return None;
     }
     let llm_req_prompt = llm_req_res.expect("Uncaught error in llm_req_res"); 
@@ -201,7 +212,7 @@ async fn get_import_lines_chunk(system_prompt_lines: &str, chunk_str: &str, file
 }
 
 async fn get_import_path_file(numbered_content: &Vec<String>, import_line: FileImportLines, system_prompt: &str, file_path: &str) -> Option<Vec<ImportPath>> {
-    let mut import_paths = Vec::<ImportPath>::new();
+    let mut import_paths = Vec::<ImportPaths>::new();
     // get import lines from numbered lines
     let import_lines_str_opt = numbered_import_lines(numbered_content, import_line);
     if import_lines_str_opt.is_none() {
@@ -238,7 +249,7 @@ async fn get_import_path_file(numbered_content: &Vec<String>, import_line: FileI
                         import_res.expect_err("Empty error in funcdefs_res"));
                         continue;
                 }
-                let import_path: ImportPath = import_res.expect("Uncaught error in funcdefs_res");
+                let import_path: ImportPaths = import_res.expect("Uncaught error in funcdefs_res");
                 import_paths.push(import_path);
             }
         }
@@ -246,7 +257,11 @@ async fn get_import_path_file(numbered_content: &Vec<String>, import_line: FileI
     if import_paths.is_empty() {
         return None;
     }
-    return Some(import_paths);
+    let import_path_vec: Vec<ImportPath> = import_paths
+        .iter()
+        .flat_map(|ip| ip.imports.iter().cloned())
+        .collect();
+    return Some(import_path_vec);
 }
 
 fn numbered_import_lines(numbered_content: &Vec<String>, import_line: FileImportLines) -> Option<Vec<String>>{

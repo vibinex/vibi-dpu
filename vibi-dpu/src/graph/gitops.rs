@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, process::Command, str::{self, FromStr}};
+use std::{collections::HashMap, path::{Path, PathBuf}, process::Command, str::{self, FromStr}};
 
 use crate::utils::{gitops::StatItem, review::Review};
 
@@ -6,16 +6,15 @@ use crate::utils::{gitops::StatItem, review::Review};
 pub struct HunkDiffLines {
     start_line: usize,
     end_line: usize,
-    content: Vec<String>,
 }
 
 impl HunkDiffLines {
-    pub fn start_line(&self) -> usize {
-        self.start_line
+    pub fn start_line(&self) -> &usize {
+        &self.start_line
     }
 
-    pub fn end_line(&self) -> usize {
-        self.end_line
+    pub fn end_line(&self) -> &usize {
+        &self.end_line
     }
 }
 
@@ -49,15 +48,13 @@ impl HunkDiffMap {
         self.file_line_map.keys().collect::<Vec<&String>>()
     }
 
-    pub fn all_files_pathbuf(&self) -> Vec<PathBuf> {
+    pub fn all_files_pathbuf(&self, clone_dir: &str) -> Vec<PathBuf> {
+        let base_path = Path::new(clone_dir);
         self.file_line_map.keys()
         .filter_map(|s| {
-            // Try to convert each &str to a PathBuf
-            let s_pathbuf_res = PathBuf::from_str(s);
-            match s_pathbuf_res {
-                Ok(pathbuf) => Some(pathbuf),
-                Err(_) => None,
-            }
+            let relative_path = Path::new(s);
+            let abs_filepath = base_path.join(relative_path);
+            Some(abs_filepath)
         })
         .collect::<Vec<PathBuf>>()
     }
@@ -100,8 +97,6 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
         let diffstr = diffstr_res.expect("Uncaught error in diffstr_res");
         log::debug!("[extract_hunks] diffstr = {}", &diffstr);
 
-        let mut current_add_content = Vec::new();
-        let mut current_del_content = Vec::new();
         let mut current_add_start = 0;
         let mut current_del_start = 0;
         let mut current_add_end = 0;
@@ -117,21 +112,17 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
                     file_hunks.added_hunks.push(HunkDiffLines {
                         start_line: current_add_start,
                         end_line: current_add_end,
-                        content: current_add_content.clone(),
                     });
                 }
                 if in_del_hunk {
                     file_hunks.deleted_hunks.push(HunkDiffLines {
                         start_line: current_del_start,
                         end_line: current_del_end,
-                        content: current_del_content.clone(),
                     });
                 }
                 // Reset states for next hunk
                 in_add_hunk = false;
                 in_del_hunk = false;
-                current_add_content.clear();
-                current_del_content.clear();
 
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() > 2 {
@@ -154,14 +145,6 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
                         }
                     }
                 }
-            } else if line.starts_with('-') {
-                if in_del_hunk {
-                    current_del_content.push(line[1..].to_string());
-                }
-            } else if line.starts_with('+') {
-                if in_add_hunk {
-                    current_add_content.push(line[1..].to_string());
-                }
             }
         }
 
@@ -170,18 +153,19 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
             file_hunks.added_hunks.push(HunkDiffLines {
                 start_line: current_add_start,
                 end_line: current_add_end,
-                content: current_add_content.clone(),
             });
         }
         if in_del_hunk {
             file_hunks.deleted_hunks.push(HunkDiffLines {
                 start_line: current_del_start,
                 end_line: current_del_end,
-                content: current_del_content.clone(),
             });
         }
-
-        file_hunk_map.file_line_map.insert(filepath.to_string(), file_hunks);
+        let abs_filepath = Path::new(review.clone_dir());
+        let abs_file_pathbuf = abs_filepath.join(Path::new(filepath));
+        file_hunk_map.file_line_map.insert(
+            abs_file_pathbuf.to_str().expect("Unable to deserialize pathbuf").to_string(),
+            file_hunks);
     }
 
     return file_hunk_map;

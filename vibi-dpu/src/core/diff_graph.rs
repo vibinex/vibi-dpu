@@ -16,7 +16,7 @@ pub async fn send_diff_graph(review: &Review, excluded_files: &Vec<StatItem>, sm
 }
 
 async fn diff_graph_comment_text(excluded_files: &Vec<StatItem>, small_files: &Vec<StatItem>, review: &Review) -> String {
-    let mut comment = "Relevant users for this PR:\n\n".to_string();  
+    let mut comment = "Diff Graph:\n\n".to_string();  
     
     let all_diff_files: Vec<StatItem> = excluded_files
         .iter()

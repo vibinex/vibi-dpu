@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::{Path, PathBuf}, slice::Chunks};
 
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use strsim::jaro_winkler;
 use walkdir::WalkDir;
 use std::fs;
@@ -21,7 +21,7 @@ struct LlmResponse {
 
 pub async fn call_llm_api(prompt: String) -> Option<String> {
     let client = get_client();
-    let url = "http://host.docker.internal:11434/api/generate";
+    let url = "http://34.100.208.132/api/generate";
     log::debug!("[call_llm_api] Prompt = {:?}", &prompt);
     let response_res = client.post(url)
         .json(&json!({"model": "phind-codellama", "prompt": prompt}))
@@ -52,17 +52,30 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
         start = end + 1;
     }
 
+    // Process each chunk
     for chunk in chunks {
-        let parsed_chunk_res = serde_json::from_str(&chunk);
+        // Attempt to fix incomplete chunks
+        let fixed_chunk = if !chunk.starts_with("{") {
+            format!("{{{}", chunk)
+        } else if !chunk.ends_with("}") {
+            format!("{}{}", chunk, "}")
+        } else {
+            chunk.to_string()
+        };
+        let parsed_chunk_res = serde_json::from_str::<Value>(&fixed_chunk);
         if parsed_chunk_res.is_err() {
             let e = parsed_chunk_res.expect_err("Empty error in parsed_chunk_res");
             log::error!("[call_llm_api] Unable to deserialize {}: {:?}", chunk, e);
             continue;
         }
-        let parsed_chunk: LlmResponse = parsed_chunk_res.expect("Uncaught error in parsed_chunk_res");
-        final_response.push_str(&parsed_chunk.response);
-        if parsed_chunk.done {
-            break;
+        let parsed_chunk = parsed_chunk_res.expect("Uncaught error in parsed_chunk_res");
+        if let Some(parsed_response) =  parsed_chunk.get("response").and_then(|v| v.as_str()){
+            final_response.push_str(parsed_response);    
+        }
+        if let Some(done_field) = parsed_chunk.get("done").and_then(|v| v.as_bool()) {
+            if done_field {
+                break;
+            }
         }
     }
     log::debug!("[call_llm_api] final_response = {:?}", &final_response);
@@ -86,28 +99,6 @@ pub fn read_file(file: &str) -> Option<String> {
     Some(content)
 }
 
-pub fn get_specific_lines(line_numbers: Vec<(usize, usize)>, numbered_content: &str) -> String {
-    // Split the input content into lines and collect into a vector
-    let lines: Vec<&str> = numbered_content.lines().collect();
-    let mut result = String::new();
-    // Iterate over each line number we are interested in
-    for (mut start, mut end) in line_numbers {
-        if start > end {
-            let xchng = start;
-            start = end;
-            end = xchng;
-        }
-        for line_number in start..=end {
-            // Check if the line_number is within the bounds of the vector
-            if line_number < lines.len() {
-                result.push_str(lines[line_number]);
-                result.push('\n');
-            }
-        }
-    }
-    return result;
-}
-
 pub fn generate_random_string(length: usize) -> String {
     const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
     let mut rng = rand::thread_rng();
@@ -128,7 +119,10 @@ pub fn all_code_files(dir: &str) -> Option<Vec<PathBuf>> {
         let ext = path.extension().and_then(|ext| ext.to_str());
         log::debug!("[generate_function_map] extension = {:?}", &ext);
         if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            code_files.push(path);
+            match path.canonicalize() {
+                Ok(abs_path) => code_files.push(abs_path),
+                Err(e) => log::error!("Failed to get absolute path for {:?}: {:?}", path, e),
+            }
         }
     }
     if code_files.is_empty() {
@@ -156,7 +150,7 @@ pub fn numbered_content(file_contents: String) -> Vec<String> {
     let lines = file_contents
         .lines()
         .enumerate()
-        .map(|(index, line)| format!("{} {}", index+1, line))
+        .map(|(index, line)| format!("{} {}", index, line))
         .collect::<Vec<String>>();
     return lines;
 }

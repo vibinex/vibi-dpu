@@ -1,7 +1,7 @@
 use sled::IVec;
 
-use crate::{db::config::get_db, graph::file_imports::AllFileImportInfo};
-pub fn save_import_info_to_db(review_key: &str, commit_id: &str, all_imports: &AllFileImportInfo) {
+use crate::{db::config::get_db, graph::file_imports::FilesImportInfo};
+pub fn save_import_info_to_db(review_key: &str, commit_id: &str, all_imports: &FilesImportInfo) {
     let db = get_db();
     let graph_info_key = format!("graph_info/{}/{}", review_key, commit_id);
     // Serialize repo struct to JSON 
@@ -16,7 +16,7 @@ pub fn save_import_info_to_db(review_key: &str, commit_id: &str, all_imports: &A
     log::debug!("[save_graph_info_to_db] Graph Info succesfully upserted: {:#?}", all_imports);
 }
 
-pub fn get_import_info_from_db(review_key: &str, commit_id: &str) -> Option<AllFileImportInfo> {
+pub fn get_import_info_from_db(review_key: &str, commit_id: &str) -> Option<FilesImportInfo> {
     let db = get_db();
     let graph_info_key = format!("graph_info/{}/{}", review_key, commit_id);
     let graph_info_res = db.get(IVec::from(graph_info_key.as_bytes()));
@@ -40,6 +40,6 @@ pub fn get_import_info_from_db(review_key: &str, commit_id: &str) -> Option<AllF
         );
         return None;
     }
-    let graph_info: AllFileImportInfo = graph_info_res.expect("Uncaught error in graph_info_res");
+    let graph_info: FilesImportInfo = graph_info_res.expect("Uncaught error in graph_info_res");
     return Some(graph_info);
 }

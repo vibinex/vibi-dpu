@@ -10,6 +10,9 @@ pub struct FunctionCallChunk {
 }
 
 impl FunctionCallChunk {
+    pub fn new(function_calls: Vec<usize>) -> Self {
+        Self { function_calls }
+    }
     pub fn function_calls(&self) -> &Vec<usize> {
         &self.function_calls
     }

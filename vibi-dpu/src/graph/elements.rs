@@ -345,8 +345,8 @@ impl MermaidGraphElements {
         dest_file: &str,
         source_color: &str,
         dest_color: &str,
-        source_def_line: usize,
-        dest_def_line: usize
+        source_def_line: &usize,
+        dest_def_line: &usize
     ) {        
         self.create_node(source_file, source_func_name, source_color, source_def_line);
         self.create_node(dest_file, dest_func_name, dest_color, dest_def_line);
@@ -360,20 +360,20 @@ impl MermaidGraphElements {
         self.add_edge_to_edges(edge);
     }
 
-    fn create_node(&mut self, subgraph_key: &str, node_func_name: &str, node_color: &str, def_line: usize) {
+    fn create_node(&mut self, subgraph_key: &str, node_func_name: &str, node_color: &str, def_line: &usize) {
         if let Some(subgraph) = self.subgraphs.get_mut(subgraph_key) {
             if let Some(node) = subgraph.get_mut_node(node_func_name) {
                 node.compare_and_change_color(node_color);
             } else {
                 let mut node = MermaidNode::new(node_func_name.to_string(),
-                subgraph.name().to_string(), def_line);
+                subgraph.name().to_string(), def_line.to_owned());
                 node.set_color(node_color);
                 subgraph.add_node(node);
             }
         } else {
             let mut subgraph = MermaidSubgraph::new(subgraph_key.to_string());
             let mut node = MermaidNode::new(node_func_name.to_string(),
-            subgraph.name().to_string(), def_line);
+            subgraph.name().to_string(), def_line.to_owned());
             node.set_color(node_color);
             subgraph.add_node(node);
             self.add_subgraph(subgraph);

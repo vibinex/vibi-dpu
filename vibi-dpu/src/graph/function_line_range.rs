@@ -26,12 +26,12 @@ impl FuncDefInfo {
         &self.name
     }
 
-    pub fn line_start(&self) -> usize {
-        self.line_start
+    pub fn line_start(&self) -> &usize {
+        &self.line_start
     }
 
-    pub fn line_end(&self) -> usize {
-        self.line_end
+    pub fn line_end(&self) -> &usize {
+        &self.line_end
     }
 }
 
@@ -117,12 +117,16 @@ struct LlmFuncDefRequest {
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 struct LlmFuncDef {
+    #[serde(default)]
     name: String,
-    line_num: usize,
+    #[serde(default)]
+    line_start: usize,
+    #[serde(default)]
     parent: String
 }
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 struct LlmFuncDefResponse {
+    #[serde(default)]
     functions: Vec<LlmFuncDef>
 }
 
@@ -166,7 +170,7 @@ pub async fn generate_function_map(file_paths: &Vec<PathBuf>) -> Option<AllFileF
         };
         let file_contents = std::fs::read_to_string(path.clone()).ok()?;
         let numbered_content = numbered_content(file_contents);
-        let chunks = numbered_content.chunks(50);
+        let chunks = numbered_content.chunks(30);
         for chunk in chunks {
             let chunk_str = chunk.join("\n");
             let function_defs_opt = get_function_defs_in_chunk(&chunk_str, &system_prompt_lines).await;
@@ -176,14 +180,14 @@ pub async fn generate_function_map(file_paths: &Vec<PathBuf>) -> Option<AllFileF
             }
             let function_defs = function_defs_opt.expect("Empty function_defs");
             for func_def in function_defs.functions.iter() {
-                let func_boundary_opt = get_function_boundaries_in_chunk(&numbered_content, func_def.line_num, &system_prompt_lines_end).await;
+                let func_boundary_opt = get_function_boundaries_in_chunk(&numbered_content, func_def.line_start, &system_prompt_lines_end).await;
                 if func_boundary_opt.is_none() {
                     continue;
                 }
                 let func_boundary = func_boundary_opt.expect("Empty func_boundary_opt");
                 function_map.functions.push(FuncDefInfo {
                     name: func_def.name.clone(),
-                    line_start: func_def.line_num,
+                    line_start: func_def.line_start,
                     line_end: func_boundary.function_boundary as usize,
                     parent: func_def.parent.clone(),
                 });
@@ -218,7 +222,7 @@ async fn get_function_defs_in_chunk(chunk: &str, system_prompt: &str) -> Option<
             let funcdefs_res = serde_json::from_str(&llm_response);
             if funcdefs_res.is_err() {
                 log::error!(
-                    "[get_function_defs_in_chunk] funcdefs error: {}",
+                    "[get_function_defs_in_chunk] funcdefs error: {:?}",
                     funcdefs_res.expect_err("Empty error in funcdefs_res"));
                     return None;
             }
@@ -232,7 +236,7 @@ async fn get_function_defs_in_chunk(chunk: &str, system_prompt: &str) -> Option<
 
 async fn get_function_boundaries_in_chunk(file_lines_numbered: &Vec<String>, func_def_line_num: usize, system_prompt: &str) -> Option<LlmFuncBoundaryResponse> {
     // divide lines into chunks and call with each chunk until line_end is found or files is empty
-    let chunk_size = 70;
+    let chunk_size = 40;
     let mut start = func_def_line_num;
     
     while start < file_lines_numbered.len() {
