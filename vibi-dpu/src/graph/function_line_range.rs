@@ -9,10 +9,10 @@ use super::{gitops::HunkDiffLines, utils::{all_code_files, call_llm_api, read_fi
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FuncDefInfo {
-    name: String,
-    line_start: usize,
-    line_end: usize,
-    parent: String,
+    pub(crate) name: String,
+    pub(crate) line_start: usize,
+    pub(crate) line_end: usize,
+    pub(crate) parent: String,
 }
 
 impl PartialEq for FuncDefInfo {
@@ -33,12 +33,16 @@ impl FuncDefInfo {
     pub fn line_end(&self) -> &usize {
         &self.line_end
     }
+
+    pub fn parent(&self) -> &String {
+        &self.parent
+    }
 }
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionFileMap {
-    file_name: String,
-    functions: Vec<FuncDefInfo>
+    pub(crate) file_name: String,
+    pub(crate) functions: Vec<FuncDefInfo>
     // implement a function which takes in starting and ending line numbers of a continous range
     // and returns the functions inside the range like Vec of ((start_line, end_line) function_name)
 }
@@ -90,7 +94,7 @@ impl FunctionFileMap {
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct AllFileFunctions {
-    func_map: HashMap<String, FunctionFileMap>  // file name will be key
+    pub(crate) func_map: HashMap<String, FunctionFileMap>  // file name will be key
 }
 
 impl AllFileFunctions {
@@ -168,7 +172,13 @@ pub async fn generate_function_map(file_paths: &Vec<PathBuf>) -> Option<AllFileF
             file_name: path.to_str().to_owned().unwrap_or("").to_string(),
             functions: Vec::new(),
         };
-        let file_contents = std::fs::read_to_string(path.clone()).ok()?;
+        let file_contents_res = std::fs::read_to_string(path.clone());
+        if file_contents_res.is_err() {
+            log::error!("[generate_function_map] Error in reading file contents: {:?}",
+                file_contents_res.expect_err("Empty error"));
+            continue;
+        }
+        let file_contents = file_contents_res.expect("Uncaught error in file_content_res");
         let numbered_content = numbered_content(file_contents);
         let chunks = numbered_content.chunks(30);
         for chunk in chunks {
@@ -182,6 +192,7 @@ pub async fn generate_function_map(file_paths: &Vec<PathBuf>) -> Option<AllFileF
             for func_def in function_defs.functions.iter() {
                 let func_boundary_opt = get_function_boundaries_in_chunk(&numbered_content, func_def.line_start, &system_prompt_lines_end).await;
                 if func_boundary_opt.is_none() {
+                    log::debug!("[generate_function_map] No function end detected for func: {:?}", &func_def);
                     continue;
                 }
                 let func_boundary = func_boundary_opt.expect("Empty func_boundary_opt");

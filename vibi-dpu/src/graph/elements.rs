@@ -76,7 +76,7 @@ impl MermaidSubgraph {
             all_nodes.push(node.render_node(review, subgraph_map));
         }
         let subgraph_str = format!(
-            "\tsubgraph {} [{}]\n{}\n\tend\n{}\n",
+            "\tsubgraph {} [\"{}\"]\n{}\n\tend\n{}\n",
             self.mermaid_id,
             self.name,
             all_nodes.join("\n"),
@@ -179,7 +179,7 @@ impl MermaidNode {
         let url_str = format!("\tclick {} href \"{}\" _blank",
             self.mermaid_id(), self.get_node_str(review, subgraph_map));
         let class_str = self.get_style_class();
-        let node_str = format!("\t{}[{}]", &self.mermaid_id, &self.function_name);
+        let node_str = format!("\t{}[\"{}\"]", &self.mermaid_id, &self.function_name);
         return format!("{}\n{}\n{}", &node_str, &class_str, &url_str);
     }
     
@@ -347,9 +347,9 @@ impl MermaidGraphElements {
         dest_color: &str,
         source_def_line: &usize,
         dest_def_line: &usize
-    ) {        
-        self.create_node(source_file, source_func_name, source_color, source_def_line);
-        self.create_node(dest_file, dest_func_name, dest_color, dest_def_line);
+    ) {
+        self.create_or_modify_node(source_file, source_func_name, source_color, source_def_line);
+        self.create_or_modify_node(dest_file, dest_func_name, dest_color, dest_def_line);
         let edge = MermaidEdge::new(
             calling_line_num,
             source_func_name.to_string(),
@@ -357,10 +357,11 @@ impl MermaidGraphElements {
             dest_func_name.to_string(),
             dest_file.to_string(),
             edge_color.to_string());
+        log::debug!("[add_edge] edge = {:#?}", &edge);
         self.add_edge_to_edges(edge);
     }
 
-    fn create_node(&mut self, subgraph_key: &str, node_func_name: &str, node_color: &str, def_line: &usize) {
+    fn create_or_modify_node(&mut self, subgraph_key: &str, node_func_name: &str, node_color: &str, def_line: &usize) {
         if let Some(subgraph) = self.subgraphs.get_mut(subgraph_key) {
             if let Some(node) = subgraph.get_mut_node(node_func_name) {
                 node.compare_and_change_color(node_color);
@@ -394,17 +395,6 @@ impl MermaidGraphElements {
         }
         self.edges.insert(edge_key, edge);
     }
-
-    // fn render_edges(&self) -> String {
-    //     let mut all_edges = Vec::<String>::new();
-    //     let mut all_edges_style = Vec::<String>::new();
-    //     for (idx, (_, edge)) in self.edges.iter().enumerate() {
-    //         all_edges.push(edge.render_edge_definition(&self.subgraphs));
-    //         all_edges_style.push(format!("\tlinkStyle {} {}", idx, edge.render_edge_style()));
-    //     }
-    //     let all_edges_str = format!("{}{}", all_edges.join("\n"), all_edges_style.join("\n"));
-    //     all_edges_str
-    // }
 
     fn render_subgraphs(&self, review: &Review) -> String {
         format!("{}\n{}",

@@ -26,7 +26,7 @@ async fn diff_graph_comment_text(excluded_files: &Vec<StatItem>, small_files: &V
     if let Some(mermaid_text) = mermaid_comment(&all_diff_files, review).await {
         comment += mermaid_text.as_str();
     }
-    comment += "To modify DiffGraph settings, go to [your Vibinex settings page.](https://vibinex.com/settings)\n";
+    comment += "\nTo modify DiffGraph settings, go to [your Vibinex settings page.](https://vibinex.com/settings)\n";
     return comment;
 }
 

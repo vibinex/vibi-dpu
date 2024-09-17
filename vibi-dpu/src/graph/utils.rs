@@ -70,13 +70,17 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
         }
         let parsed_chunk = parsed_chunk_res.expect("Uncaught error in parsed_chunk_res");
         if let Some(parsed_response) =  parsed_chunk.get("response").and_then(|v| v.as_str()){
-            final_response.push_str(parsed_response);    
+            final_response.push_str(parsed_response);
         }
         if let Some(done_field) = parsed_chunk.get("done").and_then(|v| v.as_bool()) {
             if done_field {
                 break;
             }
         }
+    }
+    let final_response_trimmed = final_response.trim();
+    if final_response_trimmed.starts_with("{") && !final_response_trimmed.ends_with("}") {
+        final_response.push_str("}");
     }
     log::debug!("[call_llm_api] final_response = {:?}", &final_response);
     Some(final_response)
@@ -115,9 +119,9 @@ pub fn all_code_files(dir: &str) -> Option<Vec<PathBuf>> {
     let mut code_files = Vec::<PathBuf>::new();
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path().to_owned();
-        log::debug!("[generate_function_map] path = {:?}", path);
+        log::debug!("[all_code_files] path = {:?}", path);
         let ext = path.extension().and_then(|ext| ext.to_str());
-        log::debug!("[generate_function_map] extension = {:?}", &ext);
+        log::debug!("[all_code_files] extension = {:?}", &ext);
         if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
             match path.canonicalize() {
                 Ok(abs_path) => code_files.push(abs_path),
@@ -129,6 +133,18 @@ pub fn all_code_files(dir: &str) -> Option<Vec<PathBuf>> {
         return None;
     }
     return Some(code_files);
+}
+
+pub fn match_imported_filename_to_path(paths: &Vec<PathBuf>, filename: &str) -> Option<PathBuf> {
+    let relative_path = Path::new(filename);
+    // Find the first path that matches the filename or relative path
+    for path in paths {
+        if path.ends_with(relative_path) {
+            return Some(path.clone());  // Return the first matching path
+        }
+    }
+    // Return an empty PathBuf or handle the case where no match is found
+    None
 }
 
 pub fn source_diff_files(diff_files: &Vec<StatItem>) -> Option<Vec<StatItem>> {
@@ -157,8 +173,23 @@ pub fn numbered_content(file_contents: String) -> Vec<String> {
 
 pub fn match_overlap(str1: &str, str2: &str, similarity_threshold: f64) -> bool {
     let similarity = jaro_winkler(str1, str2);
+    log::debug!("[match_overlap] str1 = {}, str2 = {}, similarity = {}, similarity_threshold = {}", str1, str2, similarity, similarity_threshold);
     if similarity >= similarity_threshold {
         return true;
     }
     return false;
+}
+
+pub fn absolute_to_relative_path(abs_path: &str, review: &Review) -> Option<String> {
+    let base_path = review.clone_dir();
+    let full_path = PathBuf::from(abs_path);
+    let rel_path_res = full_path.strip_prefix(base_path);
+    log::debug!("[absolute_to_relative_path] rel_path = {:#?}", &rel_path_res);
+    log::debug!("[absolute_to_relative_path] full_path = {:?}, base_path = {:?}", &full_path, base_path);
+    if let Err(e) = rel_path_res {
+        log::error!("[absolute_to_relative_path] Error in removing prefix: {:?}", e);
+        return None;
+    }
+    let rel_path = rel_path_res.expect("Uncaught error in rel_path_res");
+    return Some(rel_path.to_str().expect("Unable to deserialze rel_path").to_string());
 }
