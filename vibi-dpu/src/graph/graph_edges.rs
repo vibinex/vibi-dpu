@@ -10,10 +10,18 @@ pub async fn graph_edges(base_filepaths: &Vec<PathBuf>, head_filepaths: &Vec<Pat
 
 async fn incoming_edges(head_filepaths: &Vec<PathBuf>, review: &Review, all_import_info: &FilesImportInfo, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
     for (dest_filename, func_defs) in diff_graph.diff_func_defs() {
+        let mut dest_file_rel = dest_filename.to_string();
+        if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
+            dest_file_rel = dest_file_relative_path;
+        }
         for dest_func in func_defs.added_func_defs() {
             git_checkout_commit(review, review.pr_head_commit());
             // search in diff graph
             for (source_filename, file_func_defs) in diff_graph.all_file_imports().file_import_map() {
+                let mut source_rel_path = source_filename.to_string();
+                if let Some(src_relative_filepath) = absolute_to_relative_path(&source_rel_path, review) {
+                    source_rel_path = src_relative_filepath;
+                }
                 let file_imports = file_func_defs.all_import_paths();
                 for file_import in file_imports {
                     // search for correct import
@@ -32,8 +40,8 @@ async fn incoming_edges(head_filepaths: &Vec<PathBuf>, review: &Review, all_impo
                                             line_num.to_owned(), 
                                             &source_func_def.name(), 
                                             &dest_func.name(),
-                                            &source_filename,
-                                            dest_filename,
+                                            &source_rel_path,
+                                            &dest_file_rel,
                                             "",
                                             "green",
                                             source_func_def.line_start(),
@@ -49,6 +57,10 @@ async fn incoming_edges(head_filepaths: &Vec<PathBuf>, review: &Review, all_impo
             git_checkout_commit(review, review.base_head_commit());
             // search in full graph
             for (source_filename, file_func_defs) in all_import_info.file_import_map() {
+                let mut source_file_rel = source_filename.to_string();
+                if let Some(src_relative_filepath) = absolute_to_relative_path(&source_file_rel, review) {
+                    source_file_rel = src_relative_filepath;
+                } 
                 let file_imports = file_func_defs.all_import_paths();
                 for file_import in file_imports {
                     // search for correct import
@@ -59,15 +71,20 @@ async fn incoming_edges(head_filepaths: &Vec<PathBuf>, review: &Review, all_impo
                             if let Some(func_call_vec) = function_calls_in_file(&src_filepath, dest_func.name()).await {
                                 // call func in  that takes vec of lines and returns funcdefs
                                 let lines = func_call_vec.iter().flat_map(|chunk| chunk.function_calls()).cloned().collect();
-                                let source_func_defs = diff_graph.all_file_func_defs().functions_in_file(source_filename).expect("No source filename found").funcs_for_lines(&lines);
+                                let source_func_defs_opt = diff_graph.all_file_func_defs().functions_in_file(source_filename);
+                                if source_func_defs_opt.is_none() {
+                                    log::debug!("[incoming_edges] No funcs for file: {}", source_filename);
+                                    continue;
+                                }
+                                let source_func_defs = source_func_defs_opt.expect("No source filename found").funcs_for_lines(&lines);
                                 for (line_num, source_func_def) in source_func_defs {
                                     if source_func_def != dest_func.to_owned() {
                                         graph_elems.add_edge("",
                                             line_num.to_owned(), 
                                             &source_func_def.name(), 
                                             &dest_func.name(),
-                                            &source_filename,
-                                            dest_filename,
+                                            &source_file_rel,
+                                            &dest_file_rel,
                                             "",
                                             "green",
                                             source_func_def.line_start(),
@@ -84,6 +101,10 @@ async fn incoming_edges(head_filepaths: &Vec<PathBuf>, review: &Review, all_impo
         for dest_func in func_defs.deleted_func_defs() {
             // search in diff graph
             for (source_filename, file_func_defs) in diff_graph.all_file_imports().file_import_map() {
+                let mut source_file_rel = source_filename.to_string();
+                if let Some(src_relative_filepath) = absolute_to_relative_path(&source_file_rel, review) {
+                    source_file_rel = src_relative_filepath;
+                }
                 let file_imports = file_func_defs.all_import_paths();
                 for file_import in file_imports {
                     // search for correct import
@@ -95,15 +116,20 @@ async fn incoming_edges(head_filepaths: &Vec<PathBuf>, review: &Review, all_impo
                             if let Some(func_call_vec) = function_calls_in_file(&src_filepath, dest_func.name()).await {
                                 // call func in  that takes vec of lines and returns funcdefs
                                 let lines = func_call_vec.iter().flat_map(|chunk| chunk.function_calls()).cloned().collect();
-                                let source_func_defs = diff_graph.all_file_func_defs().functions_in_file(source_filename).expect("No source filename found").funcs_for_lines(&lines);
+                                let source_func_defs_opt = diff_graph.all_file_func_defs().functions_in_file(source_filename);
+                                if source_func_defs_opt.is_none() {
+                                    log::debug!("[incoming_edges] No funcs for file: {}", source_filename);
+                                    continue;
+                                }
+                                let source_func_defs = source_func_defs_opt.expect("No source filename found").funcs_for_lines(&lines);
                                 for (line_num, source_func_def) in source_func_defs {
                                     if source_func_def != dest_func.to_owned() {
                                         graph_elems.add_edge("",
                                             line_num.to_owned(), 
                                             &source_func_def.name(), 
                                             &dest_func.name(),
-                                            &source_filename,
-                                            dest_filename,
+                                            &source_file_rel,
+                                            &dest_file_rel,
                                             "",
                                             "red",
                                             source_func_def.line_start(),
@@ -118,6 +144,10 @@ async fn incoming_edges(head_filepaths: &Vec<PathBuf>, review: &Review, all_impo
             }
             // search in full graph
             for (source_filename, file_func_defs) in all_import_info.file_import_map() {
+                let mut source_file_rel = source_filename.to_string();
+                if let Some(src_relative_filepath) = absolute_to_relative_path(&source_file_rel, review) {
+                    source_file_rel = src_relative_filepath;
+                }
                 let file_imports = file_func_defs.all_import_paths();
                 for file_import in file_imports {
                     // search for correct import
@@ -128,15 +158,20 @@ async fn incoming_edges(head_filepaths: &Vec<PathBuf>, review: &Review, all_impo
                             if let Some(func_call_vec) = function_calls_in_file(&src_filepath, dest_func.name()).await {
                                 // call func in  that takes vec of lines and returns funcdefs
                                 let lines = func_call_vec.iter().flat_map(|chunk| chunk.function_calls()).cloned().collect();
-                                let source_func_defs = diff_graph.all_file_func_defs().functions_in_file(source_filename).expect("No source filename found").funcs_for_lines(&lines);
+                                let source_func_defs_opt = diff_graph.all_file_func_defs().functions_in_file(source_filename);
+                                if source_func_defs_opt.is_none() {
+                                    log::debug!("[incoming_edges] No funcs for file: {}", source_filename);
+                                    continue;
+                                }
+                                let source_func_defs = source_func_defs_opt.expect("No source filename found").funcs_for_lines(&lines);
                                 for (line_num, source_func_def) in source_func_defs {
                                     if source_func_def != dest_func.to_owned() {
                                         graph_elems.add_edge("red",
                                             line_num.to_owned(),
                                             &source_func_def.name(), 
                                             &dest_func.name(),
-                                            &source_filename,
-                                            dest_filename,
+                                            &source_file_rel,
+                                            &dest_file_rel,
                                             "",
                                             "red",
                                             source_func_def.line_start(),
@@ -158,10 +193,10 @@ fn match_import_func(import_obj: &ImportPath, dest_func_info: &FuncDefInfo) -> b
     // TODO FIXME - first condition doesn't make sense, it should always be true? - have to check for all calls of this function
     match_overlap(&dest_func_info.name(),
         &import_obj.imported(),
-        0.5)
+        0.6)
         || match_overlap(&dest_func_info.parent(),
         &import_obj.imported(),
-        0.5)
+        0.6)
 }
 
 async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, head_filepaths: &Vec<PathBuf>, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements, review: &Review) {
@@ -173,6 +208,7 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, head_filepaths: &Vec<Path
         }
         for source_func_call in func_calls.added_calls() {
             log::debug!("[outgoing_edges] source func call import info = {:#?}", source_func_call.import_info());
+            // todo fixme - normalize dest_filename
             let dest_filename = source_func_call.import_info().import_path();
             let lines = source_func_call.call_info().iter().flat_map(|chunk| chunk.function_calls()).cloned().collect();
             // send this file for getting func defs
@@ -211,6 +247,10 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, head_filepaths: &Vec<Path
             if let Some(all_file_funcdefs) = generate_function_map(&vec![dest_filepath.clone()]).await {
                 // identify this particular func
                 let dest_filepath_key = dest_filepath.as_os_str().to_str().expect("Unable to deserialize dest_filepath");
+                let mut dest_file_rel = dest_filepath_key.to_string();
+                if let Some(dest_relative_filepath) = absolute_to_relative_path(&dest_file_rel, review) {
+                    dest_file_rel = dest_relative_filepath;
+                }
                 if let Some(func_defs) = all_file_funcdefs.functions_in_file(dest_filepath_key) {
                     let source_func_defs = func_defs.funcs_for_lines(&lines);
                     for dest_func_def in func_defs.functions() {
@@ -222,7 +262,7 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, head_filepaths: &Vec<Path
                                     source_func_def.name(), 
                                     dest_func_def.name(),
                                     &source_file_name,
-                                    dest_filename,
+                                    &dest_file_rel,
                                     "green",
                                     "",
                                     source_func_def.line_start(),
@@ -237,6 +277,7 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, head_filepaths: &Vec<Path
         // do same for deleted_calls
         for source_func_call in func_calls.deleted_calls() {
             log::debug!("[outgoing_edges] source func call import info = {:#?}", source_func_call.import_info());
+            // todo fixme - normalize dest_filename
             let dest_filename = source_func_call.import_info().import_path();
             let diff_file_funcdefs = diff_graph.all_file_func_defs();
             let lines = source_func_call.call_info().iter().flat_map(|chunk| chunk.function_calls()).cloned().collect();

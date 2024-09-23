@@ -75,10 +75,14 @@ impl MermaidSubgraph {
         for (_, node) in self.nodes() {
             all_nodes.push(node.render_node(review, subgraph_map));
         }
+        let mut subg_name: &str = self.name();
+        if subg_name == "" {
+            subg_name = "unidentified_file";
+        }
         let subgraph_str = format!(
             "\tsubgraph {} [\"{}\"]\n{}\n\tend\n{}\n",
             self.mermaid_id,
-            self.name,
+            subg_name,
             all_nodes.join("\n"),
             self.render_subgraph_style()
         );
@@ -179,7 +183,11 @@ impl MermaidNode {
         let url_str = format!("\tclick {} href \"{}\" _blank",
             self.mermaid_id(), self.get_node_str(review, subgraph_map));
         let class_str = self.get_style_class();
-        let node_str = format!("\t{}[\"{}\"]", &self.mermaid_id, &self.function_name);
+        let mut func_name: &str = self.function_name(); 
+        if func_name == "" {
+            func_name = "unidentified_func";
+        }
+        let node_str = format!("\t{}[\"{}\"]", &self.mermaid_id, func_name);
         return format!("{}\n{}\n{}", &node_str, &class_str, &url_str);
     }
     

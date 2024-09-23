@@ -36,7 +36,7 @@ struct LlmImportPathRequest {
 }
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
-pub struct ImportPath {
+pub struct  ImportPath {
     import_line: usize,
     import_path: String,
     imported: String
@@ -49,6 +49,10 @@ impl PartialEq for ImportPath {
 }
 
 impl ImportPath {
+    
+    pub fn new(import_line: usize, import_path: String, imported: String) -> Self {
+        Self { import_line, import_path, imported }
+    }
     pub fn import_path(&self) -> &String {
         &self.import_path
     }

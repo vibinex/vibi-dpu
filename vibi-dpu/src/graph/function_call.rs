@@ -6,12 +6,14 @@ use super::{file_imports::get_import_lines, gitops::HunkDiffMap, utils::{call_ll
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionCallChunk {
-    function_calls: Vec<usize>
+    function_calls: Vec<usize>,
+    #[serde(skip_deserializing)]
+    function_name: Option<String>
 }
 
 impl FunctionCallChunk {
-    pub fn new(function_calls: Vec<usize>) -> Self {
-        Self { function_calls }
+    pub fn new(function_calls: Vec<usize>, function_name: String) -> Self {
+        Self { function_calls, function_name: Some(function_name) }
     }
     pub fn function_calls(&self) -> &Vec<usize> {
         &self.function_calls
