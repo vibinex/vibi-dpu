@@ -190,6 +190,10 @@ pub async fn generate_function_map(file_paths: &Vec<PathBuf>) -> Option<AllFileF
             }
             let function_defs = function_defs_opt.expect("Empty function_defs");
             for func_def in function_defs.functions.iter() {
+                if func_def.name.len() == 0 {
+                    log::debug!("[generate_function_map] No valid name for func_def {:?}", &func_def);
+                    continue;
+                }
                 let func_boundary_opt = get_function_boundaries_in_chunk(&numbered_content, func_def.line_start, &system_prompt_lines_end).await;
                 if func_boundary_opt.is_none() {
                     log::debug!("[generate_function_map] No function end detected for func: {:?}", &func_def);
