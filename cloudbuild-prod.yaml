@@ -8,8 +8,7 @@ steps:
 
  # Download the prompts folder from GCS bucket
   - name: 'gcr.io/cloud-builders/gsutil'
-    args: ['cp', '-r', 'gs://vibi-secrets-prod/prompts', './prompts']  # Download the folder to your workspace
-
+    args: ['cp', '-r', 'gs://vibi-secrets-prod/prompts', './prompts/']  # Add trailing slash to destination directory
 
   # Perform cargo build inside vibi-dpu directory
   - name: 'rust:latest'
