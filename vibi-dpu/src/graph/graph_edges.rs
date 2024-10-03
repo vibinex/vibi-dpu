@@ -9,6 +9,10 @@ pub async fn graph_edges(base_filepaths: &Vec<PathBuf>, head_filepaths: &Vec<Pat
 }
 
 async fn incoming_edges(head_filepaths: &Vec<PathBuf>, review: &Review, all_import_info: &FilesImportInfo, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
+    // filter files with ripgrep
+    // for each filtered file
+        // get func call
+        // get func def
     for (dest_filename, func_defs) in diff_graph.diff_func_defs() {
         let mut dest_file_rel = dest_filename.to_string();
         if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
@@ -206,144 +210,150 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, head_filepaths: &Vec<Path
         if let Some(source_file) =  absolute_to_relative_path(source_filepath, review){
             source_file_name = source_file.clone();
         }
-        for source_func_call in func_calls.added_calls() {
-            log::debug!("[outgoing_edges] source func call import info = {:#?}", source_func_call.import_info());
-            // todo fixme - normalize dest_filename
-            let dest_filename = source_func_call.import_info().import_path();
-            let lines = source_func_call.call_info().iter().flat_map(|chunk| chunk.function_calls()).cloned().collect();
-            // send this file for getting func defs
-            // search in diff graph
-            let diff_file_funcdefs = diff_graph.all_file_func_defs();
-            // identify this particular func
-            if let Some(func_defs) = diff_file_funcdefs.functions_in_file(dest_filename) {
-                let source_func_defs = func_defs.funcs_for_lines(&lines);
-                for dest_func_def in func_defs.functions() {
-                    if match_import_func( source_func_call.import_info(), dest_func_def) {
-                        // add edge
-                        log::debug!("[outgoing_edges] Adding edge");
-                        for (line_num, source_func_def) in &source_func_defs {
-                            graph_elems.add_edge("green",
-                                line_num.to_owned(), 
-                                source_func_def.name(), 
-                                dest_func_def.name(),
-                                &source_file_name,
-                                dest_filename,
-                                "green",
-                                "",
-                                source_func_def.line_start(),
-                                dest_func_def.line_start()
-                            );
-                        }
-                    }
-                }
-            }
-            // search in full graph
-            let dest_filepath_opt = match_imported_filename_to_path(base_filepaths, dest_filename);
-            if dest_filepath_opt.is_none() {
-                log::error!("[outgoing_edges] Unable to find filename in all paths: {}", dest_filename);
-                continue;
-            }
-            let dest_filepath = dest_filepath_opt.expect("EMpty dest_filepath_opt");
-            if let Some(all_file_funcdefs) = generate_function_map(&vec![dest_filepath.clone()]).await {
-                // identify this particular func
-                let dest_filepath_key = dest_filepath.as_os_str().to_str().expect("Unable to deserialize dest_filepath");
-                let mut dest_file_rel = dest_filepath_key.to_string();
-                if let Some(dest_relative_filepath) = absolute_to_relative_path(&dest_file_rel, review) {
-                    dest_file_rel = dest_relative_filepath;
-                }
-                if let Some(func_defs) = all_file_funcdefs.functions_in_file(dest_filepath_key) {
-                    let source_func_defs = func_defs.funcs_for_lines(&lines);
-                    for dest_func_def in func_defs.functions() {
-                        if match_import_func(source_func_call.import_info(), dest_func_def) {
-                            // add edge
-                            for (line_num, source_func_def) in &source_func_defs {
-                                graph_elems.add_edge("green",
-                                    line_num.to_owned(), 
-                                    source_func_def.name(), 
-                                    dest_func_def.name(),
-                                    &source_file_name,
-                                    &dest_file_rel,
-                                    "green",
-                                    "",
-                                    source_func_def.line_start(),
-                                    dest_func_def.line_start()
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        // do same for deleted_calls
-        for source_func_call in func_calls.deleted_calls() {
-            log::debug!("[outgoing_edges] source func call import info = {:#?}", source_func_call.import_info());
-            // todo fixme - normalize dest_filename
-            let dest_filename = source_func_call.import_info().import_path();
-            let diff_file_funcdefs = diff_graph.all_file_func_defs();
-            let lines = source_func_call.call_info().iter().flat_map(|chunk| chunk.function_calls()).cloned().collect();
-            // identify this particular func
-            if let Some(func_defs) = diff_file_funcdefs.functions_in_file(dest_filename) {
-                let source_func_defs = func_defs.funcs_for_lines(&lines);
-                for dest_func_def in func_defs.functions() {
-                    if match_import_func(source_func_call.import_info(), dest_func_def) {
-                        // add edge
-                        for (line_num, source_func_def) in &source_func_defs {
-                            graph_elems.add_edge("red",
-                                line_num.to_owned(), 
-                                source_func_def.name(), 
-                                dest_func_def.name(),
-                                &source_file_name,
-                                dest_filename,
-                                "red",
-                                "",
-                                source_func_def.line_start(),
-                                dest_func_def.line_start()
-                            );
-                        }
-                    }
-                }
-            }
-            // send this file for getting func defs
-            let dest_filepath_opt = match_imported_filename_to_path(base_filepaths, dest_filename);
-            if dest_filepath_opt.is_none() {
-                log::error!("[outgoing_edges] Unable to find filename in all paths: {}", dest_filename);
-                continue;
-            }
-            let dest_filepath = dest_filepath_opt.expect("EMpty dest_filepath_opt");
-            if let Some(all_file_funcdefs) = generate_function_map(&vec![dest_filepath.clone()]).await {
-                // identify this particular func
-                if let Some(src_file_funcs) = diff_graph.all_file_func_defs().functions_in_file(source_filepath) {
-                    let dest_filepath_key = dest_filepath.as_os_str().to_str().expect("Unable to deserialize dest_filepath");
-                    if let Some(dest_func_defs) = all_file_funcdefs.functions_in_file(dest_filepath_key) {
-                        let mut rel_dest_filepath = dest_filepath_key.to_string();
-                        if let Some(dest_file) =  absolute_to_relative_path(dest_filepath_key, review){
-                            rel_dest_filepath = dest_file.clone();
-                        }
-                    // TODO FIXME - func_defs is for dest, we need it for src file, check other places as well to fix this
-                        let source_func_defs = src_file_funcs.funcs_for_lines(&lines);
-                        log::debug!("[outgoing_edges] lines = {:?}, source_func_defs = {:#?} dest_func_defs = {:#?}", &lines, &source_func_defs, &dest_func_defs);
-                        for dest_func_def in dest_func_defs.functions() {
-                            if match_import_func(source_func_call.import_info(), dest_func_def) {
-                                // add edge
-                                for (line_num, source_func_def) in &source_func_defs {
-                                    log::debug!("[outgoing_edges] Adding edge for deleted func in full_graph");
-                                    graph_elems.add_edge("red",
-                                        line_num.to_owned(), 
-                                        source_func_def.name(), 
-                                        dest_func_def.name(),
-                                        &source_file_name,
-                                        &rel_dest_filepath,
-                                        "red",
-                                        "",
-                                        source_func_def.line_start(),
-                                        dest_func_def.line_start()
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+
+        // get func calls
+        // get import and path
+        // get file
+        // get func def
+
+        // for source_func_call in func_calls.added_calls() {
+        //     log::debug!("[outgoing_edges] source func call import info = {:#?}", source_func_call.import_info());
+        //     // todo fixme - normalize dest_filename
+        //     let dest_filename = source_func_call.import_info().import_path();
+        //     let lines = source_func_call.call_info().iter().flat_map(|chunk| chunk.function_calls()).cloned().collect();
+        //     // send this file for getting func defs
+        //     // search in diff graph
+        //     let diff_file_funcdefs = diff_graph.all_file_func_defs();
+        //     // identify this particular func
+        //     if let Some(func_defs) = diff_file_funcdefs.functions_in_file(dest_filename) {
+        //         let source_func_defs = func_defs.funcs_for_lines(&lines);
+        //         for dest_func_def in func_defs.functions() {
+        //             if match_import_func( source_func_call.import_info(), dest_func_def) {
+        //                 // add edge
+        //                 log::debug!("[outgoing_edges] Adding edge");
+        //                 for (line_num, source_func_def) in &source_func_defs {
+        //                     graph_elems.add_edge("green",
+        //                         line_num.to_owned(), 
+        //                         source_func_def.name(), 
+        //                         dest_func_def.name(),
+        //                         &source_file_name,
+        //                         dest_filename,
+        //                         "green",
+        //                         "",
+        //                         source_func_def.line_start(),
+        //                         dest_func_def.line_start()
+        //                     );
+        //                 }
+        //             }
+        //         }
+        //     }
+        //     // search in full graph
+        //     let dest_filepath_opt = match_imported_filename_to_path(base_filepaths, dest_filename);
+        //     if dest_filepath_opt.is_none() {
+        //         log::error!("[outgoing_edges] Unable to find filename in all paths: {}", dest_filename);
+        //         continue;
+        //     }
+        //     let dest_filepath = dest_filepath_opt.expect("EMpty dest_filepath_opt");
+        //     if let Some(all_file_funcdefs) = generate_function_map(&vec![dest_filepath.clone()]).await {
+        //         // identify this particular func
+        //         let dest_filepath_key = dest_filepath.as_os_str().to_str().expect("Unable to deserialize dest_filepath");
+        //         let mut dest_file_rel = dest_filepath_key.to_string();
+        //         if let Some(dest_relative_filepath) = absolute_to_relative_path(&dest_file_rel, review) {
+        //             dest_file_rel = dest_relative_filepath;
+        //         }
+        //         if let Some(func_defs) = all_file_funcdefs.functions_in_file(dest_filepath_key) {
+        //             let source_func_defs = func_defs.funcs_for_lines(&lines);
+        //             for dest_func_def in func_defs.functions() {
+        //                 if match_import_func(source_func_call.import_info(), dest_func_def) {
+        //                     // add edge
+        //                     for (line_num, source_func_def) in &source_func_defs {
+        //                         graph_elems.add_edge("green",
+        //                             line_num.to_owned(), 
+        //                             source_func_def.name(), 
+        //                             dest_func_def.name(),
+        //                             &source_file_name,
+        //                             &dest_file_rel,
+        //                             "green",
+        //                             "",
+        //                             source_func_def.line_start(),
+        //                             dest_func_def.line_start()
+        //                         );
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+        // // do same for deleted_calls
+        // for source_func_call in func_calls.deleted_calls() {
+        //     log::debug!("[outgoing_edges] source func call import info = {:#?}", source_func_call.import_info());
+        //     // todo fixme - normalize dest_filename
+        //     let dest_filename = source_func_call.import_info().import_path();
+        //     let diff_file_funcdefs = diff_graph.all_file_func_defs();
+        //     let lines = source_func_call.call_info().iter().flat_map(|chunk| chunk.function_calls()).cloned().collect();
+        //     // identify this particular func
+        //     if let Some(func_defs) = diff_file_funcdefs.functions_in_file(dest_filename) {
+        //         let source_func_defs = func_defs.funcs_for_lines(&lines);
+        //         for dest_func_def in func_defs.functions() {
+        //             if match_import_func(source_func_call.import_info(), dest_func_def) {
+        //                 // add edge
+        //                 for (line_num, source_func_def) in &source_func_defs {
+        //                     graph_elems.add_edge("red",
+        //                         line_num.to_owned(), 
+        //                         source_func_def.name(), 
+        //                         dest_func_def.name(),
+        //                         &source_file_name,
+        //                         dest_filename,
+        //                         "red",
+        //                         "",
+        //                         source_func_def.line_start(),
+        //                         dest_func_def.line_start()
+        //                     );
+        //                 }
+        //             }
+        //         }
+        //     }
+        //     // send this file for getting func defs
+        //     let dest_filepath_opt = match_imported_filename_to_path(base_filepaths, dest_filename);
+        //     if dest_filepath_opt.is_none() {
+        //         log::error!("[outgoing_edges] Unable to find filename in all paths: {}", dest_filename);
+        //         continue;
+        //     }
+        //     let dest_filepath = dest_filepath_opt.expect("EMpty dest_filepath_opt");
+        //     if let Some(all_file_funcdefs) = generate_function_map(&vec![dest_filepath.clone()]).await {
+        //         // identify this particular func
+        //         if let Some(src_file_funcs) = diff_graph.all_file_func_defs().functions_in_file(source_filepath) {
+        //             let dest_filepath_key = dest_filepath.as_os_str().to_str().expect("Unable to deserialize dest_filepath");
+        //             if let Some(dest_func_defs) = all_file_funcdefs.functions_in_file(dest_filepath_key) {
+        //                 let mut rel_dest_filepath = dest_filepath_key.to_string();
+        //                 if let Some(dest_file) =  absolute_to_relative_path(dest_filepath_key, review){
+        //                     rel_dest_filepath = dest_file.clone();
+        //                 }
+        //             // TODO FIXME - func_defs is for dest, we need it for src file, check other places as well to fix this
+        //                 let source_func_defs = src_file_funcs.funcs_for_lines(&lines);
+        //                 log::debug!("[outgoing_edges] lines = {:?}, source_func_defs = {:#?} dest_func_defs = {:#?}", &lines, &source_func_defs, &dest_func_defs);
+        //                 for dest_func_def in dest_func_defs.functions() {
+        //                     if match_import_func(source_func_call.import_info(), dest_func_def) {
+        //                         // add edge
+        //                         for (line_num, source_func_def) in &source_func_defs {
+        //                             log::debug!("[outgoing_edges] Adding edge for deleted func in full_graph");
+        //                             graph_elems.add_edge("red",
+        //                                 line_num.to_owned(), 
+        //                                 source_func_def.name(), 
+        //                                 dest_func_def.name(),
+        //                                 &source_file_name,
+        //                                 &rel_dest_filepath,
+        //                                 "red",
+        //                                 "",
+        //                                 source_func_def.line_start(),
+        //                                 dest_func_def.line_start()
+        //                             );
+        //                         }
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
 }

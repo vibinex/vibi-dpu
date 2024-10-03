@@ -1,8 +1,9 @@
 use std::{collections::HashMap, path::{Path, PathBuf}};
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
-use super::{file_imports::get_import_lines, gitops::HunkDiffMap, utils::{call_llm_api, numbered_content, read_file}};
+use super::{gitops::HunkDiffMap, utils::{call_llm_api, numbered_content, read_file}};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionCallChunk {
@@ -140,3 +141,147 @@ pub async fn function_calls_in_file(filepath: &PathBuf, func_name: &str) -> Opti
 //     }
 //     return Some(file_func_call_map);
 // }
+#[derive(Serialize, Deserialize, Debug)]
+struct InputSchema {
+    code_chunk: String,
+    language: String,
+    file_path: String,
+}
+
+// Structure for function calls in the output schema
+#[derive(Serialize, Deserialize, Debug)]
+struct FunctionCall {
+    line_number: u32,
+    function_name: String,
+}
+
+// Output schema structure
+#[derive(Serialize, Deserialize, Debug)]
+struct FunctionCallsOutput {
+    function_calls: Vec<FunctionCall>,
+    notes: Option<String>,
+}
+
+// Instruction structure
+#[derive(Serialize, Deserialize, Debug)]
+struct Instructions {
+    input_schema: InputSchemaDescription,
+    output_schema: OutputSchemaDescription,
+    task_description: String,
+}
+
+// Description of input schema
+#[derive(Serialize, Deserialize, Debug)]
+struct InputSchemaDescription {
+    code_chunk: String,
+    language: String,
+    file_path: String,
+}
+
+// Description of output schema
+#[derive(Serialize, Deserialize, Debug)]
+struct OutputSchemaDescription {
+    function_calls: Vec<FunctionCallDescription>,
+    notes: String,
+}
+
+// Description for each function call in output
+#[derive(Serialize, Deserialize, Debug)]
+struct FunctionCallDescription {
+    line_number: String,
+    function_name: String,
+}
+
+// Complete structure for JSON input and output
+#[derive(Serialize, Deserialize, Debug)]
+struct JsonStructure {
+    instructions: Instructions,
+    sample_input: InputSchema,
+    expected_output: FunctionCallsOutput,
+    input: Option<InputSchema>,
+}
+
+impl JsonStructure {
+    fn set_input(&mut self, input: InputSchema) {
+        self.input = Some(input);
+    }
+}
+
+pub struct FunctionCallIdentifier {
+    prompt: JsonStructure
+}
+
+impl FunctionCallIdentifier {
+    pub fn new() -> Option<Self> {
+        let system_prompt_opt = read_file("/app/prompts/prompt_function_call");
+        if system_prompt_opt.is_none() {
+            log::error!("[function_calls_in_chunk] Unable to read prompt_function_call");
+            return None;
+        }
+        let system_prompt_lines = system_prompt_opt.expect("Empty system_prompt");
+        let prompt_json_res = serde_json::from_str(&system_prompt_lines);
+        if prompt_json_res.is_err() {
+            log::error!("[FunctionCallIdentifier/new] Unable to deserialize prompt_json: {:?}",
+                prompt_json_res.expect("Empty bprompt_json_res"));
+            return None;
+        }
+        let prompt_json: JsonStructure = prompt_json_res.expect("Empty error in prompt_json_res");
+        return Some(Self { prompt: prompt_json});
+    }
+
+    pub async fn functions_in_file(&mut self, filepath: &PathBuf, lang: &str) -> Option<FunctionCallsOutput> {
+        // concatenate functioncallsoutput for all chunks
+        let mut all_func_calls: FunctionCallsOutput = FunctionCallsOutput{ function_calls: vec![], notes: None };
+        // TODO
+        let file_contents_res = std::fs::read_to_string(filepath.clone());
+        if file_contents_res.is_err() {
+            log::error!(
+                "[FunctionCallIdentifier/functions_in_file] Unable to read file: {:?}, error: {:?}",
+                &filepath, file_contents_res.expect_err("Empty error in file_contents_res")
+            );
+            return None;
+        }
+        let file_contents = file_contents_res.expect("Uncaught error in file_contents_res");
+        let numbered_content = numbered_content(file_contents);
+        let chunks = numbered_content.chunks(50);
+        for chunk in chunks {
+            let chunk_str = chunk.join("\n");
+            if let Some(mut func_calls) = self.functions_in_chunk(&chunk_str, filepath, lang).await {
+                all_func_calls.function_calls.append(&mut func_calls.function_calls);
+            }
+        }
+        if all_func_calls.function_calls.is_empty() {
+            return None;
+        }
+        return Some(all_func_calls);
+    }
+
+    pub async fn functions_in_chunk(&mut self, chunk: &str, filepath: &PathBuf, lang: &str) -> Option<FunctionCallsOutput> {
+        let input = InputSchema{ code_chunk: chunk.to_string(), language: lang.to_string(),
+            file_path: filepath.to_str().expect("Empty filepath").to_string() };
+        self.prompt.input = Some(input);
+        let prompt_str_res = serde_json::to_string(&self.prompt);
+        if prompt_str_res.is_err() {
+            log::error!(
+                "[FunctionCallIdentifier/functions_in_chunk] Unable to serialize prompt: {:?}",
+                prompt_str_res.expect_err("Empty error in prompt_str_res"));
+                return None;
+        }
+        let prompt_str = prompt_str_res.expect("Uncaught error in prompt_str_res");
+        let final_prompt = format!("{}\nOutput - ", &prompt_str);
+        let prompt_response_opt =  call_llm_api(final_prompt).await;
+        if prompt_response_opt.is_none() {
+            log::error!("[FunctionCallIdentifier/functions_in_chunk] Unable to call llm for chunk: {:?}", chunk);
+            return None;
+        }
+        let prompt_response = prompt_response_opt.expect("Empty prompt_response_opt");
+        let deserialized_response = serde_json::from_str(&prompt_response);
+        if deserialized_response.is_err() {
+            let e = deserialized_response.expect_err("Empty error in deserialized_response");
+            log::error!("[FunctionCallIdentifier/functions_in_chunk] Error in deserializing response: {:?}", e);
+            return None;
+        }
+        let func_calls: FunctionCallsOutput = deserialized_response.expect("Empty error in deserialized_response");
+        return Some(func_calls);
+    }
+}

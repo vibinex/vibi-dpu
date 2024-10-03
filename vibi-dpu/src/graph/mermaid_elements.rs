@@ -1,7 +1,7 @@
 
 use crate::{graph::{elements::MermaidGraphElements, graph_edges::graph_edges, graph_info::generate_diff_graph}, utils::{gitops::{git_checkout_commit, StatItem}, review::Review}};
 
-use super::{file_imports::{get_import_lines, ChunkImportInfo, FileImportInfo, FileImportLines, FilesImportInfo, ImportPath}, function_call::FunctionCallChunk, function_line_range::{AllFileFunctions, FuncDefInfo, FunctionFileMap}, graph_info::{DiffFuncCall, DiffFuncDefs, DiffGraph, FuncCall}, utils::all_code_files};
+use super::{function_call::FunctionCallChunk, function_line_range::{AllFileFunctions, FuncDefInfo, FunctionFileMap}, graph_info::{DiffFuncCall, DiffFuncDefs, DiffGraph, FuncCall}, utils::all_code_files};
 
 
 pub async fn generate_mermaid_flowchart(diff_files: &Vec<StatItem>, review: &Review) -> Option<String> {
@@ -38,15 +38,8 @@ async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review
         return None;
     }
     let base_filepaths = base_filepaths_opt.expect("Empty base_filepaths_opt");
-    let base_commit_import_info_opt = get_import_lines(&base_filepaths).await;
-    log::debug!("[generate_flowchart_elements] ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ all_file_import_info_opt = {:#?}", &base_commit_import_info_opt);
-    if base_commit_import_info_opt.is_none() {
-        log::error!("[generate_flowchart_elements] Unable to get import info for source files: {:#?}", &base_filepaths);
-        return None;
-    }
-    let base_commit_import_info = base_commit_import_info_opt.expect("Empty import_lines_opt");
     // let base_commit_import_info = get_test_import_info();
-    let diff_graph_opt = generate_diff_graph(diff_files, review, &base_commit_import_info).await;
+    let diff_graph_opt = generate_diff_graph(diff_files, review).await;
     log::debug!("[generate_flowchart_elements] diff_graph_opt = {:#?}", &diff_graph_opt);
     if diff_graph_opt.is_none() {
         log::error!(
