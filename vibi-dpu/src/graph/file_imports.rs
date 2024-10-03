@@ -185,7 +185,7 @@ pub async fn get_import_lines(file_paths: &Vec<PathBuf>) -> Option<FilesImportIn
 async fn get_import_lines_chunk(system_prompt_lines: &str, chunk_str: &str, file_path: &str) -> Option<FileImportLines> {
     let llm_req = LlmImportLineRequest { input: 
         LlmImportLineInput {
-            language: "rust".to_string(),
+            language: "typescript".to_string(),
             file_path: file_path.to_string(),
             chunk: chunk_str.to_string() } };
     let llm_req_res = serde_json::to_string(&llm_req);
@@ -227,7 +227,7 @@ async fn get_import_path_file(numbered_content: &Vec<String>, import_line: FileI
     for import_lines_chunk in import_lines_str_chunks {
         let llm_req = LlmImportPathRequest{
             input: LlmImportPathInput {
-                language: "rust".to_string(),
+                language: "typescript".to_string(),
                 file_path: file_path.to_string(),
                 import_lines: import_lines_chunk 
             }
@@ -279,8 +279,10 @@ fn numbered_import_lines(numbered_content: &Vec<String>, import_line: FileImport
             chunk = String::new();
             line_count = 0;
         }
-        chunk += &numbered_content[line as usize];
-        line_count += 1;
+        if line < (numbered_content.len() as i32) {
+            chunk += &numbered_content[line as usize];
+            line_count += 1;
+        }
     }
 
     // Push the last chunk if it's not empty

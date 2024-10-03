@@ -120,9 +120,12 @@ pub fn all_code_files(dir: &str) -> Option<Vec<PathBuf>> {
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path().to_owned();
         log::debug!("[all_code_files] path = {:?}", path);
-        let ext = path.extension().and_then(|ext| ext.to_str());
-        log::debug!("[all_code_files] extension = {:?}", &ext);
-        if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+        // let ext = path.extension().and_then(|ext| ext.to_str());
+        // log::debug!("[all_code_files] extension = {:?}", &ext);
+        if path.extension().and_then(|ext| ext.to_str())
+            .map(|ext| matches!(ext, "ts" | "tsx" | "d.ts"))
+            .unwrap_or(false) 
+        {
             match path.canonicalize() {
                 Ok(abs_path) => code_files.push(abs_path),
                 Err(e) => log::error!("Failed to get absolute path for {:?}: {:?}", path, e),
@@ -152,7 +155,10 @@ pub fn source_diff_files(diff_files: &Vec<StatItem>) -> Option<Vec<StatItem>> {
     for stat_item in diff_files {
         let filepath_str = &stat_item.filepath;
         let filepath = Path::new(filepath_str);   
-        if filepath.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+        if filepath.extension().and_then(|ext| ext.to_str())
+            .map(|ext| matches!(ext, "ts" | "tsx" | "d.ts"))
+            .unwrap_or(false) 
+        {
             code_files.push(stat_item.clone());
         }
     }

@@ -35,7 +35,7 @@ pub async fn function_calls_in_chunk(chunk: &str, func_name: &str) -> Option<Fun
     }
     let system_prompt_lines = system_prompt_opt.expect("Empty system_prompt");
     let func_call_input = FunctionCallInput{
-        language: "rust".to_string(),
+        language: "typescript".to_string(),
         chunk: chunk.to_string(),
         function_name: func_name.to_string() };
     let func_call_input_res = serde_json::to_string(&func_call_input);

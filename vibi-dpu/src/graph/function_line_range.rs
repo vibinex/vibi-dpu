@@ -217,7 +217,7 @@ pub async fn generate_function_map(file_paths: &Vec<PathBuf>) -> Option<AllFileF
 async fn get_function_defs_in_chunk(chunk: &str, system_prompt: &str) -> Option<LlmFuncDefResponse> {
     let llm_req = LlmFuncDefRequest {
         input: LlmFuncDefInput {
-                language: "rust".to_string(),
+                language: "typescript".to_string(),
                 chunk: chunk.to_string()
             } 
         };
@@ -260,7 +260,7 @@ async fn get_function_boundaries_in_chunk(file_lines_numbered: &Vec<String>, fun
         let chunk_str = chunk.join("\n");
         
         let input = LlmFuncBoundaryInput {
-            language: "rust".to_string(), // Assuming Rust as language, you can modify this as needed
+            language: "typescript".to_string(), // Assuming typescript as language, you can modify this as needed
             func_declared: file_lines_numbered[func_def_line_num].to_string(),
             chunk: chunk_str,
         };
