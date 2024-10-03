@@ -6,9 +6,9 @@ steps:
   - name: 'gcr.io/cloud-builders/gsutil'
     args: ['cp', 'gs://vibi-secrets-prod/vibinex-dpu.2024-01-11.private-key.pem', 'repo-profiler.pem']
 
- # Download the prompts folder from GCS bucket
   - name: 'gcr.io/cloud-builders/gsutil'
-    args: ['cp', '-r', 'gs://vibi-secrets-prod/prompts', './prompts/']  # Add trailing slash to destination directory
+    args: ['cp', '-r', 'gs://vibi-secrets-prod/prompts/', './']  # Download to the current directory (root workspace)
+
 
   # Perform cargo build inside vibi-dpu directory
   - name: 'rust:latest'
