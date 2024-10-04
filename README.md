@@ -2,9 +2,9 @@
 
 Vibi-DPU is an application written in Rust and packaged as a Docker image. It runs on the users' infrastructure to analyze private Intellectual Property data, empowering users through analysis without sacrificing privacy.
 
-The application communicates with our Next.js server, hosted on our infrastructure, which is also open source. You can find it [here](https://github.com/Alokit-Innovations/team-monitor-website/).
+The application communicates with our Next.js server, hosted on our infrastructure, which is also open source. You can find it [here](https://github.com/vibinex/vibinex-server).
 
-Currently, we analyze code in Git repositories, and are soon planning to add APM data and business events. The insights we get from these analyses are communicated through comments/actions on pull requests and through our [open-source Chrome Extension](https://chrome.google.com/webstore/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc). 
+Currently, we analyze code in Git repositories, and are soon planning to add APM data and business events. The insights we get from these analyses are communicated through comments/actions on pull requests and through our [open-source Chrome Extension](https://chrome.google.com/webstore/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc).
 
 For more information, visit our website at https://vibinex.com/.
 
@@ -14,7 +14,7 @@ To run Vibi-DPU locally:
 
 1. Generate public url using ngrok - `ngrok http 3000`. We will run our next server locally on port 3000 in later steps.
 2. Paste this in OAuth consumers in callback_url field.
-3. Clone [vibinex-server](https://github.com/Alokit-Innovations/vibinex-server/) locally.
+3. Clone [vibinex-server](https://github.com/vibinex/vibinex-server/) locally.
 4. Paste the client id and secret in vibinex-server in .env.local in root directory. Also use them in the docker command below.
 5. Fire up cloud sql proxy - `./cloud-sql-proxy --port 5432 vibi-test-394606:asia-south1:test-db`
 6. Change url in vibinex-server in .env.local - `NEXTAUTH_URL=https://example.ngrok-free.app`
