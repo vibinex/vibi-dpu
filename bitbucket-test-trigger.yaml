@@ -1,7 +1,7 @@
 steps:
 # Clone the main repository
 - name: 'gcr.io/cloud-builders/git'
-  args: ['clone', '--recursive', 'https://github.com/Alokit-Innovations/test-scripts.git']
+  args: ['clone', '--recursive', 'https://github.com/vibinex/test-scripts.git']
 
 # Install Python dependencies
 - name: 'gcr.io/cloud-builders/python'
@@ -12,7 +12,7 @@ steps:
 - name: 'gcr.io/cloud-builders/python'
   args: ['on-prem-bitbucket-tests.py']
   dir: 'test-scripts'
-  env: 
+  env:
     - 'test_oauth_consumer_key=${_TEST_OAUTH_CONSUMER_KEY}'
     - 'test_oauth_consumer_secret=${_TEST_OAUTH_CONSUMER_SECRET}'
     - 'test_db_host=${_TEST_DB_HOST}'
