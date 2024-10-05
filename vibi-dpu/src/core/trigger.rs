@@ -48,9 +48,7 @@ pub async fn process_trigger(message_data: &Vec<u8>) {
 	// commit_check
 	commit_check(&review, &access_token).await;
 	// process_review_changes
-	let hunkmap_opt = process_review_changes(&review).await;
-	// send_hunkmap
-	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token, &None).await;
+	process_review_changes(&review, &repo_config, &access_token, &None).await;
 }
 
 fn parse_message_fields(msg: &Value) -> Option<TriggerReview> {

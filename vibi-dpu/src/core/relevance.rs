@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, utils::{aliases::get_login_handles, relevance::Relevance, hunk::{HunkMap, PrHunkItem}, user::ProviderEnum}};
+use crate::{bitbucket::{self, user::author_from_commit}, core::github, db::review::save_review_to_db, utils::{aliases::get_login_handles, gitops::StatItem, hunk::{HunkMap, PrHunkItem}, relevance::Relevance, user::ProviderEnum}};
 use crate::utils::review::Review;
 use crate::utils::repo_config::RepoConfig;
 
-pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
+pub async fn process_relevance(hunkmap: &HunkMap, excluded_files: &Vec<StatItem>, review: &Review,
 	repo_config: &mut RepoConfig, access_token: &str, old_review_opt: &Option<Review>,
 ) {
 	log::info!("Processing relevance of code authors...");
@@ -22,7 +22,7 @@ pub async fn process_relevance(hunkmap: &HunkMap, review: &Review,
 		let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
 		if repo_config.comment() {
 			// create comment text
-			let comment = comment_text(&relevance_vec, repo_config.auto_assign());
+			let comment = relevant_reviewers_comment_text(&relevance_vec, repo_config.auto_assign(), excluded_files).await;
 			// add comment
 			if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
 				// TODO - add feature flag check
@@ -184,7 +184,8 @@ async fn calculate_relevance(prhunk: &PrHunkItem, review: &mut Review) -> Option
     return Some(relevance_vec);
 }
 
-fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
+async fn relevant_reviewers_comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool,
+    excluded_files: &Vec<StatItem>) -> String {
     let mut comment = "Relevant users for this PR:\n\n".to_string();  // Added two newlines
     comment += "| Contributor Name/Alias  | Relevance |\n";  // Added a newline at the end
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
@@ -208,6 +209,14 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
         comment += &format!("Missing profile handles for {} aliases. [Go to your Vibinex settings page](https://vibinex.com/settings) to map aliases to profile handles.", unmapped_aliases.len());
     }
 
+    if !excluded_files.is_empty() {
+        comment += "\n\n";
+        comment += "Ignoring following files due to large size: ";
+        for file_item in excluded_files {
+            comment += &format!("- {}\n", file_item.filepath.as_str());
+        }
+    }
+
     if auto_assign {
         comment += "\n\n";
         comment += "Auto assigning to relevant reviewers.";
@@ -216,7 +225,6 @@ fn comment_text(relevance_vec: &Vec<Relevance>, auto_assign: bool) -> String {
     comment += "If you are a relevant reviewer, you can use the [Vibinex browser extension](https://chromewebstore.google.com/detail/vibinex-code-review/jafgelpkkkopeaefadkdjcmnicgpcncc) to see parts of the PR relevant to you\n";  // Added a newline at the end
     comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
     comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
-
     return comment;
 }
 
