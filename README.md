@@ -1,4 +1,7 @@
 # Vibi-DPU
+![Docker size](https://img.shields.io/docker/image-size/vibinexhub/dpu)
+![DPU commit activity](https://img.shields.io/github/commit-activity/y/vibinex/vibi-dpu)
+![DPU contributors](https://img.shields.io/github/contributors/vibinex/vibi-dpu)
 
 Vibi-DPU is an application written in Rust and packaged as a Docker image. It runs on the users' infrastructure to analyze private Intellectual Property data, empowering users through analysis without sacrificing privacy.
 
