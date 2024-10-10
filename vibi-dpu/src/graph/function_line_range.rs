@@ -1,11 +1,10 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
-use walkdir::WalkDir;
 
-use crate::{graph::utils::numbered_content, utils::review::Review};
+use crate::graph::utils::numbered_content;
 
-use super::{gitops::HunkDiffLines, utils::{all_code_files, call_llm_api, read_file}};
+use super::{function_call::FunctionCall, gitops::HunkDiffLines, utils::{call_llm_api, read_file}};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FuncDefInfo {
@@ -39,6 +38,18 @@ impl FuncDefInfo {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct HunkFuncDef {
+    func_def: FuncDefInfo,
+    hunk_info: HunkDiffLines
+}
+
+impl HunkFuncDef {
+    pub fn func_def(&self) -> &FuncDefInfo {
+        &self.func_def
+    }
+}
+
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionFileMap {
     pub(crate) file_name: String,
@@ -65,31 +76,44 @@ impl FunctionFileMap {
             |f| f.line_start <= line_num && line_num <= f.line_end)
     }
 
-    pub fn funcs_in_hunk(&self, hunk: &HunkDiffLines) -> Vec<FuncDefInfo> {
-        self.functions
+    pub fn funcs_in_hunk(&self, hunk: &HunkDiffLines) -> Vec<HunkFuncDef> {
+        let hunk_func_vec: Vec<HunkFuncDef> = self.functions
             .iter()
-            .filter(|func| {
+            .filter_map(|func| {
                 // Check if the function's start or end line falls within the hunk's start and end line range
-                (func.line_start() >= hunk.start_line() && func.line_start() <= hunk.end_line()) ||
+                if (func.line_start() >= hunk.start_line() && func.line_start() <= hunk.end_line()) ||
                 (func.line_end() >= hunk.start_line() && func.line_end() <= hunk.end_line()) ||
                 // Additionally check if the function completely spans over the hunk range
                 (func.line_start() <= hunk.start_line() && func.line_end() >= hunk.end_line())
-            }).cloned()
-            .collect()
-    }
-
-    pub fn funcs_for_lines(&self, lines: &Vec<usize>) -> HashMap<usize, FuncDefInfo> {
-        let mut line_funcdef_map = HashMap::new();
-
-        for line in lines {
-            for func in &self.functions {
-                if func.line_start <= *line && *line <= func.line_end {
-                    line_funcdef_map.entry(*line).or_insert(func.clone());
+                {
+                    let hunkfuncdef = HunkFuncDef {
+                        func_def: func.clone(),
+                        hunk_info: hunk.clone(),
+                    };
+                    return Some(hunkfuncdef);
                 }
-            }
-        }
-        return line_funcdef_map;
+                return None;
+            }).collect();
+        return hunk_func_vec;
     }
+
+    pub fn funcs_for_func_call(&self, func_call: &FunctionCall) -> Option<&FuncDefInfo>{
+        let line_num = func_call.line_number().to_owned() as usize;
+        return self.func_at_line(line_num);
+    }
+
+    // pub fn funcs_for_lines(&self, lines: &Vec<usize>) -> HashMap<usize, FuncDefInfo> {
+    //     let mut line_funcdef_map = HashMap::new();
+
+    //     for line in lines {
+    //         for func in &self.functions {
+    //             if func.line_start <= *line && *line <= func.line_end {
+    //                 line_funcdef_map.entry(*line).or_insert(func.clone());
+    //             }
+    //         }
+    //     }
+    //     return line_funcdef_map;
+    // }
 }
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]

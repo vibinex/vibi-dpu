@@ -226,17 +226,29 @@ struct InputSchema {
 
 // Output schema structure for matching import
 #[derive(Serialize, Deserialize, Debug)]
-struct MatchingImport {
+pub struct MatchingImport {
     line_number: u32,
     import_statement: String,
     possible_file_path: String,
 }
 
+impl MatchingImport {
+    pub fn possible_file_path(&self) -> &String {
+        &self.possible_file_path
+    }
+}
+
 // Full output schema structure
 #[derive(Serialize, Deserialize, Debug)]
-struct ImportPathOutput {
+pub struct ImportPathOutput {
     matching_import: MatchingImport,
     notes: Option<String>,
+}
+
+impl ImportPathOutput {
+    pub fn get_matching_import(&self) -> &MatchingImport {
+        &self.matching_import
+    }
 }
 
 // Instruction structure
@@ -309,7 +321,7 @@ impl ImportIdentifier {
             prompt_struct: sys_prompt_struct
         });
     }
-    pub async fn get_import_path(&mut self, func_name: &str, lang: &str, file_path: &str, chunk: &str) -> Option<ImportPathOutput>{
+    async fn get_import_path(&mut self, func_name: &str, lang: &str, file_path: &str, chunk: &str) -> Option<ImportPathOutput>{
         // create prompt
         let input_schema = InputSchema {
             function_name: func_name.to_string(),

@@ -1,27 +1,27 @@
 use std::{collections::HashMap, path::PathBuf};
-use crate::{core::diff_graph, graph::{function_line_range::generate_function_map}, utils::{gitops::{git_checkout_commit, StatItem}, review::Review}};
-use super::{function_call::{function_calls_in_file, FunctionCallChunk}, function_line_range::{AllFileFunctions, FuncDefInfo}, gitops::{get_changed_hunk_lines, HunkDiffLines, HunkDiffMap}, utils::source_diff_files};
+use crate::{graph::function_line_range::generate_function_map, utils::{gitops::{git_checkout_commit, StatItem}, review::Review}};
+use super::{function_call::{FunctionCallChunk, FunctionCallIdentifier, FunctionCallsOutput}, function_line_range::{AllFileFunctions, HunkFuncDef}, gitops::{get_changed_hunk_lines, HunkDiffMap}, utils::source_diff_files};
 
 #[derive(Debug, Default, Clone)]
 pub struct DiffFuncDefs {
-    added_func_defs: Vec<FuncDefInfo>,
-    deleted_func_defs: Vec<FuncDefInfo>
+    added_func_defs: Vec<HunkFuncDef>,
+    deleted_func_defs: Vec<HunkFuncDef>
 }
 
 impl DiffFuncDefs {
-    pub fn extend_added_funcdefs(&mut self, add_funcdefs: Vec<FuncDefInfo>) {
+    pub fn extend_added_funcdefs(&mut self, add_funcdefs: Vec<HunkFuncDef>) {
         self.added_func_defs.extend(add_funcdefs);
     }
 
-    pub fn extend_deleted_funcdefs(&mut self, del_funcdefs: Vec<FuncDefInfo>) {
+    pub fn extend_deleted_funcdefs(&mut self, del_funcdefs: Vec<HunkFuncDef>) {
         self.deleted_func_defs.extend(del_funcdefs);
     }
 
-    pub fn added_func_defs(&self) -> &Vec<FuncDefInfo> {
+    pub fn added_func_defs(&self) -> &Vec<HunkFuncDef> {
         &self.added_func_defs
     }
 
-    pub fn deleted_func_defs(&self) -> &Vec<FuncDefInfo> {
+    pub fn deleted_func_defs(&self) -> &Vec<HunkFuncDef> {
         &self.deleted_func_defs
     }
 }
@@ -65,24 +65,24 @@ impl FuncCall {
 
 #[derive(Debug, Default, Clone)]
 pub struct DiffFuncCall {
-    added_calls: Vec<FuncCall>,
-    deleted_calls: Vec<FuncCall>
+    added_calls: FunctionCallsOutput,
+    deleted_calls: FunctionCallsOutput
 }
 
 impl DiffFuncCall {
-    pub fn add_added_calls(&mut self, add_calls: FuncCall) {
-        self.added_calls.push(add_calls);
-    }
+    // pub fn add_added_calls(&mut self, add_calls: FuncCall) {
+    //     self.added_calls.push(add_calls);
+    // }
     
-    pub fn add_deleted_calls(&mut self, del_calls: FuncCall) {
-        self.deleted_calls.push(del_calls);
-    }
+    // pub fn add_deleted_calls(&mut self, del_calls: FuncCall) {
+    //     self.deleted_calls.push(del_calls);
+    // }
 
-    pub fn added_calls(&self) -> &Vec<FuncCall> {
+    pub fn added_calls(&self) -> &FunctionCallsOutput {
         &self.added_calls
     }
 
-    pub fn deleted_calls(&self) -> &Vec<FuncCall> {
+    pub fn deleted_calls(&self) -> &FunctionCallsOutput {
         &self.deleted_calls
     }
 }
@@ -91,7 +91,7 @@ impl DiffFuncCall {
 pub struct DiffGraph {
     diff_files_func_defs: AllFileFunctions,
     // diff_files_imports: FilesImportInfo,
-    diff_files_func_calls: HashMap<String, HashMap<String, FuncCall>>,
+    diff_files_func_calls: HashMap<String, FunctionCallsOutput>,
     diff_func_defs: HashMap<String, DiffFuncDefs>,
     diff_func_calls: HashMap<String, DiffFuncCall>,
 }
@@ -121,14 +121,14 @@ impl DiffGraph {
         &self.diff_func_calls
     }
 
-    pub fn func_calls_for_func(&self, function_name: &str, filename: &str) -> Option<&FuncCall> {
-        if let Some(func_call_map) =  self.diff_files_func_calls.get(filename) {
-            if let Some(func_call) = func_call_map.get(function_name) {
-                return Some(func_call)
-            }
-        }
-        return None;
-    }
+    // pub fn func_calls_for_func(&self, function_name: &str, filename: &str) -> Option<&FuncCall> {
+    //     if let Some(func_call_map) =  self.diff_files_func_calls.get(filename) {
+    //         if let Some(func_call) = func_call_map.get(function_name) {
+    //             return Some(func_call)
+    //         }
+    //     }
+    //     return None;
+    // }
 }
 
 pub async fn generate_diff_graph(diff_files: &Vec<StatItem>, review: &Review) -> Option<DiffGraph> {
@@ -155,6 +155,12 @@ async fn process_hunk_diff(hunk_diff_map: &HunkDiffMap, review: &Review) -> Opti
         return None;
     }
     let base_commit_func_defs = base_commit_func_defs_opt.expect("Empty let base_commit_func_defs_opt");
+    let base_func_calls_opt = diff_file_func_calls(&all_diff_files, hunk_diff_map, false).await;
+    if base_func_calls_opt.is_none() {
+        log::debug!("[process_hunk_diff] Unable to calculate diff_file_func_calls");
+        return None;
+    }
+    let base_func_calls = base_func_calls_opt.expect("Empty base_func_calls_opt");
     git_checkout_commit(review, &review.pr_head_commit());
     let diff_func_defs_opt = generate_function_map(&all_diff_files).await;
     // let diff_imports_opt = get_import_lines(&all_diff_files).await;
@@ -163,27 +169,33 @@ async fn process_hunk_diff(hunk_diff_map: &HunkDiffMap, review: &Review) -> Opti
         log::debug!("[process_hunk_diff] Unable to generate func definitions diff map");
         return None;
     }
-    // if diff_imports_opt.is_none() {
-    //     log::debug!("[process_hunk_diff] Unable to generate func imports diff map");
-    //     return None;
-    // }
     let diff_files_func_defs = diff_func_defs_opt.expect("Empty all_file_func_defs_opt)");
-    // let diff_files_imports = diff_imports_opt.expect("Empty all_file_imports_opt");
-    let diff_files_func_calls = diff_file_func_calls(&all_diff_files, &diff_files_func_defs).await;
+    let diff_files_func_calls_opt = diff_file_func_calls(&all_diff_files, hunk_diff_map, true).await;
+    if diff_files_func_calls_opt.is_none() {
+        log::debug!("[process_hunk_diff] Unable to calculate diff_file_func_calls");
+        return None;
+    }
+    let diff_files_func_calls = diff_files_func_calls_opt.expect("Empty diff_files_func_calls_opt");
     let mut diff_graph = DiffGraph {
-        diff_files_func_calls,
+        diff_files_func_calls: diff_files_func_calls.clone(),
         diff_files_func_defs,
         // diff_files_imports,
         diff_func_defs: HashMap::new(),
         diff_func_calls: HashMap::new(),
     };
-    let mut diff_func_calls_map: HashMap<String, DiffFuncCall> = HashMap::new();
     for filepath in &all_diff_files {
         let filename = filepath.to_str().expect("Unable to deserialize pathbuf");
         let mut diff_func_defs = DiffFuncDefs {
             added_func_defs: Vec::new(), deleted_func_defs: Vec::new()};
-        let mut diff_func_calls_add = DiffFuncCall {
-            added_calls: Vec::new(), deleted_calls: Vec::new()};
+        // define base and diff func calls output for this filename
+        if let Some(base_func_call) = base_func_calls.get(filename) {
+            if let Some(diff_func_call) = diff_files_func_calls.get(filename) {
+                // initialize and add DiffFuncCall to diff_func_calls_map
+                let func_calls = DiffFuncCall {
+                    added_calls: diff_func_call.to_owned(), deleted_calls: base_func_call.to_owned()};
+                    diff_graph.add_diff_func_calls(filename.to_string(), func_calls);
+            }
+        };
         if let Some(file_line_map) = hunk_diff_map.file_hunks(filename) {
             for hunk_diff in file_line_map.added_hunks() {
                 if let Some(funcs_map) = diff_graph.all_file_func_defs().functions_in_file(filename) {
@@ -239,59 +251,61 @@ async fn process_hunk_diff(hunk_diff_map: &HunkDiffMap, review: &Review) -> Opti
     // git_checkout_commit(review, &review.base_head_commit());
     // for filepath in &all_diff_files {
     //     let filename = filepath.to_str().expect("Unable to deserialize pathbuf");
-    //     let diff_func_call_del = diff_func_calls_map.entry(filename.to_string()).or_insert(DiffFuncCall { added_calls: Vec::new(), deleted_calls: Vec::new() });
-    //     if let Some(imports_info) = base_commit_import_info.file_import_info(filename) {
-    //         for import_info in imports_info.all_import_paths() {
-    //             // todo fixme - finding all func calls in file needs a different approach to add added and deleted calls
-    //             if let Some(func_calls) = function_calls_in_file(&filepath, import_info.imported()).await {
-    //                 // func_calls is basically all func calls of a function in the latest commit of the file
-    //                 if let Some(file_line_map) = hunk_diff_map.file_hunks(filename) {
-    //                     let func_call = FuncCall{ import_info, call_info: func_calls };
-    //                     for hunk_diff in file_line_map.deleted_hunks() {
-    //                         if let Some(hunk_func_call) =  func_call.func_call_hunk_lines(&hunk_diff) {
-    //                             diff_func_call_del.add_deleted_calls(hunk_func_call);    
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
+    //     let diff_func_call = diff_func_calls_map.entry(filename.to_string()).or_insert(DiffFuncCall { added_calls: Vec::new(), deleted_calls: Vec::new() });
+        
+    //     // if let Some(imports_info) = base_commit_import_info.file_import_info(filename) {
+    //     //     for import_info in imports_info.all_import_paths() {
+    //     //         // todo fixme - finding all func calls in file needs a different approach to add added and deleted calls
+    //     //         if let Some(func_calls) = function_calls_in_file(&filepath, import_info.imported()).await {
+    //     //             // func_calls is basically all func calls of a function in the latest commit of the file
+    //     //             if let Some(file_line_map) = hunk_diff_map.file_hunks(filename) {
+    //     //                 let func_call = FuncCall{ import_info, call_info: func_calls };
+    //     //                 for hunk_diff in file_line_map.deleted_hunks() {
+    //     //                     if let Some(hunk_func_call) =  func_call.func_call_hunk_lines(&hunk_diff) {
+    //     //                         diff_func_call_del.add_deleted_calls(hunk_func_call);    
+    //     //                     }
+    //     //                 }
+    //     //             }
+    //     //         }
+    //     //     }
+    //     // }
     // }
-    // for (filename, diff_func_call) in diff_func_calls_map.iter() {
+    // // for (filename, diff_func_call) in diff_func_calls_map.iter() {
     //     diff_graph.add_diff_func_calls(filename.to_owned(), diff_func_call.to_owned());
     // }
     return Some(diff_graph);
 }
 
-async fn diff_file_func_calls(all_diff_files: &Vec<PathBuf>, diff_imports: &FilesImportInfo, diff_file_funcs: &AllFileFunctions) -> HashMap<String, HashMap<String, FuncCall>>{
+async fn diff_file_func_calls(all_diff_files: &Vec<PathBuf>, hunk_diff_map: &HunkDiffMap, added: bool) -> Option<HashMap<String, FunctionCallsOutput>> {
+    // func calls made in diff hunks for all diff files
     let mut func_call_file_map = HashMap::new();
+    let func_call_identifier_opt = FunctionCallIdentifier::new();
+    if func_call_identifier_opt.is_none() {
+        log::error!("[diff_file_func_calls] Unable to create FunctionCallIdentifier");
+        return None;
+    }
+    let mut func_call_identifier = func_call_identifier_opt.expect("Empty func_call_identifier_opt");
     for filepathbuf in all_diff_files {
         let filepath = filepathbuf.to_str().expect("Unable to deserialize pathbuf");
-        let mut func_call_map = HashMap::<String, FuncCall>::new();
-        // search using imports
-        if let Some(imports_info) = diff_imports.file_import_info(filepath) {
-            for import_info in imports_info.all_import_paths() {
-                if let Some(func_calls) = function_calls_in_file(
-                    &filepathbuf, import_info.imported()).await {
-                        let func_call = FuncCall{ import_info, call_info: func_calls };
-                        func_call_map.insert(
-                            func_call.function_name().to_string(), func_call);
-                }
-            }
+        let hunk_diffs_opt = hunk_diff_map.file_hunks(filepath);
+        if hunk_diffs_opt.is_none() {
+            log::debug!("[diff_file_func_calls] No entry in hunk_diff_map for {}", filepath);
+            continue;
         }
-        // search in func defs
-        if let Some(func_def_map) = diff_file_funcs.functions_in_file(filepath) {
-            for func_def in func_def_map.functions() {
-                if let Some(func_calls) = function_calls_in_file(
-                    &filepathbuf, func_def.name()).await {
-                        let fake_import = ImportPath::new( 0, filepath.to_string(), func_def.name().to_string());
-                        let func_call = FuncCall{import_info: fake_import, call_info: func_calls};
-                        func_call_map.insert(
-                            func_call.function_name().to_string(), func_call);
-                }
-            }
+        let hunk_diffs = hunk_diffs_opt.expect("Empty hunk_diffs_opt");
+        let file_hunks;
+        if added {
+            file_hunks = hunk_diffs.added_hunks();
+        } else {
+            file_hunks = hunk_diffs.deleted_hunks();
         }
-        func_call_file_map.insert(filepath.to_string(), func_call_map);
+        let func_calls_opt = func_call_identifier.function_calls_in_hunks(filepathbuf, "rust", file_hunks).await;
+        if func_calls_opt.is_none() {
+            log::debug!("[diff_file_func_calls] No function calls in hunks: {}, {:?}", filepath, hunk_diffs);
+            continue;
+        }
+        let func_calls = func_calls_opt.expect("Empty func_calls_opt");
+        func_call_file_map.insert(filepath.to_string(), func_calls);
     }
-    return func_call_file_map;
+    return Some(func_call_file_map);
 } 

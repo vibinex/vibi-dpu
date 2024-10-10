@@ -10,4 +10,3 @@ pub mod prs;
 pub mod bitbucket;
 pub mod github;
 pub mod aliases;
-pub mod graph_info;

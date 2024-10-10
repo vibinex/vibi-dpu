@@ -50,16 +50,17 @@ async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review
     let diff_graph = diff_graph_opt.expect("Empty diff_graph_opt");
     // let diff_graph = get_test_diff_graph();
     // let diff_info = generate_diff_info(&full_graph, &diff_graph); 
+    // git_checkout_commit(review, review.pr_head_commit());
+    // let head_filepaths_opt = all_code_files(review.clone_dir());
+    // if head_filepaths_opt.is_none() {
+    //     log::error!(
+    //         "[generate_flowchart_elements] Unable to get file paths: {}", review.clone_dir());
+    //     return None;
+    // }
+    // let head_filepaths = head_filepaths_opt.expect("Empty head_filepaths_opt");
     let mut graph_elems = MermaidGraphElements::new();
-    git_checkout_commit(review, review.pr_head_commit());
-    let head_filepaths_opt = all_code_files(review.clone_dir());
-    if head_filepaths_opt.is_none() {
-        log::error!(
-            "[generate_flowchart_elements] Unable to get file paths: {}", review.clone_dir());
-        return None;
-    }
-    let head_filepaths = head_filepaths_opt.expect("Empty head_filepaths_opt");
-    graph_edges(&base_filepaths, &head_filepaths, review, &base_commit_import_info, &diff_graph, &mut graph_elems).await;
+    let lang = "rust";
+    graph_edges(&base_filepaths, review, &diff_graph, &mut graph_elems, lang).await;
     let elems_str = graph_elems.render_elements(review);
     return Some(elems_str);
 }

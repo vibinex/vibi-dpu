@@ -1,9 +1,10 @@
-use std::{collections::HashMap, path::{Path, PathBuf}};
+use std::{collections::{HashMap, HashSet}, io::BufReader, path::{Path, PathBuf}, process::{Command, Stdio}};
 
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use std::io::BufRead;
+use crate::utils::review::Review;
 
-use super::{gitops::HunkDiffMap, utils::{call_llm_api, numbered_content, read_file}};
+use super::{gitops::{HunkDiffLines, HunkDiffMap}, utils::{call_llm_api, numbered_content, read_file}};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionCallChunk {
@@ -149,17 +150,33 @@ struct InputSchema {
 }
 
 // Structure for function calls in the output schema
-#[derive(Serialize, Deserialize, Debug)]
-struct FunctionCall {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FunctionCall {
     line_number: u32,
     function_name: String,
 }
 
+impl FunctionCall {
+    pub fn function_name(&self) -> &String {
+        &self.function_name
+    }
+
+    pub fn line_number(&self) -> &u32 {
+        &self.line_number
+    }
+}
+
 // Output schema structure
-#[derive(Serialize, Deserialize, Debug)]
-struct FunctionCallsOutput {
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+pub struct FunctionCallsOutput {
     function_calls: Vec<FunctionCall>,
     notes: Option<String>,
+}
+
+impl FunctionCallsOutput {
+    pub fn function_calls(&self) -> &Vec<FunctionCall> {
+        return &self.function_calls
+    }
 }
 
 // Instruction structure
@@ -208,7 +225,8 @@ impl JsonStructure {
 }
 
 pub struct FunctionCallIdentifier {
-    prompt: JsonStructure
+    prompt: JsonStructure,
+    chunk_size: usize
 }
 
 impl FunctionCallIdentifier {
@@ -226,13 +244,12 @@ impl FunctionCallIdentifier {
             return None;
         }
         let prompt_json: JsonStructure = prompt_json_res.expect("Empty error in prompt_json_res");
-        return Some(Self { prompt: prompt_json});
+        return Some(Self { prompt: prompt_json, chunk_size: 30});
     }
 
     pub async fn functions_in_file(&mut self, filepath: &PathBuf, lang: &str) -> Option<FunctionCallsOutput> {
         // concatenate functioncallsoutput for all chunks
         let mut all_func_calls: FunctionCallsOutput = FunctionCallsOutput{ function_calls: vec![], notes: None };
-        // TODO
         let file_contents_res = std::fs::read_to_string(filepath.clone());
         if file_contents_res.is_err() {
             log::error!(
@@ -256,7 +273,7 @@ impl FunctionCallIdentifier {
         return Some(all_func_calls);
     }
 
-    pub async fn functions_in_chunk(&mut self, chunk: &str, filepath: &PathBuf, lang: &str) -> Option<FunctionCallsOutput> {
+    async fn functions_in_chunk(&mut self, chunk: &str, filepath: &PathBuf, lang: &str) -> Option<FunctionCallsOutput> {
         let input = InputSchema{ code_chunk: chunk.to_string(), language: lang.to_string(),
             file_path: filepath.to_str().expect("Empty filepath").to_string() };
         self.prompt.input = Some(input);
@@ -284,4 +301,55 @@ impl FunctionCallIdentifier {
         let func_calls: FunctionCallsOutput = deserialized_response.expect("Empty error in deserialized_response");
         return Some(func_calls);
     }
+
+    pub async fn function_calls_in_hunks(&mut self, filepath: &PathBuf, lang: &str, diff_hunks: &Vec<HunkDiffLines>) -> Option<FunctionCallsOutput> {
+        let func_calls_opt = self.functions_in_file(filepath, lang).await;
+        if func_calls_opt.is_none() {
+            log::debug!("[FunctionCallIdentifier/function_calls_in_hunks] No func calls in {:?}", filepath);
+            return None;
+        }
+        let mut func_calls = func_calls_opt.expect("Empty func_calls_opt");
+        func_calls.function_calls.retain(|function_call| {
+            // Check if the function call's line number is outside of any hunk diff ranges
+            !diff_hunks.iter().any(|hunk| {
+                function_call.line_number >= *hunk.start_line() as u32 && function_call.line_number <= *hunk.end_line() as u32
+            })
+        });
+        return Some(func_calls);
+    }
+}
+
+pub fn function_calls_search(review: &Review, function_name: &str) -> Option<HashSet<String>>{
+    let pattern = format!(r"{}\([^\)]*\)", function_name); // Regex pattern for the specific function call
+    let directory = review.clone_dir();             // The directory to search in (current directory here)
+
+    // Spawn the ripgrep process, adding `-l` for filenames and `--absolute-path` for absolute paths
+    let rg_command_res = Command::new("rg")
+        .arg("--absolute-path")  // Print absolute file paths
+        .arg("-l")               // Print only filenames that contain matches
+        .arg("-e")               // Use regular expression
+        .arg(pattern)            // The regex pattern for function calls
+        .arg(directory)          // Directory to search
+        .stdout(Stdio::piped())  // Pipe the output
+        .spawn();               // Spawn the ripgrep process
+    if rg_command_res.is_err() {
+        log::error!("[function_calls_search] error in rg command: {:?}",
+            rg_command_res.expect_err("Empty error in rg_command_res"));
+        return None;
+    }
+    let rg_command = rg_command_res.expect("Uncaught error in rg_command_res");
+    // Capture the stdout of ripgrep
+    let stdout = rg_command.stdout.expect("Failed to capture stdout");
+    let reader = BufReader::new(stdout);
+
+    // Use a HashSet to avoid duplicate filenames
+    let mut files: HashSet<String> = HashSet::new();
+
+    // Read the output line by line
+    for line in reader.lines() {
+        if let Ok(file) = line { // Each line is an absolute filename with a match
+            files.insert(file);
+        }
+    }
+    return Some(files);
 }
