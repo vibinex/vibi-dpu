@@ -80,11 +80,28 @@ struct InputSchema {
     function_name: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct InputSchemaDescription {
+    code_chunk: String,
+    language: String,
+    function_name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct OutputSchemaDescription {
+    function_definition: FunctionDefinitionDescription,
+    notes: String,
+}
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+struct FunctionDefinitionDescription {
+    line_number: String,
+}
+
 // Struct for instructions that hold input/output schemas
 #[derive(Serialize, Deserialize, Debug)]
 struct Instructions {
-    input_schema: InputSchema,
-    output_schema: FunctionDefOutput,
+    input_schema: InputSchemaDescription,
+    output_schema: OutputSchemaDescription,
     task_description: String,
 }
 // Struct for the entire JSON prompt

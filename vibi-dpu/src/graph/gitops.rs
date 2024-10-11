@@ -118,7 +118,7 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
     for item in diff_files {
         let filepath = item.filepath.as_str();
         let commit_range = format!("{}...{}", prev_commit, curr_commit);
-        log::debug!("[extract_hunks] | clone_dir = {:?}, filepath = {:?}", clone_dir, filepath);
+        log::debug!("[get_changed_hunk_lines] | clone_dir = {:?}, filepath = {:?}", clone_dir, filepath);
 
         let output_res = Command::new("git")
             .arg("diff")
@@ -131,7 +131,7 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
 
         if output_res.is_err() {
             let commanderr = output_res.expect_err("No error in output_res");
-            log::error!("[extract_hunks] git diff command failed to start : {:?}", commanderr);
+            log::error!("[get_changed_hunk_lines] git diff command failed to start : {:?}", commanderr);
             continue;
         }
 
@@ -141,12 +141,12 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
 
         if diffstr_res.is_err() {
             let e = diffstr_res.expect_err("No error in diffstr_res");
-            log::error!("[extract_hunks] Unable to deserialize diff: {:?}", e);
+            log::error!("[get_changed_hunk_lines] Unable to deserialize diff: {:?}", e);
             continue;
         }
 
         let diffstr = diffstr_res.expect("Uncaught error in diffstr_res");
-        log::debug!("[extract_hunks] diffstr = {}", &diffstr);
+        log::debug!("[get_changed_hunk_lines] diffstr = {}", &diffstr);
 
         let mut current_add_start = 0;
         let mut current_del_start = 0;
@@ -187,13 +187,12 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
                 in_del_hunk = false;
 
                 // Extract the function name or any string after the last @@
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() > 2 {
-                    function_line = Some(parts[2].to_string()); // Store the function line here
+                if let Some(pos) = line.rfind("@@ ") {
+                    function_line = Some(line[(pos+3)..].to_string());
                 } else {
                     function_line = None; // Reset if no valid function line found
                 }
-
+                let parts: Vec<&str> = line.split_whitespace().collect();
                 // Determine the start and end lines for the hunks
                 let del_hunk = parts.get(1);
                 let add_hunk = parts.get(2);
