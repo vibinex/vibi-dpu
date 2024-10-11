@@ -326,7 +326,7 @@ fn set_func_line_numbers(hunk_diff_map: &mut HunkDiffMap, added: bool) -> &mut H
                     let line_number_opt = file_contents
                         .lines() // Split into lines
                         .enumerate() // Get (index, line)
-                        .position(|(_, line)| line == func_line_raw) // Find the position where the line matches
+                        .position(|(_, line)| line.contains(func_line_raw)) // Find the position where the line matches
                         .map(|index| index + 1); // Convert 0-based index to 1-based line number
 
                     file_hunk.set_line_number(line_number_opt);
