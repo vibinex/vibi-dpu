@@ -231,16 +231,16 @@ pub struct FunctionCallIdentifier {
 
 impl FunctionCallIdentifier {
     pub fn new() -> Option<Self> {
-        let system_prompt_opt = read_file("/app/prompts/prompt_function_call");
+        let system_prompt_opt = read_file("/app/prompts/prompt_function_calls");
         if system_prompt_opt.is_none() {
-            log::error!("[function_calls_in_chunk] Unable to read prompt_function_call");
+            log::error!("[function_calls_in_chunk] Unable to read prompt_function_calls");
             return None;
         }
         let system_prompt_lines = system_prompt_opt.expect("Empty system_prompt");
         let prompt_json_res = serde_json::from_str(&system_prompt_lines);
         if prompt_json_res.is_err() {
             log::error!("[FunctionCallIdentifier/new] Unable to deserialize prompt_json: {:?}",
-                prompt_json_res.expect("Empty bprompt_json_res"));
+                prompt_json_res.expect("Empty prompt_json_res"));
             return None;
         }
         let prompt_json: JsonStructure = prompt_json_res.expect("Empty error in prompt_json_res");
@@ -302,21 +302,47 @@ impl FunctionCallIdentifier {
         return Some(func_calls);
     }
 
-    pub async fn function_calls_in_hunks(&mut self, filepath: &PathBuf, lang: &str, diff_hunks: &Vec<HunkDiffLines>) -> Option<FunctionCallsOutput> {
+    pub async fn function_calls_in_hunks(&mut self, filepath: &PathBuf, lang: &str, diff_hunks: &Vec<HunkDiffLines>) -> Option<Vec<(HunkDiffLines, FunctionCallsOutput)>> {
         let func_calls_opt = self.functions_in_file(filepath, lang).await;
+        
         if func_calls_opt.is_none() {
             log::debug!("[FunctionCallIdentifier/function_calls_in_hunks] No func calls in {:?}", filepath);
             return None;
         }
-        let mut func_calls = func_calls_opt.expect("Empty func_calls_opt");
-        func_calls.function_calls.retain(|function_call| {
-            // Check if the function call's line number is outside of any hunk diff ranges
-            !diff_hunks.iter().any(|hunk| {
-                function_call.line_number >= *hunk.start_line() as u32 && function_call.line_number <= *hunk.end_line() as u32
-            })
-        });
-        return Some(func_calls);
+    
+        let func_calls = func_calls_opt.expect("Empty func_calls_opt");
+        
+        // Create a vector to store the result (HunkDiffLines, FunctionCallsOutput) tuples
+        let mut hunk_func_pairs: Vec<(HunkDiffLines, FunctionCallsOutput)> = Vec::new();
+    
+        // For each hunk, find matching function calls
+        for hunk in diff_hunks {
+            // Collect function calls within this hunk's line range
+            let matching_func_calls: Vec<FunctionCall> = func_calls
+                .function_calls
+                .iter()
+                .filter(|function_call| {
+                    function_call.line_number >= *hunk.start_line() as u32 && function_call.line_number <= *hunk.end_line() as u32
+                })
+                .cloned()  // Clone the function calls so we can move them into the new FunctionCallsOutput
+                .collect();
+    
+            // If there are any matching function calls, create a FunctionCallsOutput and pair it with the hunk
+            if !matching_func_calls.is_empty() {
+                let mut matching_func_calls_output = func_calls.clone();
+                matching_func_calls_output.function_calls = matching_func_calls;
+    
+                hunk_func_pairs.push((hunk.clone(), matching_func_calls_output));
+            }
+        }
+    
+        if hunk_func_pairs.is_empty() {
+            None
+        } else {
+            Some(hunk_func_pairs)
+        }
     }
+    
 }
 
 pub fn function_calls_search(review: &Review, function_name: &str) -> Option<HashSet<String>>{

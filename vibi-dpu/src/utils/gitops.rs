@@ -251,6 +251,7 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 		let output_res = Command::new("git")
 			.arg("diff")
 			.arg("-U0")
+			.arg("--ignore-space-change")
 			.arg(&commit_range)
 			.arg(&filepath)
 			.current_dir(clone_dir)
