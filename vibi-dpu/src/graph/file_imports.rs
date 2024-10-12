@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::{graph::utils::numbered_content, utils::review::Review};
 
-use super::utils::{all_code_files, call_llm_api, read_file};
+use super::utils::{all_code_files, call_llm_api, read_file, strip_json_prefix};
 
 // #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 // struct LlmImportLineInput {
@@ -346,7 +346,10 @@ impl ImportIdentifier {
             log::debug!("[ImportIdentifier/get_import_path] Unable to call llm api");
             return None;
         }
-        let import_path_str = import_path_opt.expect("Empty import_path_opt");
+        let mut import_path_str = import_path_opt.expect("Empty import_path_opt");
+        if let Some(stripped_json) = strip_json_prefix(&import_path_str) {
+            import_path_str = stripped_json.to_string();
+        }
         let import_path_res = serde_json::from_str(&import_path_str);
         if import_path_res.is_err() {
             log::debug!(

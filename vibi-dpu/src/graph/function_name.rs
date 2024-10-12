@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use super::utils::{call_llm_api, read_file};
+use super::utils::{call_llm_api, read_file, strip_json_prefix};
 
 // Struct to represent the output schema
 #[derive(Serialize, Deserialize, Debug)]
@@ -89,7 +89,10 @@ impl FunctionNameIdentifier {
             log::error!("[FunctionNameIdentifier/function_name_in_line] Unable to call llm for code line: {:?}", code_line);
             return None;
         }
-        let prompt_response = prompt_response_opt.expect("Empty prompt_response_opt");
+        let mut prompt_response = prompt_response_opt.expect("Empty prompt_response_opt");
+        if let Some(stripped_json) = strip_json_prefix(&prompt_response) {
+            prompt_response = stripped_json.to_string();
+        }
         let deserialized_response = serde_json::from_str(&prompt_response);
         if deserialized_response.is_err() {
             let e = deserialized_response.expect_err("Empty error in deserialized_response");
