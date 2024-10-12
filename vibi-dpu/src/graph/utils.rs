@@ -167,10 +167,10 @@ pub fn source_diff_files(diff_files: &Vec<StatItem>) -> Option<Vec<StatItem>> {
     let mut code_files = Vec::<StatItem>::new();
     for stat_item in diff_files {
         let filepath_str = &stat_item.filepath;
-        let filepath = Path::new(filepath_str);   
-        if filepath.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+        let filepath = Path::new(filepath_str);  
+        if let Some(lang) = detect_language(&filepath_str) {
             code_files.push(stat_item.clone());
-        }
+        } 
     }
     if code_files.is_empty() {
         return None;
@@ -272,17 +272,17 @@ fn get_extension_map() -> HashMap<&'static str, &'static str> {
 
     // Frameworks and template languages
     extension_map.insert("jsx", "React JSX");
-    extension_map.insert("tsx", "TypeScript");
+    extension_map.insert("tsx", "React TypeScript TSX");
     extension_map.insert("vue", "Vue.js");
     extension_map.insert("erb", "Ruby on Rails Embedded Ruby");
     extension_map.insert("ejs", "Express.js Embedded JavaScript");
 
     // Config and data formats
-    extension_map.insert("json", "JSON");
-    extension_map.insert("yaml", "YAML");
-    extension_map.insert("toml", "TOML");
-    extension_map.insert("ini", "INI Config");
-    extension_map.insert("config", "Configuration File");
+    // extension_map.insert("json", "JSON");
+    // extension_map.insert("yaml", "YAML");
+    // extension_map.insert("toml", "TOML");
+    // extension_map.insert("ini", "INI Config");
+    // extension_map.insert("config", "Configuration File");
 
     extension_map
 }
