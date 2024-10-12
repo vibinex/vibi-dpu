@@ -358,6 +358,9 @@ impl ImportIdentifier {
             return None;
         }
         let import_path: ImportPathOutput = import_path_res.expect("Unacaught error in import_path_res");
+        if !import_path.get_matching_import().possible_file_path().is_empty() {
+            return None;
+        }
         return Some(import_path);
     }
 

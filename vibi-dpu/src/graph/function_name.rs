@@ -99,8 +99,11 @@ impl FunctionNameIdentifier {
             log::error!("[FunctionNameIdentifier/function_name_in_line] Error in deserializing response: {:?}", e);
             return None;
         }
-        let func_calls: FunctionNameOutput = deserialized_response.expect("Empty error in deserialized_response");
-        self.cached_output.insert(code_line.to_string(), func_calls.get_function_name().to_string());
-        return Some(func_calls);
+        let func_name: FunctionNameOutput = deserialized_response.expect("Empty error in deserialized_response");
+        if func_name.get_function_name().is_empty() {
+            return None;
+        }
+        self.cached_output.insert(code_line.to_string(), func_name.get_function_name().to_string());
+        return Some(func_name);
     }
 }
