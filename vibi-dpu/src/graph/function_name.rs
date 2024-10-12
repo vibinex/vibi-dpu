@@ -103,7 +103,7 @@ impl FunctionNameIdentifier {
         if func_name.get_function_name().is_empty() {
             return None;
         }
-        self.cached_output.insert(code_line.to_string(), func_name.get_function_name().to_string());
+        self.cached_output.insert(code_line.trim().to_string(), func_name.get_function_name().to_string());
         return Some(func_name);
     }
 }
