@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::io::BufRead;
 use crate::utils::review::Review;
 
-use super::{gitops::{HunkDiffLines, HunkDiffMap}, utils::{call_llm_api, numbered_content, read_file}};
+use super::{gitops::{HunkDiffLines, HunkDiffMap}, utils::{call_llm_api, detect_language, numbered_content, read_file}};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionCallChunk {
@@ -345,13 +345,12 @@ impl FunctionCallIdentifier {
     
 }
 
-pub fn function_calls_search(review: &Review, function_name: &str) -> Option<HashSet<String>>{
+pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -> Option<HashSet<String>>{
     let pattern = format!(r"{}\([^\)]*\)", function_name); // Regex pattern for the specific function call
     let directory = review.clone_dir();             // The directory to search in (current directory here)
 
-    // Spawn the ripgrep process, adding `-l` for filenames and `--absolute-path` for absolute paths
+    // Spawn the ripgrep process, adding `-l` for filenames
     let rg_command_res = Command::new("rg")
-        .arg("--absolute-path")  // Print absolute file paths
         .arg("-l")               // Print only filenames that contain matches
         .arg("-e")               // Use regular expression
         .arg(pattern)            // The regex pattern for function calls
@@ -374,7 +373,11 @@ pub fn function_calls_search(review: &Review, function_name: &str) -> Option<Has
     // Read the output line by line
     for line in reader.lines() {
         if let Ok(file) = line { // Each line is an absolute filename with a match
-            files.insert(file);
+            if let Some(file_lang) = detect_language(&file) {
+                if lang == &file_lang {
+                    files.insert(file);
+                }    
+            }
         }
     }
     return Some(files);

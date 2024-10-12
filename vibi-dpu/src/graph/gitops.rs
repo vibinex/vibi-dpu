@@ -24,6 +24,10 @@ impl HunkDiffLines {
         &self.function_line
     }
 
+    pub fn function_name(&self) -> &Option<String> {
+        &self.function_name
+    }
+
     pub fn line_number(&self) -> &Option<usize> {
         &self.line_number
     }

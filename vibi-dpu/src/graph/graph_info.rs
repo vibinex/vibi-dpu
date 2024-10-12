@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 use crate::{graph::function_line_range::generate_function_map, utils::{gitops::{git_checkout_commit, StatItem}, review::Review}};
-use super::{function_call::{FunctionCallChunk, FunctionCallIdentifier, FunctionCallsOutput}, function_line_range::{AllFileFunctions, HunkFuncDef}, function_name::FunctionNameIdentifier, gitops::{get_changed_hunk_lines, HunkDiffMap}, utils::{numbered_content, read_file, source_diff_files}};
+use super::{function_call::{FunctionCallChunk, FunctionCallIdentifier, FunctionCallsOutput}, function_line_range::{AllFileFunctions, HunkFuncDef}, function_name::FunctionNameIdentifier, gitops::{get_changed_hunk_lines, HunkDiffMap}, utils::{detect_language, numbered_content, read_file, source_diff_files}};
 
 #[derive(Debug, Default, Clone)]
 pub struct DiffFuncDefs {
@@ -130,7 +130,7 @@ impl DiffGraph {
     // }
 }
 
-pub async fn generate_diff_graph(diff_files: &Vec<StatItem>, review: &Review, lang: &str) -> Option<DiffGraph> {
+pub async fn generate_diff_graph(diff_files: &Vec<StatItem>, review: &Review) -> Option<DiffGraph> {
     let diff_code_files_opt = source_diff_files(diff_files);
     if diff_code_files_opt.is_none() {
         log::debug!("[generate_diff_graph] No relevant source diff files in: {:#?}", diff_files);
@@ -140,11 +140,11 @@ pub async fn generate_diff_graph(diff_files: &Vec<StatItem>, review: &Review, la
     let mut hunk_diff_map = get_changed_hunk_lines(&diff_code_files, review);
     // get func defs for base commit for files in diff
     log::debug!("[generate_diff_graph] hunk diff map =======~~~~~~~~ {:#?}", &hunk_diff_map);
-    let diff_graph_opt = process_hunk_diff(&mut hunk_diff_map, review, lang).await;
+    let diff_graph_opt = process_hunk_diff(&mut hunk_diff_map, review).await;
     return diff_graph_opt;
 }
 
-async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review, lang: &str) -> Option<DiffGraph> {
+async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review) -> Option<DiffGraph> {
     // full graph func def and import info for diff selected files is required.
     let func_name_identifier_opt = FunctionNameIdentifier::new();
     if func_name_identifier_opt.is_none() {
@@ -153,9 +153,9 @@ async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review, lan
     }
     let mut func_name_identifier = func_name_identifier_opt.expect("Empty func_name_identifier_opt");
     git_checkout_commit(review, review.pr_head_commit());
-    set_func_def_info(hunk_diff_map, &mut func_name_identifier, lang, true).await;
+    set_func_def_info(hunk_diff_map, &mut func_name_identifier, true).await;
     git_checkout_commit(review, review.base_head_commit());
-    set_func_def_info(hunk_diff_map, &mut func_name_identifier, lang, false).await;
+    set_func_def_info(hunk_diff_map, &mut func_name_identifier, false).await;
     let diff_graph = DiffGraph {
         hunk_diff_map: hunk_diff_map.to_owned()
     };
@@ -317,7 +317,7 @@ async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review, lan
 //     return Some(func_call_file_map);
 // }
 
-async fn set_func_def_info(hunk_diff_map: &mut HunkDiffMap, func_name_identifier: &mut FunctionNameIdentifier, lang: &str, added: bool) {
+async fn set_func_def_info(hunk_diff_map: &mut HunkDiffMap, func_name_identifier: &mut FunctionNameIdentifier, added: bool) {
     for (filepath, file_func_diff) in hunk_diff_map.file_line_map_mut() {
         let file_hunks;
         if added {
@@ -336,11 +336,12 @@ async fn set_func_def_info(hunk_diff_map: &mut HunkDiffMap, func_name_identifier
                         .map(|index| index + 1); // Convert 0-based index to 1-based line number
 
                     file_hunk.set_line_number(line_number_opt);
-                    if let Some(func_name) = func_name_identifier.function_name_in_line(&func_line_raw, lang).await {
-                        file_hunk.set_function_name(func_name.get_function_name().to_string());
+                    if let Some(lang) = detect_language(filepath) {
+                        if let Some(func_name) = func_name_identifier.function_name_in_line(&func_line_raw, &lang).await {
+                            file_hunk.set_function_name(func_name.get_function_name().to_string());
+                        }    
                     }
                 }
-                // get function name from llm
             }
         }
     }

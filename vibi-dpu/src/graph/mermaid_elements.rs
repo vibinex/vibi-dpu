@@ -31,7 +31,7 @@ pub async fn generate_mermaid_flowchart(diff_files: &Vec<StatItem>, review: &Rev
 async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review) -> Option<String> {
     // generate full graph for base commit id
     git_checkout_commit(review, review.base_head_commit());
-    let base_filepaths_opt = all_code_files(review.clone_dir());
+    let base_filepaths_opt = all_code_files(review.clone_dir(), diff_files);
     if base_filepaths_opt.is_none() {
         log::error!(
             "[generate_flowchart_elements] Unable to get file paths: {}", review.clone_dir());
@@ -39,8 +39,7 @@ async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review
     }
     let base_filepaths = base_filepaths_opt.expect("Empty base_filepaths_opt");
     // let base_commit_import_info = get_test_import_info();
-    let lang = "rust";
-    let diff_graph_opt = generate_diff_graph(diff_files, review, lang).await;
+    let diff_graph_opt = generate_diff_graph(diff_files, review).await;
     log::debug!("[generate_flowchart_elements] diff_graph_opt = {:#?}", &diff_graph_opt);
     if diff_graph_opt.is_none() {
         log::error!(
@@ -60,7 +59,7 @@ async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review
     // }
     // let head_filepaths = head_filepaths_opt.expect("Empty head_filepaths_opt");
     let mut graph_elems = MermaidGraphElements::new();
-    graph_edges(&base_filepaths, review, &diff_graph, &mut graph_elems, lang).await;
+    graph_edges(&base_filepaths, review, &diff_graph, &mut graph_elems).await;
     let elems_str = graph_elems.render_elements(review);
     return Some(elems_str);
 }

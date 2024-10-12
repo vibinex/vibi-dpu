@@ -1,6 +1,5 @@
-use std::{collections::HashMap, path::{Path, PathBuf}, slice::Chunks};
+use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
 
-use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use strsim::jaro_winkler;
@@ -115,17 +114,24 @@ pub fn generate_random_string(length: usize) -> String {
     random_string
 }
 
-pub fn all_code_files(dir: &str) -> Option<Vec<PathBuf>> {
+pub fn all_code_files(dir: &str, diff_files: &Vec<StatItem>) -> Option<Vec<PathBuf>> {
     let mut code_files = Vec::<PathBuf>::new();
+    let all_diff_langs = detect_langs_diff(diff_files);
+    if all_diff_langs.is_empty() {
+        log::error!("[all_code_files] No known language files detected in diff");
+        return None;
+    }
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path().to_owned();
         log::debug!("[all_code_files] path = {:?}", path);
         let ext = path.extension().and_then(|ext| ext.to_str());
         log::debug!("[all_code_files] extension = {:?}", &ext);
-        if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            match path.canonicalize() {
-                Ok(abs_path) => code_files.push(abs_path),
-                Err(e) => log::error!("Failed to get absolute path for {:?}: {:?}", path, e),
+        if let Some(file_lang) = detect_language(&path.to_string_lossy()) {
+            if all_diff_langs.contains(&file_lang) {
+                match path.canonicalize() {
+                    Ok(abs_path) => code_files.push(abs_path),
+                    Err(e) => log::error!("Failed to get absolute path for {:?}: {:?}", path, e),
+                }
             }
         }
     }
@@ -133,6 +139,16 @@ pub fn all_code_files(dir: &str) -> Option<Vec<PathBuf>> {
         return None;
     }
     return Some(code_files);
+}
+
+fn detect_langs_diff(diff_files: &Vec<StatItem>) -> HashSet<String> {
+    let mut all_diff_langs: HashSet<String> = HashSet::new();
+    for diff_file in diff_files {
+        if let Some(diff_lang) = detect_language(&diff_file.filepath) {
+            all_diff_langs.insert(diff_lang);
+        }
+    }
+    return all_diff_langs;
 }
 
 pub fn match_imported_filename_to_path(paths: &Vec<PathBuf>, filename: &str) -> Option<PathBuf> {
@@ -192,4 +208,93 @@ pub fn absolute_to_relative_path(abs_path: &str, review: &Review) -> Option<Stri
     }
     let rel_path = rel_path_res.expect("Uncaught error in rel_path_res");
     return Some(rel_path.to_str().expect("Unable to deserialze rel_path").to_string());
+}
+
+// Generate a map of file extensions to languages or frameworks
+fn get_extension_map() -> HashMap<&'static str, &'static str> {
+    let mut extension_map = HashMap::new();
+
+    // Common programming languages
+    extension_map.insert("rs", "Rust");
+    extension_map.insert("py", "Python");
+    extension_map.insert("js", "JavaScript");
+    extension_map.insert("ts", "TypeScript");
+    extension_map.insert("java", "Java");
+    extension_map.insert("rb", "Ruby");
+    extension_map.insert("go", "Go");
+    extension_map.insert("cpp", "C++");
+    extension_map.insert("cs", "C#");
+    extension_map.insert("c", "C");
+    extension_map.insert("php", "PHP");
+    extension_map.insert("swift", "Swift");
+    extension_map.insert("kt", "Kotlin");
+    extension_map.insert("m", "Objective-C");
+    extension_map.insert("pl", "Perl");
+    extension_map.insert("r", "R");
+    extension_map.insert("scala", "Scala");
+    extension_map.insert("dart", "Dart");
+    extension_map.insert("lua", "Lua");
+    extension_map.insert("hs", "Haskell");
+    extension_map.insert("erl", "Erlang");
+    extension_map.insert("ml", "OCaml");
+    extension_map.insert("groovy", "Groovy");
+    extension_map.insert("sql", "SQL");
+    extension_map.insert("v", "V");
+    extension_map.insert("nim", "Nim");
+    extension_map.insert("elm", "Elm");
+    extension_map.insert("jl", "Julia");
+    extension_map.insert("cr", "Crystal");
+    extension_map.insert("ex", "Elixir");
+    extension_map.insert("fs", "F#");
+    extension_map.insert("clj", "Clojure");
+    extension_map.insert("coffee", "CoffeeScript");
+    extension_map.insert("hx", "Haxe");
+    extension_map.insert("lisp", "Lisp");
+    extension_map.insert("scss", "Sass");
+    extension_map.insert("ps1", "PowerShell");
+    extension_map.insert("vb", "Visual Basic");
+    extension_map.insert("bat", "Batch Script");
+    extension_map.insert("matlab", "MATLAB");
+    extension_map.insert("vbs", "VBScript");
+    extension_map.insert("as", "ActionScript");
+    extension_map.insert("rkt", "Racket");
+    extension_map.insert("cls", "Apex");
+    extension_map.insert("sass", "Sass");
+    extension_map.insert("less", "Less");
+
+    // Web and markup languages
+    extension_map.insert("html", "HTML");
+    extension_map.insert("css", "CSS");
+    extension_map.insert("xml", "XML");
+    extension_map.insert("md", "Markdown");
+    extension_map.insert("adoc", "AsciiDoc");
+    extension_map.insert("rst", "reStructuredText");
+
+    // Frameworks and template languages
+    extension_map.insert("jsx", "React JSX");
+    extension_map.insert("tsx", "TypeScript");
+    extension_map.insert("vue", "Vue.js");
+    extension_map.insert("erb", "Ruby on Rails Embedded Ruby");
+    extension_map.insert("ejs", "Express.js Embedded JavaScript");
+
+    // Config and data formats
+    extension_map.insert("json", "JSON");
+    extension_map.insert("yaml", "YAML");
+    extension_map.insert("toml", "TOML");
+    extension_map.insert("ini", "INI Config");
+    extension_map.insert("config", "Configuration File");
+
+    extension_map
+}
+
+// Detect the programming language or framework based on the file extension
+pub fn detect_language(file_path: &str) -> Option<String> {
+    let extension_map = get_extension_map();
+    let path = Path::new(file_path);
+
+    // Extract the file extension and match it with the map
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_lowercase()) // Normalize to lowercase
+        .and_then(|ext| extension_map.get(ext.as_str()).map(|&lang| lang.to_string()))
 }

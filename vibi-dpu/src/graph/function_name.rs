@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use super::utils::{call_llm_api, read_file};
 
@@ -44,7 +46,8 @@ impl FunctionNamePrompt {
 }
 
 pub struct FunctionNameIdentifier {
-    prompt: FunctionNamePrompt
+    prompt: FunctionNamePrompt,
+    cached_output: HashMap<String, String>
 }
 
 impl FunctionNameIdentifier {
@@ -62,11 +65,14 @@ impl FunctionNameIdentifier {
             return None;
         }
         let prompt_json: FunctionNamePrompt = prompt_json_res.expect("Empty error in prompt_json_res");
-        return Some(Self { prompt: prompt_json});
+        return Some(Self { prompt: prompt_json, cached_output: HashMap::new()});
     }
 
     pub async fn function_name_in_line(&mut self, code_line: &str, lang: &str) -> Option<FunctionNameOutput> {
         // concatenate functioncallsoutput for all chunks
+        if let Some(cached_func_name) = self.cached_output.get(code_line) {
+            return Some(FunctionNameOutput{ function_name: cached_func_name.to_string(), notes: None })
+        }
         let input = InputSchema{ code_line: code_line.to_string(), language: lang.to_string() };
         self.prompt.input = Some(input);
         let prompt_str_res = serde_json::to_string(&self.prompt);
@@ -91,6 +97,7 @@ impl FunctionNameIdentifier {
             return None;
         }
         let func_calls: FunctionNameOutput = deserialized_response.expect("Empty error in deserialized_response");
+        self.cached_output.insert(code_line.to_string(), func_calls.get_function_name().to_string());
         return Some(func_calls);
     }
 }

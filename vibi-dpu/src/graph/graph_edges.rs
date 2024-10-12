@@ -1,14 +1,14 @@
 use std::path::{Path, PathBuf};
 use crate::utils::{gitops::git_checkout_commit, review::Review};
 
-use super::{elements::MermaidGraphElements, file_imports::ImportIdentifier, function_call::{function_calls_search, FunctionCallIdentifier}, function_line_range::{generate_function_map, get_function_def_for_func_call, FunctionDefIdentifier}, graph_info::DiffGraph, utils::absolute_to_relative_path};
+use super::{elements::MermaidGraphElements, file_imports::ImportIdentifier, function_call::{function_calls_search, FunctionCallIdentifier}, function_line_range::{generate_function_map, get_function_def_for_func_call, FunctionDefIdentifier}, graph_info::DiffGraph, utils::{absolute_to_relative_path, detect_language}};
 
-pub async fn graph_edges(base_filepaths: &Vec<PathBuf>, review: &Review, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements, lang: &str) {
-    outgoing_edges(base_filepaths, diff_graph, graph_elems, review, lang).await;
-    incoming_edges(review, diff_graph, graph_elems, lang).await;
+pub async fn graph_edges(base_filepaths: &Vec<PathBuf>, review: &Review, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
+    outgoing_edges(base_filepaths, diff_graph, graph_elems, review).await;
+    incoming_edges(review, diff_graph, graph_elems).await;
 }
 
-async fn incoming_edges(review: &Review, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements, lang :&str) {
+async fn incoming_edges(review: &Review, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
     // filter files with ripgrep
     // for each filtered file
         // get func call
@@ -206,7 +206,6 @@ async fn incoming_edges(review: &Review, diff_graph: &DiffGraph, graph_elems: &m
         &mut funcdef_identifier,
         diff_graph,
         &mut func_call_identifier,
-        lang,
         graph_elems,
         "green"
     ).await;
@@ -216,7 +215,6 @@ async fn incoming_edges(review: &Review, diff_graph: &DiffGraph, graph_elems: &m
         &mut funcdef_identifier,
         diff_graph,
         &mut func_call_identifier,
-        lang,
         graph_elems,
         "red"
     ).await;
@@ -234,7 +232,7 @@ async fn incoming_edges(review: &Review, diff_graph: &DiffGraph, graph_elems: &m
 // }
 
 async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, diff_graph: &DiffGraph,
-    graph_elems: &mut MermaidGraphElements, review: &Review, lang: &str) 
+    graph_elems: &mut MermaidGraphElements, review: &Review) 
 {
     let func_call_identifier_opt = FunctionCallIdentifier::new();
     if func_call_identifier_opt.is_none() {
@@ -259,7 +257,6 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, diff_graph: &DiffGraph,
         &mut import_identifier,
         &mut func_call_identifier,
         &mut funcdef_identifier,
-        lang,
         review,
         diff_graph,
         base_filepaths,
@@ -269,7 +266,6 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, diff_graph: &DiffGraph,
     process_func_calls(&mut import_identifier,
         &mut func_call_identifier,
         &mut funcdef_identifier,
-        lang,
         review,
         diff_graph,
         base_filepaths,
@@ -279,7 +275,7 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, diff_graph: &DiffGraph,
 
 async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_identifier: &mut FunctionCallIdentifier,
     funcdef_identifier: &mut FunctionDefIdentifier,
-    lang: &str, review: &Review, diff_graph: &DiffGraph, base_filepaths: &Vec<PathBuf>,
+    review: &Review, diff_graph: &DiffGraph, base_filepaths: &Vec<PathBuf>,
     graph_elems: &mut MermaidGraphElements, edge_color: &str) 
 {
     for (source_filepath, src_file_hunks) in diff_graph.hunk_diff_map().file_line_map() {
@@ -294,14 +290,20 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
         } else {
             diff_hunks = src_file_hunks.deleted_hunks();
         }
+        let lang_opt = detect_language(source_filepath);
+        if lang_opt.is_none() {
+            log::error!("[get_import_path_file] Unable to determine language: {}", source_filepath);
+            return;
+        }
+        let lang = lang_opt.expect("Empty lang_opt");
         let source_file_path = Path::new(source_filepath);
         let source_file_pathbuf = source_file_path.to_path_buf(); 
         if let Some(hunk_func_calls) = func_call_identifier.
-                function_calls_in_hunks(&source_file_pathbuf, lang, diff_hunks).await {
+                function_calls_in_hunks(&source_file_pathbuf, &lang, diff_hunks).await {
             for (hunk_lines, func_call_output) in hunk_func_calls {
                 for dest_func_call in func_call_output.function_calls() {
                     if let Some(import_filepath) = import_identifier.get_import_path_file(
-                        source_filepath, lang, dest_func_call.function_name()).await {
+                        source_filepath, &lang, dest_func_call.function_name()).await {
                         // get file
                             // get diffgraph all files and see if they contain filepath
                             let possible_diff_file_paths: Vec<&String> =  diff_graph.hunk_diff_map().all_files().into_iter()
@@ -345,7 +347,7 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
                                         // search only for func def with specific name
                                         // if something comes up, add edge!
                                         if let Some(func_defs) = funcdef_identifier.function_defs_in_file(
-                                            possible_file_pathbuf, lang, dest_func_call.function_name()).await {
+                                            possible_file_pathbuf, &lang, dest_func_call.function_name()).await {
                                             if let Some(dest_func_def_line) = func_defs.get_function_line_number() {
                                                 if let Some(src_func_name) = hunk_lines.function_line() {
                                                     if let Some(src_func_line_number) = hunk_lines.line_number() {
@@ -380,9 +382,15 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
 
 async fn process_func_defs(review: &Review, funcdef_identifier: &mut FunctionDefIdentifier,
     diff_graph: &DiffGraph, func_call_identifier: &mut FunctionCallIdentifier,
-    lang: &str, graph_elems: &mut MermaidGraphElements, edge_color: &str) 
+    graph_elems: &mut MermaidGraphElements, edge_color: &str) 
 {
     for (dest_filename, dest_file_hunks) in diff_graph.hunk_diff_map().file_line_map() {
+        let dest_lang_opt = detect_language(&dest_filename);
+        if dest_lang_opt.is_none() {
+            log::error!("[process_func_defs] Unable to detect language: {}", dest_filename);
+            continue;
+        }
+        let dest_lang = dest_lang_opt.expect("Empty dest_lang_opt");
         let func_defs;
         if edge_color == "red" {
             func_defs = dest_file_hunks.deleted_hunks();
@@ -390,23 +398,33 @@ async fn process_func_defs(review: &Review, funcdef_identifier: &mut FunctionDef
             func_defs = dest_file_hunks.added_hunks();
         }
         for dest_func in func_defs {
-            if let Some(dest_func_name) = dest_func.function_line() {
+            if let Some(dest_func_name) = dest_func.function_name() {
                 if let Some(dest_funcdef_line) = dest_func.line_number() {
                     if let Some(possible_filepaths) = 
-                    function_calls_search(review, dest_func_name) 
+                    function_calls_search(review, dest_func_name, &dest_lang)
                 {
                     if possible_filepaths.is_empty() {
-                        log::debug!("[incoming_edges] No files detected having function call");
+                        log::debug!("[process_func_defs] No files detected having function call");
                         continue;
                     }
                     for possible_filepath in possible_filepaths {
                         if possible_filepath == *dest_filename {
                             continue;
                         }
+                        let lang_opt = detect_language(&possible_filepath);
+                        if lang_opt.is_none() {
+                            log::debug!("[process_func_defs] Unable to determine language: {}", &possible_filepath);
+                            continue;
+                        }
+                        let lang = lang_opt.expect("Empty lang_opt");
+                        if lang != dest_lang {
+                            log::debug!("[process_func_defs] Different languages: {}, {}", &lang, &dest_lang);
+                            continue;
+                        }
                         let possible_path = Path::new(&possible_filepath);
                         let possible_pathbuf = possible_path.to_path_buf();
                         // get func call
-                        if let Some(func_calls) = func_call_identifier.functions_in_file(&possible_pathbuf, lang).await {
+                        if let Some(func_calls) = func_call_identifier.functions_in_file(&possible_pathbuf, &lang).await {
                             // get func def
                             for func_call in func_calls.function_calls() {
                                 if let Some(src_func_def) = get_function_def_for_func_call(
