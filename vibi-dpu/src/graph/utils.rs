@@ -200,6 +200,17 @@ pub fn absolute_to_relative_path(abs_path: &str, review: &Review) -> Option<Stri
     return Some(rel_path.to_str().expect("Unable to deserialze rel_path").to_string());
 }
 
+pub fn strip_json_prefix(json_str: &str) -> Option<&str> {
+    if let Some(start) = json_str.find("```json") {
+        // Find the end of "```" after the "```json"
+        if let Some(end) = json_str[start + 7..].find("```") {
+            // Return the substring between "```json" and "```"
+            return Some(&json_str[start + 7..start + 7 + end]);
+        }
+    }
+    return None;
+}
+
 // Generate a map of file extensions to languages or frameworks
 fn get_extension_map() -> HashMap<&'static str, &'static str> {
     let mut extension_map = HashMap::new();

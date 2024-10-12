@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::io::BufRead;
 use crate::utils::review::Review;
 
-use super::{gitops::{HunkDiffLines, HunkDiffMap}, utils::{call_llm_api, detect_language, numbered_content, read_file}};
+use super::{gitops::{HunkDiffLines, HunkDiffMap}, utils::{call_llm_api, detect_language, numbered_content, read_file, strip_json_prefix}};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionCallChunk {
@@ -177,6 +177,10 @@ impl FunctionCallsOutput {
     pub fn function_calls(&self) -> &Vec<FunctionCall> {
         return &self.function_calls
     }
+
+    pub fn trim_empty_function_calls(&mut self) {
+        self.function_calls.retain(|func_call| !func_call.function_name().is_empty());
+    }
 }
 
 // Instruction structure
@@ -291,14 +295,21 @@ impl FunctionCallIdentifier {
             log::error!("[FunctionCallIdentifier/functions_in_chunk] Unable to call llm for chunk: {:?}", chunk);
             return None;
         }
-        let prompt_response = prompt_response_opt.expect("Empty prompt_response_opt");
+        let mut prompt_response = prompt_response_opt.expect("Empty prompt_response_opt");
+        if let Some(stripped_json) = strip_json_prefix(&prompt_response) {
+            prompt_response = stripped_json.to_string();
+        }
         let deserialized_response = serde_json::from_str(&prompt_response);
         if deserialized_response.is_err() {
             let e = deserialized_response.expect_err("Empty error in deserialized_response");
             log::error!("[FunctionCallIdentifier/functions_in_chunk] Error in deserializing response: {:?}", e);
             return None;
         }
-        let func_calls: FunctionCallsOutput = deserialized_response.expect("Empty error in deserialized_response");
+        let mut func_calls: FunctionCallsOutput = deserialized_response.expect("Empty error in deserialized_response");
+        func_calls.trim_empty_function_calls();
+        if func_calls.function_calls().is_empty() {
+            return None;
+        }
         return Some(func_calls);
     }
 
