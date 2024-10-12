@@ -2,7 +2,6 @@ use std::{collections::{HashMap, HashSet}, path::{Path, PathBuf}};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use strsim::jaro_winkler;
 use walkdir::WalkDir;
 use std::fs;
 use rand::Rng;
@@ -185,15 +184,6 @@ pub fn numbered_content(file_contents: String) -> Vec<String> {
         .map(|(index, line)| format!("{} {}", index, line))
         .collect::<Vec<String>>();
     return lines;
-}
-
-pub fn match_overlap(str1: &str, str2: &str, similarity_threshold: f64) -> bool {
-    let similarity = jaro_winkler(str1, str2);
-    log::debug!("[match_overlap] str1 = {}, str2 = {}, similarity = {}, similarity_threshold = {}", str1, str2, similarity, similarity_threshold);
-    if similarity >= similarity_threshold {
-        return true;
-    }
-    return false;
 }
 
 pub fn absolute_to_relative_path(abs_path: &str, review: &Review) -> Option<String> {
