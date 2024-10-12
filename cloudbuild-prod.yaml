@@ -4,6 +4,9 @@ steps:
     args: ['cp', 'gs://vibi-secrets-prod/pubsub-sa.json', 'pubsub-sa.json']
   
   - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['cp', '-R', 'gs://vibi-secrets-prod/prompts/prompts', '.']
+  
+  - name: 'gcr.io/cloud-builders/gsutil'
     args: ['cp', 'gs://vibi-secrets-prod/vibinex-dpu.2024-01-11.private-key.pem', 'repo-profiler.pem']
 
 
