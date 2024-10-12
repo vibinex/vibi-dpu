@@ -1,9 +1,9 @@
-use std::env;
+use std::{env, thread, time::Duration};
 
 use serde_json::Value;
 
 use crate::{
-    core::{relevance::process_relevance, utils::get_access_token},
+    core::{relevance::process_relevance, diff_graph::send_diff_graph, utils::get_access_token},
     db::{
         hunk::{get_hunk_from_db, store_hunkmap_to_db},
         repo::get_clone_url_clone_dir,
@@ -11,7 +11,7 @@ use crate::{
         review::{get_review_from_db, save_review_to_db},
     },
     utils::{
-        gitops::{commit_exists, generate_blame, generate_diff, get_excluded_files, git_pull, process_diffmap},
+        gitops::{commit_exists, generate_blame, generate_diff, get_excluded_files, git_pull, process_diffmap, StatItem},
         hunk::{HunkMap, PrHunkItem},
         repo_config::RepoConfig,
         reqwest_client::get_client,
@@ -41,11 +41,24 @@ pub async fn process_review(message_data: &Vec<u8>) {
 	}
 	let access_token = access_token_opt.expect("Empty access_token_opt");
 	commit_check(&review, &access_token).await;
-	let hunkmap_opt = process_review_changes(&review).await;
-	send_hunkmap(&hunkmap_opt, &review, &repo_config, &access_token, &old_review_opt).await;
+	process_review_changes(&review, &repo_config, &access_token, &old_review_opt).await;
 }
 
-pub async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review,
+pub async fn process_review_changes(review: &Review, repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) {
+	log::info!("Processing changes in code...");
+	if let Some((excluded_files, smallfiles)) = get_included_and_excluded_files(review) {
+		let hunkmap_opt = calculate_hunkmap(review, &smallfiles).await;
+		send_hunkmap(&hunkmap_opt, &excluded_files, review, repo_config, access_token, old_review_opt).await;
+		
+		if repo_config.diff_graph() {
+			send_diff_graph(review, &excluded_files, &smallfiles, access_token).await;
+		}
+	} else {
+		log::error!("Failed to get included and excluded files");
+	}
+}
+
+pub async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, excluded_files: &Vec<StatItem>, review: &Review,
 	repo_config: &RepoConfig, access_token: &str, old_review_opt: &Option<Review>) {
 	if hunkmap_opt.is_none() {
 		log::error!("[send_hunkmap] Empty hunkmap in send_hunkmap");
@@ -58,7 +71,7 @@ pub async fn send_hunkmap(hunkmap_opt: &Option<HunkMap>, review: &Review,
 	let hunkmap_async = hunkmap.clone();
 	let review_async = review.clone();
 	let mut repo_config_clone = repo_config.clone();
-	process_relevance(&hunkmap_async, &review_async,
+	process_relevance(&hunkmap_async, &excluded_files, &review_async,
 		&mut repo_config_clone, access_token, old_review_opt).await;
 }
 
@@ -73,16 +86,20 @@ fn hunk_already_exists(review: &Review) -> bool {
 	log::debug!("[hunk_already_exists] Hunk already in db!");
 	return true;
 }
-pub async fn process_review_changes(review: &Review) -> Option<HunkMap>{
-	log::info!("Processing changes in code...");
-	let mut prvec = Vec::<PrHunkItem>::new();
+
+fn get_included_and_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatItem>)> {
 	let fileopt = get_excluded_files(&review);
 	log::debug!("[process_review_changes] fileopt = {:?}", &fileopt);
 	if fileopt.is_none() {
 		log::error!("[process_review_changes] No files to review for PR {}", review.id());
 		return None;
 	}
-	let (_, smallfiles) = fileopt.expect("fileopt is empty");
+	let (excluded_files, smallfiles) = fileopt.expect("fileopt is empty");
+	return Some(( excluded_files, smallfiles));
+}
+
+async fn calculate_hunkmap(review: &Review, smallfiles: &Vec<StatItem>) -> Option<HunkMap> {
+	let mut prvec = Vec::<PrHunkItem>::new();
 	let diffmap = generate_diff(&review, &smallfiles);
 	log::debug!("[process_review_changes] diffmap = {:?}", &diffmap);
 	let linemap = process_diffmap(&diffmap);
@@ -109,6 +126,7 @@ pub async fn commit_check(review: &Review, access_token: &str) {
 	if !commit_exists(&review.base_head_commit(), &review.clone_dir()) 
 		|| !commit_exists(&review.pr_head_commit(), &review.clone_dir()) {
 		log::info!("Executing git pull on repo {}...", &review.repo_name());
+		thread::sleep(Duration::from_secs(1));
 		git_pull(review, access_token).await;
 	}
 }
@@ -213,7 +231,7 @@ fn create_and_save_github_review_object(deserialized_data: &Value) -> Option<Rev
 	let repo_provider = ProviderEnum::Github.to_string().to_lowercase();
 	let clone_opt = get_clone_url_clone_dir(&repo_provider, &repo_owner, &repo_name);
 	if clone_opt.is_none() {
-		log::error!("[create_and_save_github_review_object] Unable to get clone url and directory for bitbucket review");
+		log::error!("[create_and_save_github_review_object] Unable to get clone url and directory for github review");
 		return None;
 	}
 	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");

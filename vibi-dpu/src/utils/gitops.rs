@@ -7,6 +7,7 @@ use sha256::digest;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use tokio::fs;
+use tokio::task;
 use std::io::ErrorKind;
 
 use super::hunk::BlameItem;
@@ -15,9 +16,9 @@ use super::lineitem::LineItem;
 use crate::db::repo::save_repo_to_db;
 use crate::utils::repo::Repository;
 
-#[derive(Debug, Serialize, Default, Deserialize)]
+#[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct StatItem {
-	filepath: String,
+	pub filepath: String,
 	additions: i32,
 	deletions: i32,
 }
@@ -71,6 +72,29 @@ pub async fn git_pull(review: &Review, access_token: &str) {
     set_git_url(review.clone_url(), directory, &access_token, review.provider());
 	let output_res = Command::new("git")
 		.arg("pull")
+		.current_dir(directory)
+		.output();
+	if output_res.is_err() {
+		let e = output_res.expect_err("No error in output_res");
+		log::error!("[git_pull] failed to execute git pull: {:?}", e);
+		return;
+	}
+	let output = output_res.expect("Uncaught error in output_res");
+	match str::from_utf8(&output.stderr) {
+		Ok(v) => log::debug!("[git_pull] git pull stderr = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[git_pull] git pull stderr error {}", e)}, 
+	};
+	match str::from_utf8(&output.stdout) {
+		Ok(v) => log::debug!("[git_pull] git pull stdout = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[git_pull] git pull stdout error {}", e)}, 
+	};
+}
+
+pub fn git_checkout_commit(review: &Review, commit_id: &str) {
+	let directory = review.clone_dir();
+	let output_res = Command::new("git")
+		.arg("checkout")
+		.arg(commit_id)
 		.current_dir(directory)
 		.output();
 	if output_res.is_err() {
@@ -227,6 +251,7 @@ pub fn generate_diff(review: &Review, smallfiles: &Vec<StatItem>) -> HashMap<Str
 		let output_res = Command::new("git")
 			.arg("diff")
 			.arg("-U0")
+			.arg("--ignore-space-change")
 			.arg(&commit_range)
 			.arg(&filepath)
 			.current_dir(clone_dir)
