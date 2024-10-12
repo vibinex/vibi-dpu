@@ -7,3 +7,4 @@ pub mod file_imports;
 pub mod graph_info;
 pub mod graph_edges;
 pub mod function_call;
+pub mod function_name;

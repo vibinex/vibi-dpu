@@ -7,7 +7,8 @@ pub struct HunkDiffLines {
     start_line: usize,
     end_line: usize,
     function_line: Option<String>,
-    line_number: Option<usize>
+    line_number: Option<usize>,
+    function_name: Option<String>
 }
 
 impl HunkDiffLines {
@@ -29,6 +30,10 @@ impl HunkDiffLines {
 
     pub fn set_line_number(&mut self, line_number: Option<usize>) {
         self.line_number = line_number;
+    }
+
+    pub fn set_function_name(&mut self, function_name: String) {
+        self.function_name = Some(function_name);
     }
 }
 
@@ -170,7 +175,8 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
                         start_line: current_add_start,
                         end_line: current_add_end,
                         function_line: function_line.clone(), // Use the function line stored
-                        line_number: None
+                        line_number: None,
+                        function_name: None
                     });
                 }
                 if in_del_hunk {
@@ -178,7 +184,8 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
                         start_line: current_del_start,
                         end_line: current_del_end,
                         function_line: function_line.clone(), // Use the function line stored
-                        line_number: None
+                        line_number: None,
+                        function_name: None
                     });
                 }
 
@@ -225,7 +232,8 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
                 start_line: current_add_start,
                 end_line: current_add_end,
                 function_line: function_line.clone(), // Use the function line stored
-                line_number: None
+                line_number: None,
+                function_name: None
             });
         }
         if in_del_hunk {
@@ -233,7 +241,8 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
                 start_line: current_del_start,
                 end_line: current_del_end,
                 function_line: function_line.clone(), // Use the function line stored
-                line_number: None
+                line_number: None,
+                function_name: None
             });
         }
 

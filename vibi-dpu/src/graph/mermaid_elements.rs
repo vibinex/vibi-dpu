@@ -39,7 +39,8 @@ async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review
     }
     let base_filepaths = base_filepaths_opt.expect("Empty base_filepaths_opt");
     // let base_commit_import_info = get_test_import_info();
-    let diff_graph_opt = generate_diff_graph(diff_files, review).await;
+    let lang = "rust";
+    let diff_graph_opt = generate_diff_graph(diff_files, review, lang).await;
     log::debug!("[generate_flowchart_elements] diff_graph_opt = {:#?}", &diff_graph_opt);
     if diff_graph_opt.is_none() {
         log::error!(
@@ -59,7 +60,6 @@ async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review
     // }
     // let head_filepaths = head_filepaths_opt.expect("Empty head_filepaths_opt");
     let mut graph_elems = MermaidGraphElements::new();
-    let lang = "rust";
     graph_edges(&base_filepaths, review, &diff_graph, &mut graph_elems, lang).await;
     let elems_str = graph_elems.render_elements(review);
     return Some(elems_str);

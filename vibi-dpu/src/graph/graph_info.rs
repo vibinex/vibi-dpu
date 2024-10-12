@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 use crate::{graph::function_line_range::generate_function_map, utils::{gitops::{git_checkout_commit, StatItem}, review::Review}};
-use super::{function_call::{FunctionCallChunk, FunctionCallIdentifier, FunctionCallsOutput}, function_line_range::{AllFileFunctions, HunkFuncDef}, gitops::{get_changed_hunk_lines, HunkDiffMap}, utils::{numbered_content, read_file, source_diff_files}};
+use super::{function_call::{FunctionCallChunk, FunctionCallIdentifier, FunctionCallsOutput}, function_line_range::{AllFileFunctions, HunkFuncDef}, function_name::FunctionNameIdentifier, gitops::{get_changed_hunk_lines, HunkDiffMap}, utils::{numbered_content, read_file, source_diff_files}};
 
 #[derive(Debug, Default, Clone)]
 pub struct DiffFuncDefs {
@@ -130,7 +130,7 @@ impl DiffGraph {
     // }
 }
 
-pub async fn generate_diff_graph(diff_files: &Vec<StatItem>, review: &Review) -> Option<DiffGraph> {
+pub async fn generate_diff_graph(diff_files: &Vec<StatItem>, review: &Review, lang: &str) -> Option<DiffGraph> {
     let diff_code_files_opt = source_diff_files(diff_files);
     if diff_code_files_opt.is_none() {
         log::debug!("[generate_diff_graph] No relevant source diff files in: {:#?}", diff_files);
@@ -140,16 +140,22 @@ pub async fn generate_diff_graph(diff_files: &Vec<StatItem>, review: &Review) ->
     let mut hunk_diff_map = get_changed_hunk_lines(&diff_code_files, review);
     // get func defs for base commit for files in diff
     log::debug!("[generate_diff_graph] hunk diff map =======~~~~~~~~ {:#?}", &hunk_diff_map);
-    let diff_graph_opt = process_hunk_diff(&mut hunk_diff_map, review).await;
+    let diff_graph_opt = process_hunk_diff(&mut hunk_diff_map, review, lang).await;
     return diff_graph_opt;
 }
 
-async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review) -> Option<DiffGraph> {
+async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review, lang: &str) -> Option<DiffGraph> {
     // full graph func def and import info for diff selected files is required.
+    let func_name_identifier_opt = FunctionNameIdentifier::new();
+    if func_name_identifier_opt.is_none() {
+        log::error!("[process_hunk_diff] Unable to initialize function name identifier");
+        return None;
+    }
+    let mut func_name_identifier = func_name_identifier_opt.expect("Empty func_name_identifier_opt");
     git_checkout_commit(review, review.pr_head_commit());
-    set_func_line_numbers(hunk_diff_map, true);
+    set_func_def_info(hunk_diff_map, &mut func_name_identifier, lang, true).await;
     git_checkout_commit(review, review.base_head_commit());
-    set_func_line_numbers(hunk_diff_map, false);
+    set_func_def_info(hunk_diff_map, &mut func_name_identifier, lang, false).await;
     let diff_graph = DiffGraph {
         hunk_diff_map: hunk_diff_map.to_owned()
     };
@@ -311,7 +317,7 @@ async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review) -> 
 //     return Some(func_call_file_map);
 // }
 
-fn set_func_line_numbers(hunk_diff_map: &mut HunkDiffMap, added: bool) -> &mut HunkDiffMap {
+async fn set_func_def_info(hunk_diff_map: &mut HunkDiffMap, func_name_identifier: &mut FunctionNameIdentifier, lang: &str, added: bool) {
     for (filepath, file_func_diff) in hunk_diff_map.file_line_map_mut() {
         let file_hunks;
         if added {
@@ -320,20 +326,22 @@ fn set_func_line_numbers(hunk_diff_map: &mut HunkDiffMap, added: bool) -> &mut H
             file_hunks = file_func_diff.deleted_hunks_mut();
         }
         for file_hunk in file_hunks {
-            if let Some(func_line_raw) = file_hunk.function_line() {
+            if let Some(func_line_raw) = file_hunk.function_line().clone() {
                 // get line number
                 if let Some(file_contents) = read_file(filepath) {
                     let line_number_opt = file_contents
                         .lines() // Split into lines
                         .enumerate() // Get (index, line)
-                        .position(|(_, line)| line.contains(func_line_raw)) // Find the position where the line matches
+                        .position(|(_, line)| line.contains(&func_line_raw)) // Find the position where the line matches
                         .map(|index| index + 1); // Convert 0-based index to 1-based line number
 
                     file_hunk.set_line_number(line_number_opt);
+                    if let Some(func_name) = func_name_identifier.function_name_in_line(&func_line_raw, lang).await {
+                        file_hunk.set_function_name(func_name.get_function_name().to_string());
+                    }
                 }
                 // get function name from llm
             }
         }
     }
-    return hunk_diff_map;
 }

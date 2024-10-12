@@ -194,7 +194,7 @@ async fn incoming_edges(review: &Review, diff_graph: &DiffGraph, graph_elems: &m
         return;
     }
     let mut funcdef_identifier = func_def_identifier_opt.expect("Empty func_def_identifier_opt");
-    let mut func_call_identifier_opt = FunctionCallIdentifier::new();
+    let func_call_identifier_opt = FunctionCallIdentifier::new();
     if func_call_identifier_opt.is_none() {
         log::error!("[incoming_edges] Unable to create new FunctionCallIdentifier");
         return;
