@@ -145,7 +145,7 @@ fn parse_review(message_data: &Vec<u8>) -> (Option<(Review, RepoConfig)>, Option
 	let (review_opt, old_review_opt): (Option<Review>, Option<Review>) = if repo_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
 		create_and_save_bitbucket_review_object(&deserialized_data)
 	} else if repo_provider == ProviderEnum::Github.to_string().to_lowercase() {
-		(create_and_save_github_review_object(&deserialized_data), None)
+		create_and_save_github_review_object(&deserialized_data)
 	} else {
 		(None, None)
 	};
@@ -224,18 +224,19 @@ fn create_and_save_bitbucket_review_object(deserialized_data: &Value) -> (Option
 	return (Some(review), old_review_opt);
 }
 
-fn create_and_save_github_review_object(deserialized_data: &Value) -> Option<Review> {
+fn create_and_save_github_review_object(deserialized_data: &Value) -> (Option<Review>, Option<Review>) {
 	log::debug!("[create_and_save_github_review_object] deserialised_data {}", deserialized_data);
 	let repo_owner = deserialized_data["eventPayload"]["repository"]["owner"]["login"].to_string().trim_matches('"').to_string();
 	let repo_name = deserialized_data["eventPayload"]["repository"]["name"].to_string().trim_matches('"').to_string();
 	let repo_provider = ProviderEnum::Github.to_string().to_lowercase();
+	let pr_id = deserialized_data["eventPayload"]["pull_request"]["number"].to_string().trim_matches('"').to_string();
+	let old_review_opt = get_review_from_db(&repo_name, &repo_owner, &repo_provider, &pr_id);
 	let clone_opt = get_clone_url_clone_dir(&repo_provider, &repo_owner, &repo_name);
 	if clone_opt.is_none() {
 		log::error!("[create_and_save_github_review_object] Unable to get clone url and directory for github review");
-		return None;
+		return (None,old_review_opt);
 	}
 	let (clone_url, clone_dir) = clone_opt.expect("Empty clone_opt");
-	let pr_id = deserialized_data["eventPayload"]["pull_request"]["number"].to_string().trim_matches('"').to_string();
 	let review = Review::new(
 		deserialized_data["eventPayload"]["pull_request"]["base"]["sha"].to_string().replace("\"", ""),
 		deserialized_data["eventPayload"]["pull_request"]["head"]["sha"].to_string().replace("\"", ""),
@@ -251,5 +252,5 @@ fn create_and_save_github_review_object(deserialized_data: &Value) -> Option<Rev
 	);
 	log::debug!("[create_and_save_github_review_object] github review object = {:?}", &review);
 	save_review_to_db(&review);
-	return Some(review);
+	return (Some(review), old_review_opt);
 }
