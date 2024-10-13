@@ -21,21 +21,19 @@ pub async fn process_relevance(hunkmap: &HunkMap, excluded_files: &Vec<StatItem>
 		}
 		let relevance_vec = relevance_vec_opt.expect("Empty coverage_obj_opt");
 		if repo_config.comment() {
-			// create comment text
-			let comment = relevant_reviewers_comment_text(&relevance_vec, repo_config.auto_assign(), excluded_files).await;
-			// add comment
-			if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
-				// TODO - add feature flag check
-				// TODO - add comment change check
-				if did_comment_change(&relevance_vec, &old_review_opt) {
+			if did_comment_change(&relevance_vec, &old_review_opt) {
+                // create comment text
+                let comment = relevant_reviewers_comment_text(&relevance_vec, repo_config.auto_assign(), excluded_files).await;
+                // add comment
+                if review.provider().to_string() == ProviderEnum::Bitbucket.to_string() {
+                        log::info!("Inserting comment on repo {}...", review.repo_name());
+                        bitbucket::comment::add_comment(&comment, review, &access_token).await;
+                }
+                if review.provider().to_string() == ProviderEnum::Github.to_string() {
                     log::info!("Inserting comment on repo {}...", review.repo_name());
-					bitbucket::comment::add_comment(&comment, review, &access_token).await;
-				} else { log::info!("No changes in author relevance, not adding comment...");}
-			}
-			if review.provider().to_string() == ProviderEnum::Github.to_string() {
-                log::info!("Inserting comment on repo {}...", review.repo_name());
-				github::comment::add_comment(&comment, review, &access_token).await;
-			}
+                    github::comment::add_comment(&comment, review, &access_token).await;
+                } else { log::info!("No changes in author relevance, not adding comment...");}
+            }
 		}
 		if repo_config.auto_assign() {
 			log::info!("Auto assigning reviewers for repo {}...", review.repo_name());
