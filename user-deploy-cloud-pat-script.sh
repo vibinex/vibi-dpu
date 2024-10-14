@@ -39,8 +39,6 @@ spec:
           value: $_GITHUB_PAT
         - name: PROVIDER
           value: $_PROVIDER
-        - name: LOG_LEVEL
-          value: Debug
 EOF
 
 # Display the generated YAML for debugging
