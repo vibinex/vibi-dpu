@@ -84,6 +84,7 @@ impl FunctionNameIdentifier {
         }
         let prompt_str = prompt_str_res.expect("Uncaught error in prompt_str_res");
         let final_prompt = format!("{}\nOutput - ", &prompt_str);
+        log::debug!("[FunctionNameIdentifier/function_name_in_line] code_line: {}", code_line);
         let prompt_response_opt =  call_llm_api(final_prompt).await;
         if prompt_response_opt.is_none() {
             log::error!("[FunctionNameIdentifier/function_name_in_line] Unable to call llm for code line: {:?}", code_line);
@@ -103,6 +104,7 @@ impl FunctionNameIdentifier {
         if func_name.get_function_name().is_empty() {
             return None;
         }
+        log::debug!("[FunctionNameIdentifier/function_name_in_line] func_name: {:?}", &func_name);
         self.cached_output.insert(code_line.trim().to_string(), func_name.get_function_name().to_string());
         return Some(func_name);
     }

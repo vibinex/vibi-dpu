@@ -340,6 +340,7 @@ impl ImportIdentifier {
         }
         let import_struct_str = import_struct_str_res.expect("Uncaught error in import_struct_str_res");
         let prompt_str = format!("{}\nOutput -", &import_struct_str);
+        log::debug!("[ImportIdentifier/get_import_path] code_chunk: {}", chunk);
         let import_path_opt = call_llm_api(prompt_str).await;
         // deserialize output
         if import_path_opt.is_none() {
@@ -358,6 +359,7 @@ impl ImportIdentifier {
             return None;
         }
         let import_path: ImportPathOutput = import_path_res.expect("Unacaught error in import_path_res");
+        log::debug!("[ImportIdentifier/get_import_path] import_path: {:?}", &import_path);
         if !import_path.get_matching_import().possible_file_path().is_empty() {
             return None;
         }
