@@ -44,7 +44,7 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, diff_graph: &DiffGraph,
 {
     let func_call_identifier_opt = FunctionCallIdentifier::new();
     if func_call_identifier_opt.is_none() {
-        log::error!("[incoming_edges] Unable to create new FunctionCallIdentifier");
+        log::error!("[outgoing_edges] Unable to create new FunctionCallIdentifier");
         return;
     }
     let mut func_call_identifier = func_call_identifier_opt.expect("Empty func_call_identifier_opt");
@@ -87,6 +87,11 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
     graph_elems: &mut MermaidGraphElements, edge_color: &str) 
 {
     for (source_filepath, src_file_hunks) in diff_graph.hunk_diff_map().file_line_map() {
+        let lang_opt = detect_language(source_filepath);
+        if lang_opt.is_none() {
+            log::error!("[process_func_calls] Unable to determine language: {}", source_filepath);
+            continue;
+        }
         let mut source_file_name = source_filepath.to_owned();
         // get func calls
         if let Some(source_file) = absolute_to_relative_path(source_filepath, review) {
@@ -98,34 +103,65 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
         } else {
             diff_hunks = src_file_hunks.deleted_hunks();
         }
-        let lang_opt = detect_language(source_filepath);
-        if lang_opt.is_none() {
-            log::error!("[get_import_path_file] Unable to determine language: {}", source_filepath);
-            return;
-        }
+        log::debug!("[process_func_calls] file name: {}\n, diff_hunks: {:?}, edge: {}", &source_file_name, diff_hunks, edge_color);
         let lang = lang_opt.expect("Empty lang_opt");
         let source_file_path = Path::new(source_filepath);
         let source_file_pathbuf = source_file_path.to_path_buf(); 
         if let Some(hunk_func_calls) = func_call_identifier.
                 function_calls_in_hunks(&source_file_pathbuf, &lang, diff_hunks).await {
             for (hunk_lines, func_call_output) in hunk_func_calls {
-                for dest_func_call in func_call_output.function_calls() {
-                    if let Some(import_filepath) = import_identifier.get_import_path_file(
-                        source_filepath, &lang, dest_func_call.function_name()).await {
-                        // get file
-                            // get diffgraph all files and see if they contain filepath
-                            let possible_diff_file_paths: Vec<&String> =  diff_graph.hunk_diff_map().all_files().into_iter()
-                                .filter(|file_path| file_path.contains(import_filepath.get_matching_import().possible_file_path())).collect();
-                            if !possible_diff_file_paths.is_empty() {
-                                for possible_diff_file_path in possible_diff_file_paths {
-                                    if diff_graph.hunk_diff_map().all_files().contains(&possible_diff_file_path)
-                                    {
-                                        let hunks_for_func = diff_graph.hunk_diff_map().file_line_map()
-                                            .get(possible_diff_file_path).expect("Empty entry in file_line_map");
-                                        if let Some(possible_file_rel) = absolute_to_relative_path(possible_diff_file_path, review) {
-                                            if let Some(dest_func_def_line) = hunks_for_func.is_func_in_hunks(dest_func_call.function_name()) {
-                                                if let Some(src_func_name) = hunk_lines.function_line() {
-                                                    if let Some(src_func_line_number) = hunk_lines.line_number() {
+                if let Some(src_func_name) = hunk_lines.function_line() {
+                    if let Some(src_func_line_number) = hunk_lines.line_number() {
+                        for dest_func_call in func_call_output.function_calls() {
+                            if let Some(import_filepath) = import_identifier.get_import_path_file(
+                                source_filepath, &lang, dest_func_call.function_name()).await {
+                                // get file
+                                // get diffgraph all files and see if they contain filepath
+                                let possible_diff_file_paths: Vec<&String> =  diff_graph.hunk_diff_map().all_files().into_iter()
+                                    .filter(|file_path| file_path.contains(import_filepath.get_matching_import().possible_file_path())).collect();
+                                log::debug!("[process_func_calls] possible_diff_file_paths = {:?}", &possible_diff_file_paths);
+                                if !possible_diff_file_paths.is_empty() {
+                                    for possible_diff_file_path in possible_diff_file_paths {
+                                        if diff_graph.hunk_diff_map().all_files().contains(&possible_diff_file_path)
+                                        {
+                                            log::debug!("[process_func_calls] possible_diff_file_path ={}", &possible_diff_file_path);
+                                            if let Some(possible_file_rel) = absolute_to_relative_path(possible_diff_file_path, review) {
+                                                let hunks_for_func = diff_graph.hunk_diff_map().file_line_map()
+                                                    .get(possible_diff_file_path).expect("Empty entry in file_line_map");
+                                                if let Some(dest_func_def_line) = hunks_for_func.is_func_in_hunks(dest_func_call.function_name(), edge_color) {
+                                                    graph_elems.add_edge(
+                                                        edge_color,
+                                                        dest_func_call.line_number().to_owned() as usize,
+                                                        src_func_name, 
+                                                        dest_func_call.function_name(), 
+                                                        &source_file_name,
+                                                        &possible_file_rel,
+                                                        "yellow",
+                                                        "",
+                                                        src_func_line_number,
+                                                        dest_func_def_line);
+                                                }                                            
+                                            }
+                                        }
+                                    }                                
+                                } else {
+                                    // search all files
+                                    // TODO - see if git checkout is needed
+                                    let possible_file_pathbufs: Vec<&PathBuf> = base_filepaths.iter()
+                                        .filter(|file_path| 
+                                            file_path.to_string_lossy().contains(import_filepath.get_matching_import().possible_file_path())).collect();
+                                    log::debug!("[process_func_calls] possible_file_pathbufs = {:?}", &possible_file_pathbufs);
+                                    if !possible_file_pathbufs.is_empty() {
+                                        for possible_file_pathbuf in possible_file_pathbufs {
+                                            let possible_file_path: String = possible_file_pathbuf.to_string_lossy().to_string();
+                                            if let Some(possible_file_rel) = 
+                                                                absolute_to_relative_path(&possible_file_path, review) {
+                                                // search only for func def with specific name
+                                                // if something comes up, add edge!
+                                                if let Some(func_def) = funcdef_identifier.function_defs_in_file(
+                                                    possible_file_pathbuf, &lang, dest_func_call.function_name()).await {
+                                                        log::debug!("[process_func_calls] func_def ={:#?}", &func_def);
+                                                    if let Some(dest_func_def_line) = func_def.get_function_line_number() {
                                                         graph_elems.add_edge(
                                                             edge_color,
                                                             dest_func_call.line_number().to_owned() as usize,
@@ -136,51 +172,16 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
                                                             "yellow",
                                                             "",
                                                             src_func_line_number,
-                                                            dest_func_def_line);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }                                
-                            } else {
-                                // search all files
-                                // TODO - see if git checkout is needed
-                                let possible_file_pathbufs: Vec<&PathBuf> = base_filepaths.iter()
-                                    .filter(|file_path| 
-                                        file_path.to_string_lossy().contains(import_filepath.get_matching_import().possible_file_path())).collect();
-                                if !possible_file_pathbufs.is_empty() {
-                                    for possible_file_pathbuf in possible_file_pathbufs {
-                                        let possible_file_path: String = possible_file_pathbuf.to_string_lossy().to_string();
-                                        // search only for func def with specific name
-                                        // if something comes up, add edge!
-                                        if let Some(func_defs) = funcdef_identifier.function_defs_in_file(
-                                            possible_file_pathbuf, &lang, dest_func_call.function_name()).await {
-                                            if let Some(dest_func_def_line) = func_defs.get_function_line_number() {
-                                                if let Some(src_func_name) = hunk_lines.function_line() {
-                                                    if let Some(src_func_line_number) = hunk_lines.line_number() {
-                                                        if let Some(possible_file_rel) = 
-                                                            absolute_to_relative_path(&possible_file_path, review) {
-                                                                graph_elems.add_edge(
-                                                                    edge_color,
-                                                                    dest_func_call.line_number().to_owned() as usize,
-                                                                    src_func_name, 
-                                                                    dest_func_call.function_name(), 
-                                                                    &source_file_name,
-                                                                    &possible_file_rel,
-                                                                    "yellow",
-                                                                    "",
-                                                                    src_func_line_number,
-                                                                    &dest_func_def_line);
-                                                        }
+                                                            &dest_func_def_line);
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
-                    }    
+                            }    
+                        }
+                    }
                 }
             }
         }    

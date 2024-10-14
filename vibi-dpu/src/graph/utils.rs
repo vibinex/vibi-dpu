@@ -20,7 +20,6 @@ struct LlmResponse {
 pub async fn call_llm_api(prompt: String) -> Option<String> {
     let client = get_client();
     let url = "http://34.100.208.132/api/generate";
-    log::debug!("[call_llm_api] Prompt = {:?}", &prompt);
     let response_res = client.post(url)
         .json(&json!({"model": "phind-codellama", "prompt": prompt}))
         .send()
@@ -76,11 +75,11 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
             }
         }
     }
+    log::debug!("[call_llm_api] final response = {}", &final_response);
     let final_response_trimmed = final_response.trim();
     if final_response_trimmed.starts_with("{") && !final_response_trimmed.ends_with("}") {
         final_response.push_str("}");
     }
-    log::debug!("[call_llm_api] final_response = {:?}", &final_response);
     Some(final_response)
 }
 

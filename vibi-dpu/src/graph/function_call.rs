@@ -267,7 +267,9 @@ impl FunctionCallIdentifier {
         let chunks = numbered_content.chunks(50);
         for chunk in chunks {
             let chunk_str = chunk.join("\n");
+            log::debug!("[FunctionCallIdentifier/functions_in_file] chunk = {}", &chunk_str);
             if let Some(mut func_calls) = self.functions_in_chunk(&chunk_str, filepath, lang).await {
+                log::debug!("[FunctionCallIdentifier/functions_in_file] chunk = {:?}", &func_calls);
                 all_func_calls.function_calls.append(&mut func_calls.function_calls);
             }
         }
@@ -346,7 +348,7 @@ impl FunctionCallIdentifier {
                 hunk_func_pairs.push((hunk.clone(), matching_func_calls_output));
             }
         }
-    
+        log::debug!("[FunctionCallIdentifier/function_calls_in_hunks] hunk_func_pairs = {:?}", &hunk_func_pairs);
         if hunk_func_pairs.is_empty() {
             None
         } else {

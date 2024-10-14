@@ -65,15 +65,14 @@ impl FileHunks {
         &mut self.added_hunks
     }
 
-    pub fn is_func_in_hunks(&self, function_name: &str) -> &Option<usize> {
-        for hunk_lines in self.added_hunks() {
-            if let Some(func_raw) = hunk_lines.function_line() {
-                if func_raw.contains(function_name) {
-                    return hunk_lines.line_number();
-                }
-            }
+    pub fn is_func_in_hunks(&self, function_name: &str, edge_color: &str) -> &Option<usize> {
+        let hunks;
+        if edge_color == "green" {
+            hunks = self.added_hunks();
+        } else {
+            hunks = self.deleted_hunks();
         }
-        for hunk_lines in self.deleted_hunks() {
+        for hunk_lines in hunks {
             if let Some(func_raw) = hunk_lines.function_line() {
                 if func_raw.contains(function_name) {
                     return hunk_lines.line_number();
