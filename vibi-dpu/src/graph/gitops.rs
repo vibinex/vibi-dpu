@@ -32,8 +32,8 @@ impl HunkDiffLines {
         &self.line_number
     }
 
-    pub fn set_line_number(&mut self, line_number: Option<usize>) {
-        self.line_number = line_number;
+    pub fn set_line_number(&mut self, line_number: usize) {
+        self.line_number = Some(line_number);
     }
 
     pub fn set_function_name(&mut self, function_name: String) {
@@ -197,8 +197,14 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
                 in_del_hunk = false;
 
                 // Extract the function name or any string after the last @@
-                if let Some(pos) = line.rfind("@@ ") {
-                    function_line = Some(line[(pos+3)..].to_string());
+                if let Some(pos) = line.rfind("@@") {
+                    function_line = None;
+                    if pos+2 < line.len() {
+                        let fline = line[(pos+2)..].trim().to_string();
+                        if fline.len() > 2 {
+                            function_line = Some(fline);
+                        }
+                    }
                 } else {
                     function_line = None; // Reset if no valid function line found
                 }

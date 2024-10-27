@@ -4,15 +4,29 @@ use serde::{Deserialize, Serialize};
 use super::utils::{call_llm_api, read_file, strip_json_prefix};
 
 // Struct to represent the output schema
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FunctionNameOutput {
     function_name: String,
+    entity_type: String,
+    status: String,
     notes: Option<String>,
 }
 
 impl FunctionNameOutput {
     pub fn get_function_name(&self) -> &String {
         &self.function_name
+    }
+
+    pub fn get_entity_type(&self) -> &String {
+        &self.entity_type
+    }
+
+    pub fn get_status(&self) -> &String {
+        &self.status
+    }
+
+    pub fn get_notes(&self) -> Option<&String> {
+        self.notes.as_ref()
     }
 }
 
@@ -47,7 +61,7 @@ impl FunctionNamePrompt {
 
 pub struct FunctionNameIdentifier {
     prompt: FunctionNamePrompt,
-    cached_output: HashMap<String, String>
+    cached_output: HashMap<String, FunctionNameOutput>
 }
 
 impl FunctionNameIdentifier {
@@ -69,12 +83,11 @@ impl FunctionNameIdentifier {
     }
 
     pub async fn function_name_in_line(&mut self, code_line: &str, lang: &str) -> Option<FunctionNameOutput> {
-        // concatenate functioncallsoutput for all chunks
-        if let Some(cached_func_name) = self.cached_output.get(code_line) {
-            return Some(FunctionNameOutput{ function_name: cached_func_name.to_string(), notes: None })
+        if let Some(cached_func_name) = self.cached_output.get(code_line.trim()) {
+            return Some(cached_func_name.to_owned());
         }
         let input = InputSchema{ code_line: code_line.to_string(), language: lang.to_string() };
-        self.prompt.input = Some(input);
+        self.prompt.set_input(input);
         let prompt_str_res = serde_json::to_string(&self.prompt);
         if prompt_str_res.is_err() {
             log::error!(
@@ -101,11 +114,11 @@ impl FunctionNameIdentifier {
             return None;
         }
         let func_name: FunctionNameOutput = deserialized_response.expect("Empty error in deserialized_response");
-        if func_name.get_function_name().is_empty() {
+        if func_name.get_status() != "valid" || func_name.get_function_name().is_empty() {
+            log::debug!("[FunctionNameIdentifier/function_name_in_line] Invalid name: {:#?}", func_name);
             return None;
         }
-        log::debug!("[FunctionNameIdentifier/function_name_in_line] func_name: {:?}", &func_name);
-        self.cached_output.insert(code_line.trim().to_string(), func_name.get_function_name().to_string());
+        self.cached_output.insert(code_line.trim().to_string(), func_name.clone());
         return Some(func_name);
     }
 }

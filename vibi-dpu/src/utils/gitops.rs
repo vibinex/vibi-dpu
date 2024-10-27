@@ -99,17 +99,17 @@ pub fn git_checkout_commit(review: &Review, commit_id: &str) {
 		.output();
 	if output_res.is_err() {
 		let e = output_res.expect_err("No error in output_res");
-		log::error!("[git_pull] failed to execute git pull: {:?}", e);
+		log::error!("[git_checkout_commit] failed to execute git checkout: {:?}", e);
 		return;
 	}
 	let output = output_res.expect("Uncaught error in output_res");
 	match str::from_utf8(&output.stderr) {
-		Ok(v) => log::debug!("[git_pull] git pull stderr = {:?}", v),
-		Err(e) => {/* error handling */ log::error!("[git_pull] git pull stderr error {}", e)}, 
+		Ok(v) => log::debug!("[git_checkout_commit] git checkout stderr = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[git_checkout_commit] git checkout stderr error {}", e)}, 
 	};
 	match str::from_utf8(&output.stdout) {
-		Ok(v) => log::debug!("[git_pull] git pull stdout = {:?}", v),
-		Err(e) => {/* error handling */ log::error!("[git_pull] git pull stdout error {}", e)}, 
+		Ok(v) => log::debug!("[git_checkout_commit] git checkout stdout = {:?}", v),
+		Err(e) => {/* error handling */ log::error!("[git_checkout_commit] git checkout stdout error {}", e)}, 
 	};
 }
 

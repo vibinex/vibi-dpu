@@ -1,47 +1,9 @@
 use std::{collections::HashSet, path::{Path, PathBuf}};
 use crate::utils::{gitops::git_checkout_commit, review::Review};
 
-use super::{elements::MermaidGraphElements, file_imports::ImportIdentifier, function_call::{function_calls_search, FunctionCallIdentifier}, function_line_range::{generate_function_map, get_function_def_for_func_call, FunctionDefIdentifier}, graph_info::DiffGraph, utils::{absolute_to_relative_path, detect_language}};
+use super::{elements::MermaidGraphElements, file_imports::{ImportDefIdentifier, ImportIdentifier, ImportLinesIdentifier}, function_call::{function_calls_search, FunctionCallIdentifier, FunctionCallValidator}, function_line_range::{generate_function_map, get_function_def_for_func_call, FunctionDefIdentifier}, graph_info::DiffGraph, utils::{absolute_to_relative_path, detect_language}};
 
 pub async fn graph_edges(base_filepaths: &Vec<PathBuf>, review: &Review, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
-    outgoing_edges(base_filepaths, diff_graph, graph_elems, review).await;
-    incoming_edges(review, diff_graph, graph_elems).await;
-}
-
-async fn incoming_edges(review: &Review, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
-    let func_def_identifier_opt = FunctionDefIdentifier::new();
-    if func_def_identifier_opt.is_none() {
-        log::debug!("[outgoing_edges] Unable to create func def identifier");
-        return;
-    }
-    let mut funcdef_identifier = func_def_identifier_opt.expect("Empty func_def_identifier_opt");
-    let func_call_identifier_opt = FunctionCallIdentifier::new();
-    if func_call_identifier_opt.is_none() {
-        log::error!("[incoming_edges] Unable to create new FunctionCallIdentifier");
-        return;
-    }
-    let mut func_call_identifier = func_call_identifier_opt.expect("Empty func_call_identifier_opt");
-    git_checkout_commit(review, review.pr_head_commit());
-    process_func_defs(
-        review,
-        diff_graph,
-        &mut func_call_identifier,
-        graph_elems,
-        "green"
-    ).await;
-    git_checkout_commit(review, review.base_head_commit());
-    process_func_defs(
-        review,
-        diff_graph,
-        &mut func_call_identifier,
-        graph_elems,
-        "red"
-    ).await;
-}
-
-async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, diff_graph: &DiffGraph,
-    graph_elems: &mut MermaidGraphElements, review: &Review) 
-{
     let func_call_identifier_opt = FunctionCallIdentifier::new();
     if func_call_identifier_opt.is_none() {
         log::error!("[outgoing_edges] Unable to create new FunctionCallIdentifier");
@@ -60,25 +22,80 @@ async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, diff_graph: &DiffGraph,
         return;
     }
     let mut funcdef_identifier = func_def_identifier_opt.expect("Empty func_def_identifier_opt");
+    outgoing_edges(base_filepaths, diff_graph, graph_elems, review, &mut func_call_identifier, &mut import_identifier, &mut funcdef_identifier).await;
+    incoming_edges(review, diff_graph, graph_elems).await;
+}
+
+async fn incoming_edges(review: &Review, diff_graph: &DiffGraph,
+    graph_elems: &mut MermaidGraphElements)
+{
+    let import_lines_identifier_opt = ImportLinesIdentifier::new();
+    if import_lines_identifier_opt.is_none() {
+        log::error!("[incoming_edges] Unable to initiate ImportLinesIdentifier");
+        return;
+    }
+    let mut import_lines_identifier = import_lines_identifier_opt.expect("Empty import_lines_identifier_opt");
+    let import_def_identifier_opt = ImportDefIdentifier::new();
+    if import_def_identifier_opt.is_none() {
+        log::error!("[incoming_edges] Unable to initiate ImportDefIdentifier");
+        return;
+    }
+    let mut import_def_identifier = import_def_identifier_opt.expect("Empty import_def_identifier_opt");
+    let func_call_validator_opt = FunctionCallValidator::new();
+    if func_call_validator_opt.is_none() {
+        log::error!("[incoming_edges] Unable to initiate FunctionCallValidator");
+        return;
+    }
+    let mut func_call_validator = func_call_validator_opt.expect("Empty func_call_validator_opt");
+    git_checkout_commit(review, review.pr_head_commit());
+    process_func_defs(
+        review,
+        diff_graph,
+        graph_elems,
+        &mut import_lines_identifier,
+        &mut import_def_identifier,
+        &mut func_call_validator,
+        "green"
+    ).await;
+    git_checkout_commit(review, review.base_head_commit());
+    process_func_defs(
+        review,
+        diff_graph,
+        graph_elems,
+        &mut import_lines_identifier,
+        &mut import_def_identifier,
+        &mut func_call_validator,
+        "red"
+    ).await;
+    log::debug!("[incoming_edges] Incoming edges processed");
+}
+
+async fn outgoing_edges(base_filepaths: &Vec<PathBuf>, diff_graph: &DiffGraph,
+    graph_elems: &mut MermaidGraphElements, review: &Review,
+    func_call_identifier: &mut FunctionCallIdentifier,
+    import_identifier: &mut ImportIdentifier,
+    funcdef_identifier: &mut FunctionDefIdentifier) 
+{
     git_checkout_commit(review, review.pr_head_commit());
     process_func_calls(
-        &mut import_identifier,
-        &mut func_call_identifier,
-        &mut funcdef_identifier,
+        import_identifier,
+        func_call_identifier,
+        funcdef_identifier,
         review,
         diff_graph,
         base_filepaths,
         graph_elems,
         "green").await;
     git_checkout_commit(review, review.base_head_commit());
-    process_func_calls(&mut import_identifier,
-        &mut func_call_identifier,
-        &mut funcdef_identifier,
+    process_func_calls(import_identifier,
+        func_call_identifier,
+        funcdef_identifier,
         review,
         diff_graph,
         base_filepaths,
         graph_elems,
         "red").await;
+    log::debug!("[outgoing_edges] Outgoing edges processed");
 }
 
 async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_identifier: &mut FunctionCallIdentifier,
@@ -110,7 +127,7 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
         if let Some(hunk_func_calls) = func_call_identifier.
                 function_calls_in_hunks(&source_file_pathbuf, &lang, diff_hunks).await {
             for (hunk_lines, func_call_output) in hunk_func_calls {
-                if let Some(src_func_name) = hunk_lines.function_line() {
+                if let Some(src_func_name) = hunk_lines.function_name() {
                     if let Some(src_func_line_number) = hunk_lines.line_number() {
                         for dest_func_call in func_call_output.function_calls() {
                             if let Some(import_filepath) = import_identifier.get_import_path_file(
@@ -190,8 +207,9 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
 }
 
 async fn process_func_defs(review: &Review,
-    diff_graph: &DiffGraph, func_call_identifier: &mut FunctionCallIdentifier,
-    graph_elems: &mut MermaidGraphElements, edge_color: &str) 
+    diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements,
+    import_lines_identifier: &mut ImportLinesIdentifier, import_def_identifier: &mut ImportDefIdentifier,
+    func_call_validator: &mut FunctionCallValidator, edge_color: &str)
 {
     for (dest_filename, dest_file_hunks) in diff_graph.hunk_diff_map().file_line_map() {
         let dest_lang_opt = detect_language(&dest_filename);
@@ -222,7 +240,8 @@ async fn process_func_defs(review: &Review,
                         log::debug!("[process_func_defs] No files detected having function call");
                         continue;
                     }
-                    for possible_filepath in possible_filepaths {
+                    // TODO FIXME - get one file name only once
+                    for (possible_filepath, line_num, line_content) in possible_filepaths {
                         if possible_filepath == *dest_filename {
                             continue;
                         }
@@ -238,33 +257,48 @@ async fn process_func_defs(review: &Review,
                         }
                         let possible_path = Path::new(&possible_filepath);
                         let possible_pathbuf = possible_path.to_path_buf();
-                        // get func call
-                        if let Some(func_calls) = func_call_identifier.functions_in_file(&possible_pathbuf, &lang).await {
-                            // get func def
-                            for func_call in func_calls.function_calls() {
-                                if let Some(src_func_def) = get_function_def_for_func_call(
-                                    &possible_pathbuf, func_call.line_number().to_owned() as usize
-                                ).await {
+                        if let Some(import_hunks) = import_lines_identifier.import_lines_range_in_file(&possible_pathbuf, &lang).await {
+                            // TODO FIXME - filter line_num for being in import range
+                            if let Some(import_def) = import_def_identifier.identify_import_def(&possible_pathbuf, &dest_func_name, &lang, &import_hunks).await {
+                                if func_call_validator.valid_func_calls_in_file(&possible_pathbuf, &lang, &dest_func_name, &line_content, &import_def).await {
                                     if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
-                                        // add edge
-                                        let mut dest_file_rel = dest_filename.to_string();
-                                        if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
-                                            dest_file_rel = dest_file_relative_path;
+                                        if let Some(src_func_def) = get_function_def_for_func_call(
+                                            &possible_pathbuf, line_num
+                                        ).await {
+                                            // add edge
+                                            let mut dest_file_rel = dest_filename.to_string();
+                                            if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
+                                                dest_file_rel = dest_file_relative_path;
+                                            }
+                                            graph_elems.add_edge(edge_color,
+                                            line_num,
+                                            src_func_def.name(),
+                                            dest_func_name,
+                                            &source_filename,
+                                            &dest_file_rel,
+                                            "",
+                                            "yellow",
+                                            src_func_def.line_start(),
+                                            dest_funcdef_line);
+                                        } else {
+                                            // Add edge for file subgroup
                                         }
-                                        graph_elems.add_edge(edge_color,
-                                        func_call.line_number().to_owned() as usize,
-                                        src_func_def.name(),
-                                        dest_func_name,
-                                        &source_filename,
-                                        &dest_file_rel,
-                                        "",
-                                        "yellow",
-                                        src_func_def.line_start(),
-                                        dest_funcdef_line);
                                     }
                                 }
                             }
                         }
+                        // if let Some(func_calls) = func_call_identifier.functions_in_file(&possible_pathbuf, &lang).await {
+                        //     // get func def
+                        //     for func_call in func_calls.function_calls() {
+                        //         if let Some(src_func_def) = get_function_def_for_func_call(
+                        //             &possible_pathbuf, func_call.line_number().to_owned() as usize
+                        //         ).await {
+                        //             if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
+                        //                 // add edge
+                                        
+                        //         }
+                        //     }
+                        // }
                     }
                 }
             }

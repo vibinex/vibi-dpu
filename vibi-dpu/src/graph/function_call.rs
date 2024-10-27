@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::io::BufRead;
 use crate::utils::review::Review;
 
-use super::{gitops::{HunkDiffLines, HunkDiffMap}, utils::{call_llm_api, detect_language, numbered_content, read_file, strip_json_prefix}};
+use super::{file_imports::ImportDefOutput, gitops::HunkDiffLines, utils::{call_llm_api, detect_language, numbered_content, read_file, strip_json_prefix}};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionCallChunk {
@@ -179,7 +179,7 @@ impl FunctionCallsOutput {
     }
 
     pub fn trim_empty_function_calls(&mut self) {
-        self.function_calls.retain(|func_call| !func_call.function_name().is_empty());
+        self.function_calls.retain(|func_call| !func_call.function_name().is_empty() && func_call.function_name().len() > 3);
     }
 }
 
@@ -269,7 +269,7 @@ impl FunctionCallIdentifier {
             let chunk_str = chunk.join("\n");
             log::debug!("[FunctionCallIdentifier/functions_in_file] chunk = {}", &chunk_str);
             if let Some(mut func_calls) = self.functions_in_chunk(&chunk_str, filepath, lang).await {
-                log::debug!("[FunctionCallIdentifier/functions_in_file] chunk = {:?}", &func_calls);
+                log::debug!("[FunctionCallIdentifier/functions_in_file] func_calls = {:?}", &func_calls);
                 all_func_calls.function_calls.append(&mut func_calls.function_calls);
             }
         }
@@ -316,36 +316,32 @@ impl FunctionCallIdentifier {
     }
 
     pub async fn function_calls_in_hunks(&mut self, filepath: &PathBuf, lang: &str, diff_hunks: &Vec<HunkDiffLines>) -> Option<Vec<(HunkDiffLines, FunctionCallsOutput)>> {
-        let func_calls_opt = self.functions_in_file(filepath, lang).await;
-        
-        if func_calls_opt.is_none() {
-            log::debug!("[FunctionCallIdentifier/function_calls_in_hunks] No func calls in {:?}", filepath);
+        let file_contents_res = std::fs::read_to_string(filepath.clone());
+        if file_contents_res.is_err() {
+            log::error!(
+                "[FunctionCallIdentifier/function_calls_in_hunks] Unable to read file: {:?}, error: {:?}",
+                &filepath, file_contents_res.expect_err("Empty error in file_contents_res")
+            );
             return None;
         }
-    
-        let func_calls = func_calls_opt.expect("Empty func_calls_opt");
-        
-        // Create a vector to store the result (HunkDiffLines, FunctionCallsOutput) tuples
+        let file_contents = file_contents_res.expect("Uncaught error in file_contents_res");
+        let numbered_content = numbered_content(file_contents);
         let mut hunk_func_pairs: Vec<(HunkDiffLines, FunctionCallsOutput)> = Vec::new();
-    
-        // For each hunk, find matching function calls
-        for hunk in diff_hunks {
-            // Collect function calls within this hunk's line range
-            let matching_func_calls: Vec<FunctionCall> = func_calls
-                .function_calls
-                .iter()
-                .filter(|function_call| {
-                    function_call.line_number >= *hunk.start_line() as u32 && function_call.line_number <= *hunk.end_line() as u32
-                })
-                .cloned()  // Clone the function calls so we can move them into the new FunctionCallsOutput
-                .collect();
-    
-            // If there are any matching function calls, create a FunctionCallsOutput and pair it with the hunk
-            if !matching_func_calls.is_empty() {
-                let mut matching_func_calls_output = func_calls.clone();
-                matching_func_calls_output.function_calls = matching_func_calls;
-    
-                hunk_func_pairs.push((hunk.clone(), matching_func_calls_output));
+        for diff_hunk in diff_hunks {
+            // TODO - what about full files?
+            let batch_size = 30;
+            let mut hunk_calls: FunctionCallsOutput = FunctionCallsOutput{ function_calls: vec![], notes: None };
+            for start in (diff_hunk.start_line().to_owned()..diff_hunk.end_line().to_owned()).step_by(batch_size) {
+                let end = usize::min(start + batch_size, diff_hunk.end_line().to_owned());
+                let chunk_slice = &numbered_content[start..end];
+                let chunk_str = chunk_slice.join("\n");
+                if let Some(mut func_calls) = self.functions_in_chunk(&chunk_str, filepath, lang).await {
+                    log::debug!("[FunctionCallIdentifier/function_calls_in_hunks] chunk = {:?}", &func_calls);
+                    hunk_calls.function_calls.append(&mut func_calls.function_calls);
+                }
+            }
+            if !hunk_calls.function_calls().is_empty() {
+                hunk_func_pairs.push((diff_hunk.clone(), hunk_calls));
             }
         }
         log::debug!("[FunctionCallIdentifier/function_calls_in_hunks] hunk_func_pairs = {:?}", &hunk_func_pairs);
@@ -358,40 +354,200 @@ impl FunctionCallIdentifier {
     
 }
 
-pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -> Option<HashSet<String>>{
+pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -> Option<HashSet<(String, usize, String)>>{
     let pattern = format!(r"{}\([^\)]*\)", function_name); // Regex pattern for the specific function call
-    let directory = review.clone_dir();             // The directory to search in (current directory here)
+    let directory = review.clone_dir();                    // The directory to search in
 
-    // Spawn the ripgrep process, adding `-l` for filenames
+    // Spawn the ripgrep process, adding `-n` for line numbers and `-H` for filename with matches
     let rg_command_res = Command::new("rg")
-        .arg("-l")               // Print only filenames that contain matches
+        .arg("-n")               // Print line numbers for matching lines
+        .arg("-H")               // Print the filename with matches
         .arg("-e")               // Use regular expression
         .arg(pattern)            // The regex pattern for function calls
         .arg(directory)          // Directory to search
         .stdout(Stdio::piped())  // Pipe the output
-        .spawn();               // Spawn the ripgrep process
+        .spawn();                // Spawn the ripgrep process
+
     if rg_command_res.is_err() {
-        log::error!("[function_calls_search] error in rg command: {:?}",
-            rg_command_res.expect_err("Empty error in rg_command_res"));
+        log::error!(
+            "[function_calls_search] error in rg command: {:?}",
+            rg_command_res.expect_err("Empty error in rg_command_res")
+        );
         return None;
     }
+
     let rg_command = rg_command_res.expect("Uncaught error in rg_command_res");
     // Capture the stdout of ripgrep
     let stdout = rg_command.stdout.expect("Failed to capture stdout");
     let reader = BufReader::new(stdout);
 
-    // Use a HashSet to avoid duplicate filenames
-    let mut files: HashSet<String> = HashSet::new();
+    // Use a HashSet to avoid duplicate entries (file, line_number)
+    let mut results: HashSet<(String, usize, String)> = HashSet::new();
 
     // Read the output line by line
     for line in reader.lines() {
-        if let Ok(file) = line { // Each line is an absolute filename with a match
-            if let Some(file_lang) = detect_language(&file) {
-                if lang == &file_lang {
-                    files.insert(file);
-                }    
+        if let Ok(output) = line {
+            // Each line has the format: "filename:line_number:match"
+            let parts: Vec<&str> = output.splitn(3, ':').collect();
+            if parts.len() >= 3 {
+                let file = parts[0].to_string();
+                if let Some(file_lang) = detect_language(&file) {
+                    if lang == &file_lang {
+                        if let Ok(line_number) = parts[1].parse::<usize>() {
+                            let matching_line = parts[2].to_string();
+                            results.insert((file, line_number, matching_line));
+                        }
+                    }
+                }
             }
         }
     }
-    return Some(files);
+
+    Some(results)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct FunctionCallValidatorInput {
+    code_line: String,               // A line of code that potentially contains the function call or object usage
+    function_or_object_name: String, // The name of the function or object being used
+    file_path: String,               // The file path or module from which the function or object is imported
+    import_statement: String,        // The actual import statement for the function or object
+    language: String,                // The programming language of the code
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FunctionCallValidatorOutput {
+    is_valid_usage: bool,            // True if the line is a valid usage of the function or object, false otherwise
+    status: String,                  // Status: "valid", "no_match", "invalid_input", or "insufficient_context"
+}
+
+impl FunctionCallValidatorOutput {
+    pub fn is_valid_function_call(&self) -> bool {
+        if self.status == "valid" && self.is_valid_usage {
+            return true;
+        }
+        return false;
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct FunctionCallValidatorInstructions {
+    input_schema: FunctionCallValidatorInput,       // Schema for the input
+    output_schema: FunctionCallValidatorOutput,     // Schema for the output
+    task_description: String,        // Description of the task
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FunctionCallValidatorPrompt {
+    instructions: FunctionCallValidatorInstructions,      // Instructions for the LLM
+    sample_input: FunctionCallValidatorInput,       // Example of the input
+    expected_output: FunctionCallValidatorOutput,   // Example of the expected output
+    input: Option<FunctionCallValidatorInput>
+}
+
+impl FunctionCallValidatorPrompt {
+    pub fn set_input(&mut self, input: FunctionCallValidatorInput) {
+        self.input = Some(input);
+    }
+}
+
+pub struct FunctionCallValidator {
+    prompt: FunctionCallValidatorPrompt
+}
+
+impl FunctionCallValidator {
+    pub fn new() -> Option<Self> {
+        let system_prompt_opt = read_file("/app/prompts/prompt_function_call_validator");
+        if system_prompt_opt.is_none() {
+            log::debug!("[FunctionCallValidator/new] Unable to read prompt_function_call_validator");
+            return None;
+        }
+        let system_prompt_str = system_prompt_opt.expect("Empty system_prompt_opt");
+        let sys_prompt_struct_res = serde_json::from_str(&system_prompt_str);
+        if sys_prompt_struct_res.is_err() {
+            log::debug!("[FunctionCallValidator/new] Unable to deserialize sys prompt: {:?}",
+                sys_prompt_struct_res.expect_err("Empty error"));
+            return None;
+        }
+        let sys_prompt_struct: FunctionCallValidatorPrompt = sys_prompt_struct_res.expect("Uncaught error in sys_prompt_struct_res");
+        return Some(Self {
+            prompt: sys_prompt_struct
+        });
+    }
+
+    pub async fn valid_func_calls_in_file(&mut self, file_path_buf: &PathBuf, lang: &str, 
+        func_name: &str, func_call_line: &str, import_def: &ImportDefOutput) -> bool {
+        let file_contents_res = std::fs::read_to_string(file_path_buf);
+        if file_contents_res.is_err() {
+            let e = file_contents_res.expect_err("Empty error in file_content_res");
+            log::error!("[ImportLinesIdentifier/import_lines_range_in_file] Unable to read file: {:?}, error: {:?}", file_path_buf, e);
+            return false;
+        }
+        let file_contents = file_contents_res.expect("Uncaught error in file_content_res");
+        let numbered_content = numbered_content(file_contents);
+        let import_line_opt = import_def.line_range();
+        if import_line_opt.is_none() {
+            log::error!(
+                "[FunctionCallValidator/valid_func_calls_in_file] No line range in import def: {:#?}",
+                &import_def);
+            return false;
+        }
+        let import_line_range = import_line_opt.as_ref().expect("EMpty import_line_opt");
+        let import_content = numbered_content[
+            (import_line_range.start_line().to_owned() - 1)..(import_line_range.end_line().to_owned() - 1)
+            ].join("\n");
+        let call_validity = self.valid_func_calls(
+            &import_content, &func_call_line, func_name,
+            &file_path_buf.to_string_lossy(), lang).await;
+        return call_validity;
+    }
+
+    async fn valid_func_calls(&mut self, import_content: &str, code_chunk: &str, 
+        func_name: &str, file_path: &str, lang: &str) -> bool
+    {
+        let func_call_validator_input = FunctionCallValidatorInput {
+            code_line: code_chunk.to_owned(),
+            function_or_object_name: func_name.to_owned(),
+            file_path: file_path.to_owned(),
+            import_statement: import_content.to_owned(),
+            language: lang.to_owned(),
+        };
+        self.prompt.set_input(func_call_validator_input);
+        let func_call_validator_prompt_res = serde_json::to_string(&self.prompt);
+        if func_call_validator_prompt_res.is_err() {
+            log::debug!(
+                "[FunctionCallValidator/valid_func_calls] Unable to deserialize prompt struct: {:?}",
+                func_call_validator_prompt_res.expect_err("Empty error in func_call_validator_prompt_res"));
+            return false;
+        }
+        let func_call_validator_prompt_str = func_call_validator_prompt_res.expect("Uncaught error in import_def_prompt_str_res");
+        let prompt_str = format!("{}\nOutput -", &func_call_validator_prompt_str);
+        log::debug!("[FunctionCallValidator/valid_func_calls] prompt_str: {}", &prompt_str);
+        let validator_str_opt = call_llm_api(prompt_str).await;
+        // deserialize output
+        if validator_str_opt.is_none() {
+            log::debug!("[FunctionCallValidator/valid_func_calls] Unable to call llm api");
+            return false;
+        }
+        let mut validator_str = validator_str_opt.expect("Empty validator_str_opt");
+        if let Some(stripped_json) = strip_json_prefix(&validator_str) {
+            validator_str = stripped_json.to_string();
+        }
+        let validator_res = serde_json::from_str(&validator_str);
+        if validator_res.is_err() {
+            log::debug!(
+                "[FunctionCallValidator/valid_func_calls] Unable to deserialize func call validator output : {:?}",
+                validator_res.expect_err("Empty error in validator_res"));
+            return false;
+        }
+        let call_validator_output: FunctionCallValidatorOutput = validator_res.expect("Uncaught error in import_def_res");
+        log::debug!("[FunctionCallValidator/valid_func_calls] import_def: {:?}", &call_validator_output);
+        if !call_validator_output.is_valid_function_call() {
+            log::debug!(
+                "[FunctionCallValidator/valid_func_calls] Invalid function call: {:#?}, for chunk: {} ",
+                &call_validator_output, code_chunk);
+            return false;
+        }
+        return true;
+    }
 }
