@@ -199,15 +199,38 @@ pub fn absolute_to_relative_path(abs_path: &str, review: &Review) -> Option<Stri
     return Some(rel_path.to_str().expect("Unable to deserialze rel_path").to_string());
 }
 
-pub fn strip_json_prefix(json_str: &str) -> Option<&str> {
+pub fn strip_json_prefix(json_str: &str) -> Option<String> {
+    let mut extracted_json = json_str.to_string();
     if let Some(start) = json_str.find("```json") {
         // Find the end of "```" after the "```json"
         if let Some(end) = json_str[start + 7..].find("```") {
             // Return the substring between "```json" and "```"
-            return Some(&json_str[start + 7..start + 7 + end]);
+            extracted_json = json_str[start + 7..start + 7 + end].to_string();
         }
     }
-    return None;
+    if extracted_json.starts_with('[') && extracted_json.ends_with(']') {
+        // Slice the string to remove the first and last characters
+        extracted_json = extracted_json[1..extracted_json.len() - 1].to_string();
+        
+    }
+    extracted_json = fix_unbalanced_json(&extracted_json);
+    return Some(extracted_json);
+}
+
+
+fn fix_unbalanced_json(json_str: &str) -> String {
+    let mut fixed_json = json_str.to_string();
+    
+    // Count the number of opening and closing curly braces
+    let open_brace_count = fixed_json.matches('{').count();
+    let close_brace_count = fixed_json.matches('}').count();
+    
+    // Add missing closing braces if needed
+    if open_brace_count > close_brace_count {
+        fixed_json.push('}');
+    }
+    
+    return fixed_json;
 }
 
 // Generate a map of file extensions to languages or frameworks

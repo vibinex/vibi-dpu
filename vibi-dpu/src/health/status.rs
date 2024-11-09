@@ -41,7 +41,7 @@ async fn send_status(status: &str) {
     }
     let datetime = datetime_opt.expect("Empty datetime");
     let formatted_timestamp = datetime.to_rfc3339();
-    log::debug!("[] ==========<><><><><>===== now_ts = {:?}", &formatted_timestamp);
+    log::debug!("[send_status] ==========<><><><><>===== now_ts = {:?}", &formatted_timestamp);
     let client = get_client();
 	let status_url = format!("{base_url}/api/dpu/health");
     let body = HealthStatus {

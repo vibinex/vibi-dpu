@@ -6,15 +6,15 @@ use super::utils::{call_llm_api, read_file, strip_json_prefix};
 // Struct to represent the output schema
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FunctionNameOutput {
-    function_name: String,
+    name: String,
     entity_type: String,
     status: String,
     notes: Option<String>,
 }
 
 impl FunctionNameOutput {
-    pub fn get_function_name(&self) -> &String {
-        &self.function_name
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
 
     pub fn get_entity_type(&self) -> &String {
@@ -114,7 +114,7 @@ impl FunctionNameIdentifier {
             return None;
         }
         let func_name: FunctionNameOutput = deserialized_response.expect("Empty error in deserialized_response");
-        if func_name.get_status() != "valid" || func_name.get_function_name().is_empty() {
+        if func_name.get_status() != "valid" || func_name.get_name().is_empty() {
             log::debug!("[FunctionNameIdentifier/function_name_in_line] Invalid name: {:#?}", func_name);
             return None;
         }

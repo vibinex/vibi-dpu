@@ -332,7 +332,8 @@ impl FunctionCallIdentifier {
             let batch_size = 30;
             let mut hunk_calls: FunctionCallsOutput = FunctionCallsOutput{ function_calls: vec![], notes: None };
             for start in (diff_hunk.start_line().to_owned()..diff_hunk.end_line().to_owned()).step_by(batch_size) {
-                let end = usize::min(start + batch_size, diff_hunk.end_line().to_owned());
+                let end = usize::min(start + batch_size, diff_hunk.end_line().to_owned() + 1);
+                log::debug!("[function_calls_in_hunks] start = {:?}, end = {:?}", &start, &end);
                 let chunk_slice = &numbered_content[start..end];
                 let chunk_str = chunk_slice.join("\n");
                 if let Some(mut func_calls) = self.functions_in_chunk(&chunk_str, filepath, lang).await {
@@ -407,12 +408,18 @@ pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct FunctionCallValidatorInput {
+pub struct FunctionCallValidatorInput {
     code_line: String,               // A line of code that potentially contains the function call or object usage
     function_or_object_name: String, // The name of the function or object being used
     file_path: String,               // The file path or module from which the function or object is imported
     import_statement: String,        // The actual import statement for the function or object
     language: String,                // The programming language of the code
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct FunctionCallValidatorOutputSchema {
+    is_valid_usage: String,
+    status: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -433,7 +440,7 @@ impl FunctionCallValidatorOutput {
 #[derive(Serialize, Deserialize, Debug)]
 struct FunctionCallValidatorInstructions {
     input_schema: FunctionCallValidatorInput,       // Schema for the input
-    output_schema: FunctionCallValidatorOutput,     // Schema for the output
+    output_schema: FunctionCallValidatorOutputSchema,     // Schema for the output
     task_description: String,        // Description of the task
 }
 
@@ -451,6 +458,7 @@ impl FunctionCallValidatorPrompt {
     }
 }
 
+#[derive(Debug)]
 pub struct FunctionCallValidator {
     prompt: FunctionCallValidatorPrompt
 }

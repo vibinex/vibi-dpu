@@ -187,7 +187,19 @@ struct ImportLinesInput {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct ImportRange {
+struct ImportRangeOutputSchema {
+    start_line: String,
+    end_line: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ImportLinesRangeOutputSchema {
+    import_ranges: Vec<ImportRangeOutputSchema>,
+    status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ImportRange {
     start_line: usize, // The starting line number of the import range (inclusive)
     end_line: usize,   // The ending line number of the import range (inclusive)
 }
@@ -219,13 +231,19 @@ impl ImportLinesRange {
         }
         return true;
     }
+
+    pub fn remove_outside_range(&mut self, start_idx: usize, end_idx: usize) {
+        self.import_ranges.retain(|range| {
+            range.start_line >= start_idx && range.end_line <= end_idx
+        });
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ImportLinesInstructions {
-    pub input_schema: ImportLinesInput,   // Schema for the input
-    pub output_schema: ImportLinesRange, // Schema for the output
-    pub task_description: String,    // Description of the task
+struct ImportLinesInstructions {
+    input_schema: ImportLinesInput,   // Schema for the input
+    output_schema: ImportLinesRangeOutputSchema, // Schema for the output
+    task_description: String,    // Description of the task
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -242,6 +260,7 @@ impl ImportLinesPrompt {
     }
 }
 
+#[derive(Debug)]
 pub struct ImportLinesIdentifier {
     prompt: ImportLinesPrompt
 }
@@ -275,11 +294,14 @@ impl ImportLinesIdentifier {
         }
         let file_contents = file_contents_res.expect("Uncaught error in file_content_res");
         let numbered_content = numbered_content(file_contents);
-        let chunks = numbered_content.chunks(20);
+        let chunk_size: usize = 20;
+        let chunks = numbered_content.chunks(chunk_size);
         let mut results = Vec::<ImportLinesRange>::new();
-        for chunk in chunks {
+        for (idx, chunk) in chunks.enumerate() {
             let chunk_str = chunk.join("\n");
-            let import_lines_opt = self.import_lines_in_chunk(&chunk_str, lang).await;
+            let start_idx = chunk_size*idx;
+            let end_idx = start_idx + chunk_size - 1;
+            let import_lines_opt = self.import_lines_in_chunk(&chunk_str, lang, start_idx, end_idx).await;
             if import_lines_opt.is_some() {
                 results.push(import_lines_opt.expect("Empty import_lines_opt"));
             }
@@ -290,7 +312,7 @@ impl ImportLinesIdentifier {
         return Some(results);
     }
 
-    async fn import_lines_in_chunk(&mut self, chunk_code: &str, lang: &str) -> Option<ImportLinesRange> {
+    async fn import_lines_in_chunk(&mut self, chunk_code: &str, lang: &str, start_idx: usize, end_idx: usize) -> Option<ImportLinesRange> {
         let prompt_input = ImportLinesInput{
             code_chunk: chunk_code.to_string(),
             language: lang.to_string(),
@@ -323,7 +345,7 @@ impl ImportLinesIdentifier {
                 import_lines_res.expect_err("Empty error in import_lines_res"));
             return None;
         }
-        let import_lines: ImportLinesRange = import_lines_res.expect("Uncaught error in import_lines_res");
+        let mut import_lines: ImportLinesRange = import_lines_res.expect("Uncaught error in import_lines_res");
         log::debug!("[ImportLinesIdentifier/import_lines_in_chunk] import_lines: {:?}", &import_lines);
         if !import_lines.valid_status() || import_lines.import_ranges().is_empty() {
             log::debug!(
@@ -331,6 +353,7 @@ impl ImportLinesIdentifier {
                 &import_lines, chunk_code);
             return None;
         }
+        import_lines.remove_outside_range(start_idx, end_idx);
         return Some(import_lines);
     }
 }
@@ -359,6 +382,12 @@ impl LineRange {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+struct ImportDefOutputSchema {
+    line_range: String,         // The line number where the import statement occurs (if found)
+    status: String,                     // Status: "valid", "no_match", "invalid_input", or "insufficient_context"
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ImportDefOutput {
     line_range: Option<LineRange>,         // The line number where the import statement occurs (if found)
     status: String,                     // Status: "valid", "no_match", "invalid_input", or "insufficient_context"
@@ -379,16 +408,16 @@ impl ImportDefOutput {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ImportDefInstructions {
-    input_schema: ImportDefInput,          // Schema for the input
-    output_schema: ImportDefOutput,        // Schema for the output
-    task_description: String,           // Description of the task
+    input_schema: ImportDefInput,
+    output_schema: ImportDefOutputSchema,
+    task_description: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ImportDefPrompt {
-    instructions: ImportDefInstructions,         // Instructions for the LLM
-    sample_input: ImportDefInput,          // Example of the input
-    expected_output: ImportDefOutput,      // Example of the expected output
+    instructions: ImportDefInstructions,
+    sample_input: ImportDefInput,
+    expected_output: ImportDefOutput,
     input: Option<ImportDefInput>
 }
 
@@ -435,10 +464,10 @@ impl ImportDefIdentifier {
         for import_range in import_hunks {
             let chunk_ranges = import_range.import_ranges();
             for chunk_range in chunk_ranges {
-                let start_idx = chunk_range.start_line().to_owned() - 1;
-                let end_idx = chunk_range.end_line().to_owned() - 1;  
-                if end_idx <= numbered_content_len 
-                    && start_idx <= numbered_content_len 
+                let start_idx = chunk_range.start_line().to_owned();
+                let end_idx = chunk_range.end_line().to_owned() + 1;  
+                if end_idx <= numbered_content_len
+                    && start_idx < numbered_content_len 
                 {
                     let import_content = &numbered_content[start_idx..end_idx].join("\n");
                     if let Some(import_def) = self.identify_import_in_range(
