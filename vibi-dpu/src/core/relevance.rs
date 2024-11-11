@@ -189,10 +189,10 @@ async fn relevant_reviewers_comment_text(relevance_vec: &Vec<Relevance>, auto_as
     comment += "| -------------- | --------------- |\n";  // Added a newline at the end
 
     let (deduplicated_relevance_map, unmapped_aliases) = deduplicated_relevance_vec_for_comment(relevance_vec);
-    let mut deduplicated_relevance_vec: Vec<(&Vec<String>, &f32)> = deduplicated_relevance_map.iter().collect();
-    deduplicated_relevance_vec.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // I couldn't find a way to avoid unwrap here :(
+    let (filtered_relevance_vec, remaining_relevance_vec) = filter_deduplicated_relevance_map(
+        &deduplicated_relevance_map, 8, 0.1);
     
-    for (provider_ids, relevance) in &deduplicated_relevance_vec {
+    for (provider_ids, relevance) in &filtered_relevance_vec {
         let provider_id_opt = provider_ids.iter().next();
         if provider_id_opt.is_some() {
             let provider_id = provider_id_opt.expect("Empty provider_id_opt");
@@ -224,6 +224,31 @@ async fn relevant_reviewers_comment_text(relevance_vec: &Vec<Relevance>, auto_as
     comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
     comment += "To change comment and auto-assign settings, go to [your Vibinex settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
     return comment;
+}
+
+fn filter_deduplicated_relevance_map(deduplicated_relevance_map: &HashMap<Vec<String>, f32>,
+    k: usize, threshold: f32)
+-> (Vec<(&Vec<String>, &f32)>, Vec<(&Vec<String>, &f32)>) {
+     // Step 1: Collect and sort by relevance (f32) in descending order
+     let mut deduplicated_relevance_vec: Vec<(&Vec<String>, &f32)> = deduplicated_relevance_map.iter().collect();
+     deduplicated_relevance_vec.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+ 
+     // Step 2: Split into top-k elements and everything else
+     let top_k_and_filtered: Vec<_> = deduplicated_relevance_vec
+         .iter()
+         .take(k)
+         .filter(|&&(_, &value)| value > threshold)
+         .cloned()
+         .collect();
+ 
+     let remaining: Vec<_> = deduplicated_relevance_vec
+         .iter()
+         .skip(k)
+         .chain(deduplicated_relevance_vec.iter().take(k).filter(|&&(_, &value)| value <= threshold))
+         .cloned()
+         .collect();
+ 
+     (top_k_and_filtered, remaining)
 }
 
 pub fn deduplicated_relevance_vec_for_comment(relevance_vec: &Vec<Relevance>) -> (HashMap<Vec<String>, f32>, Vec<String>) {

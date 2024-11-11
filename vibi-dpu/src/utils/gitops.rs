@@ -179,7 +179,7 @@ fn process_statoutput(statstr: &str) -> Option<(Vec<StatItem>, Vec<StatItem>)>{
     let statvec = process_statitems(statstr);
     let mut excluded_files = Vec::<StatItem>::new();
     let mut filtered_files = Vec::<StatItem>::new();
-    let line_threshold = 500;
+    let line_threshold = 5500;
     for item in statvec {
         // logic for exclusion
         if (item.additions > line_threshold) || 
