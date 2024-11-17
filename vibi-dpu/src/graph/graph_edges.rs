@@ -241,7 +241,7 @@ async fn process_func_defs(review: &Review,
                         continue;
                     }
                     // TODO FIXME - get one file name only once
-                    for (possible_filepath, line_num, line_content) in possible_filepaths {
+                    for (possible_filepath, lines_info) in possible_filepaths {
                         if possible_filepath == *dest_filename {
                             continue;
                         }
@@ -259,46 +259,36 @@ async fn process_func_defs(review: &Review,
                         let possible_pathbuf = possible_path.to_path_buf();
                         if let Some(import_hunks) = import_lines_identifier.import_lines_range_in_file(&possible_pathbuf, &lang).await {
                             // TODO FIXME - filter line_num for being in import range
-                            if let Some(import_def) = import_def_identifier.identify_import_def(&possible_pathbuf, &dest_func_name, &lang, &import_hunks).await {
-                                if func_call_validator.valid_func_calls_in_file(&possible_pathbuf, &lang, &dest_func_name, &line_content, &import_def).await {
-                                    if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
-                                        if let Some(src_func_def) = get_function_def_for_func_call(
-                                            &possible_pathbuf, line_num
-                                        ).await {
-                                            // add edge
-                                            let mut dest_file_rel = dest_filename.to_string();
-                                            if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
-                                                dest_file_rel = dest_file_relative_path;
+                            for (line_num, line_content) in lines_info {
+                                if let Some(import_def) = import_def_identifier.identify_import_def(&possible_pathbuf, &dest_func_name, &lang, &import_hunks).await {
+                                    if func_call_validator.valid_func_calls_in_file(&possible_pathbuf, &lang, &dest_func_name, &line_content, &import_def).await {
+                                        if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
+                                            if let Some(src_func_def) = get_function_def_for_func_call(
+                                                &possible_pathbuf, line_num
+                                            ).await {
+                                                // add edge
+                                                let mut dest_file_rel = dest_filename.to_string();
+                                                if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
+                                                    dest_file_rel = dest_file_relative_path;
+                                                }
+                                                graph_elems.add_edge(edge_color,
+                                                line_num,
+                                                src_func_def.name(),
+                                                dest_func_name,
+                                                &source_filename,
+                                                &dest_file_rel,
+                                                "",
+                                                "yellow",
+                                                src_func_def.line_start(),
+                                                dest_funcdef_line);
+                                            } else {
+                                                // Add edge for file subgroup
                                             }
-                                            graph_elems.add_edge(edge_color,
-                                            line_num,
-                                            src_func_def.name(),
-                                            dest_func_name,
-                                            &source_filename,
-                                            &dest_file_rel,
-                                            "",
-                                            "yellow",
-                                            src_func_def.line_start(),
-                                            dest_funcdef_line);
-                                        } else {
-                                            // Add edge for file subgroup
                                         }
                                     }
                                 }
                             }
                         }
-                        // if let Some(func_calls) = func_call_identifier.functions_in_file(&possible_pathbuf, &lang).await {
-                        //     // get func def
-                        //     for func_call in func_calls.function_calls() {
-                        //         if let Some(src_func_def) = get_function_def_for_func_call(
-                        //             &possible_pathbuf, func_call.line_number().to_owned() as usize
-                        //         ).await {
-                        //             if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
-                        //                 // add edge
-                                        
-                        //         }
-                        //     }
-                        // }
                     }
                 }
             }

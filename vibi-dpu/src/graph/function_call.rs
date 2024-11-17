@@ -355,7 +355,7 @@ impl FunctionCallIdentifier {
     
 }
 
-pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -> Option<HashSet<(String, usize, String)>>{
+pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -> Option<HashMap<String, Vec<(usize, String)>>>{
     let pattern = format!(r"{}\([^\)]*\)", function_name); // Regex pattern for the specific function call
     let directory = review.clone_dir();                    // The directory to search in
 
@@ -383,7 +383,7 @@ pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -
     let reader = BufReader::new(stdout);
 
     // Use a HashSet to avoid duplicate entries (file, line_number)
-    let mut results: HashSet<(String, usize, String)> = HashSet::new();
+    let mut results: HashMap<String, Vec<(usize, String)>> = HashMap::new();
 
     // Read the output line by line
     for line in reader.lines() {
@@ -396,7 +396,13 @@ pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -
                     if lang == &file_lang {
                         if let Ok(line_number) = parts[1].parse::<usize>() {
                             let matching_line = parts[2].to_string();
-                            results.insert((file, line_number, matching_line));
+                            if let Some(results_vec) = results.get_mut(&file) {
+                                results_vec.push((line_number, matching_line));
+                            } else {
+                                let mut results_vec = Vec::new();
+                                results_vec.push((line_number, matching_line));
+                                results.insert(file, results_vec);
+                            }
                         }
                     }
                 }
