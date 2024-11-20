@@ -207,6 +207,11 @@ pub fn strip_json_prefix(json_str: &str) -> Option<String> {
             // Return the substring between "```json" and "```"
             extracted_json = json_str[start + 7..start + 7 + end].to_string();
         }
+    } else if let Some(start) = json_str.find("```") {
+        if let Some(end) = json_str[start + 7..].find("```") {
+            // Return the substring between "```" and "```"
+            extracted_json = json_str[start + 3..start + 3 + end].to_string();
+        }
     }
     if extracted_json.starts_with('[') && extracted_json.ends_with(']') {
         // Slice the string to remove the first and last characters

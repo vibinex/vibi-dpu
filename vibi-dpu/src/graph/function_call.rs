@@ -393,16 +393,14 @@ pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -
             if parts.len() >= 3 {
                 let file = parts[0].to_string();
                 if let Some(file_lang) = detect_language(&file) {
-                    if lang == &file_lang {
-                        if let Ok(line_number) = parts[1].parse::<usize>() {
-                            let matching_line = parts[2].to_string();
-                            if let Some(results_vec) = results.get_mut(&file) {
-                                results_vec.push((line_number, matching_line));
-                            } else {
-                                let mut results_vec = Vec::new();
-                                results_vec.push((line_number, matching_line));
-                                results.insert(file, results_vec);
-                            }
+                    if let Ok(line_number) = parts[1].parse::<usize>() {
+                        let matching_line = parts[2].to_string();
+                        if let Some(results_vec) = results.get_mut(&file) {
+                            results_vec.push((line_number, matching_line));
+                        } else {
+                            let mut results_vec = Vec::new();
+                            results_vec.push((line_number, matching_line));
+                            results.insert(file, results_vec);
                         }
                     }
                 }

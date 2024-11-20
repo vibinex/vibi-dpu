@@ -271,7 +271,7 @@ async fn process_func_defs(review: &Review,
                                                 if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
                                                     dest_file_rel = dest_file_relative_path;
                                                 }
-                                                graph_elems.add_edge(edge_color,
+                                                graph_elems.add_edge("",
                                                 line_num,
                                                 src_func_def.name(),
                                                 dest_func_name,
