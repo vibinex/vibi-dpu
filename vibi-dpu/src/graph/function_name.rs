@@ -67,14 +67,14 @@ struct ValidationPromptInput {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ValidationPromptOutput {
-    is_function: bool, // True if the line is a valid function definition, false otherwise
+    is_definition: bool, // True if the line is a valid function definition, false otherwise
     status: String,    // "valid", "invalid_input", or "insufficient_context"
     notes: Option<String>, // Optional notes explaining the decision
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ValidationPromptOutputSchema {
-    is_function: String,
+    is_definition: String,
     status: String,
     notes: String,
 }
@@ -170,7 +170,8 @@ impl FunctionNameIdentifier {
             return None;
         }
         let validation_out: ValidationPromptOutput = deserialized_response.expect("Empty error in deserialized_response");
-        if !validation_out.is_function || validation_out.status != "valid" {
+        log::debug!("[FunctionNameIdentifier/function_name_in_line] validation response obj: {:#?}", &validation_out);
+        if !validation_out.is_definition || validation_out.status != "valid" {
             log::error!("[FunctionNameIdentifier/function_name_in_line] Given code line is not valid function def");
             return None;
         }
