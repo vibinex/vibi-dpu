@@ -190,13 +190,12 @@ async fn relevant_reviewers_comment_text(relevance_vec: &Vec<Relevance>, auto_as
 
     let (deduplicated_relevance_map, unmapped_aliases) = deduplicated_relevance_vec_for_comment(relevance_vec);
     let (filtered_relevance_vec, remaining_relevance_vec) = filter_deduplicated_relevance_map(
-        &deduplicated_relevance_map, 8, 0.1);
+        &deduplicated_relevance_map, 4, 0.1);
     
     for (provider_ids, relevance) in &filtered_relevance_vec {
         let provider_id_opt = provider_ids.iter().next();
         if provider_id_opt.is_some() {
             let provider_id = provider_id_opt.expect("Empty provider_id_opt");
-            log::debug!("[comment-text] provider_id: {:?}", provider_id);
             let formatted_relevance_value = format!("{:.2}", *relevance);
             comment += &format!("| {} | {}% |\n", provider_id, formatted_relevance_value);
         }
