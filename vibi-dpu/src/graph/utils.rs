@@ -161,21 +161,6 @@ pub fn match_imported_filename_to_path(paths: &Vec<PathBuf>, filename: &str) -> 
     None
 }
 
-pub fn source_diff_files(diff_files: &Vec<StatItem>) -> Option<Vec<StatItem>> {
-    let mut code_files = Vec::<StatItem>::new();
-    for stat_item in diff_files {
-        let filepath_str = &stat_item.filepath;
-        let filepath = Path::new(filepath_str);  
-        if let Some(lang) = detect_language(&filepath_str) {
-            code_files.push(stat_item.clone());
-        } 
-    }
-    if code_files.is_empty() {
-        return None;
-    }
-    return Some(code_files);
-}
-
 pub fn numbered_content(file_contents: String) -> Vec<String> {
     let lines = file_contents
         .lines()
