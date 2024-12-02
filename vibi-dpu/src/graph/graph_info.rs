@@ -1,5 +1,5 @@
-use crate::utils::{gitops::{git_checkout_commit, StatItem}, review::Review};
-use super::{function_call::{FunctionCallChunk, FunctionCallsOutput}, function_line_range::HunkFuncDef, function_name::FunctionNameIdentifier, gitops::{get_changed_hunk_lines, HunkDiffMap}, utils::{detect_language, read_file, source_diff_files}};
+use crate::{graph::gitops::get_hunks_all_files, utils::{gitops::{git_checkout_commit, StatItem}, review::Review}};
+use super::{function_call::{FunctionCallChunk, FunctionCallsOutput}, function_line_range::HunkFuncDef, function_name::FunctionNameIdentifier, gitops::HunkDiffMap, utils::{detect_language, read_file}};
 
 #[derive(Debug, Default, Clone)]
 pub struct DiffFuncDefs {
@@ -63,18 +63,14 @@ impl DiffGraph {
     }
 }
 
-pub async fn generate_diff_graph(diff_files: &Vec<StatItem>, review: &Review) -> Option<DiffGraph> {
-    let diff_code_files_opt = source_diff_files(diff_files);
-    if diff_code_files_opt.is_none() {
-        log::debug!("[generate_diff_graph] No relevant source diff files in: {:#?}", diff_files);
-        return None;
+pub async fn generate_diff_graph(review: &Review) -> Option<DiffGraph> {
+    if let Some(mut hunk_diff_map) = get_hunks_all_files(review) {
+        // get func defs for base commit for files in diff
+        log::debug!("[generate_diff_graph] hunk diff map =======~~~~~~~~ {:#?}", &hunk_diff_map);
+        let diff_graph_opt = process_hunk_diff(&mut hunk_diff_map, review).await;
+        return diff_graph_opt;
     }
-    let diff_code_files = diff_code_files_opt.expect("Empty diff_code_files_opt");
-    let mut hunk_diff_map = get_changed_hunk_lines(&diff_code_files, review);
-    // get func defs for base commit for files in diff
-    log::debug!("[generate_diff_graph] hunk diff map =======~~~~~~~~ {:#?}", &hunk_diff_map);
-    let diff_graph_opt = process_hunk_diff(&mut hunk_diff_map, review).await;
-    return diff_graph_opt;
+    return None;
 }
 
 async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review) -> Option<DiffGraph> {

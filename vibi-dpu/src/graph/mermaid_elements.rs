@@ -39,7 +39,7 @@ async fn generate_flowchart_elements(diff_files: &Vec<StatItem>, review: &Review
     }
     let base_filepaths = base_filepaths_opt.expect("Empty base_filepaths_opt");
     // let base_commit_import_info = get_test_import_info();
-    let diff_graph_opt = generate_diff_graph(diff_files, review).await;
+    let diff_graph_opt = generate_diff_graph(review).await;
     log::debug!("[generate_flowchart_elements] diff_graph_opt = {:#?}", &diff_graph_opt);
     if diff_graph_opt.is_none() {
         log::error!(

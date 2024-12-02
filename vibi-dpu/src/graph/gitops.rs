@@ -2,6 +2,8 @@ use std::{collections::HashMap, path::{Path, PathBuf}, process::Command, str::{s
 
 use crate::utils::{gitops::StatItem, review::Review};
 
+use super::utils::detect_language;
+
 #[derive(Debug, Default, Clone)]
 pub struct HunkDiffLines {
     start_line: usize,
@@ -86,6 +88,8 @@ impl FileHunks {
 #[derive(Debug, Default, Clone)]
 pub struct HunkDiffMap {
     file_line_map: HashMap<String, FileHunks>,
+    added_files: Vec<String>,
+    deleted_files: Vec<String>,
 }
 
 impl HunkDiffMap {
@@ -115,24 +119,81 @@ impl HunkDiffMap {
     pub fn file_hunks(&self, filename: &str) -> Option<&FileHunks> {
         self.file_line_map.get(filename)
     }
+
+    pub fn add_added_files(&mut self, added_files: &mut Vec<String>) {
+        self.added_files.append(added_files);
+    }
+
+    pub fn add_deleted_files(&mut self, deleted_files: &mut Vec<String>) {
+        self.deleted_files.append(deleted_files);
+    }
 }
 
-pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> HunkDiffMap {
-    let mut file_hunk_map = HunkDiffMap { file_line_map: HashMap::new() };
+pub fn get_hunks_all_files(review: &Review) -> Option<HunkDiffMap> {
     let prev_commit = review.base_head_commit();
     let curr_commit = review.pr_head_commit();
     let clone_dir = review.clone_dir();
+    let commit_range = format!("{}...{}", prev_commit, curr_commit);
+    if let Some((mut added_files, mut deleted_files, modified_files))
+        = get_separated_files(clone_dir, &commit_range) 
+    {
+        let mut hunk_diff_map = get_modified_hunk_lines(&modified_files, clone_dir, &commit_range);
+        hunk_diff_map.add_added_files(&mut added_files);
+        hunk_diff_map.add_deleted_files(&mut deleted_files);
+        return Some(hunk_diff_map);
+    }
+    return None;
+}
 
-    for item in diff_files {
-        let filepath = item.filepath.as_str();
-        let commit_range = format!("{}...{}", prev_commit, curr_commit);
+fn get_separated_files(clone_dir: &str, commit_range: &str) -> Option<(Vec<String>, Vec<String>, Vec<String>)> {
+    let output = Command::new("git")
+        .arg("diff")
+        .arg("--name-status")
+        .arg(commit_range)
+        .current_dir(clone_dir)
+        .output()
+        .expect("Failed to execute git diff");
+    if !output.status.success() {
+        eprintln!(
+            "Git diff name status command failed with error: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut added_files = Vec::new();
+    let mut deleted_files = Vec::new();
+    let mut modified_files = Vec::new();
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() == 2 {
+            let (status, file) = (parts[0], parts[1]);
+            if let Some(lang) = detect_language(file) {
+                log::debug!("[get_separated_files] lang = {:}, file = {:}", &lang, file);
+                match status {
+                    "A" => added_files.push(file.to_string()),
+                    "M" => modified_files.push(file.to_string()),
+                    "D" => deleted_files.push(file.to_string()),
+                    _ => log::error!("[get_separated_files] status not identified = {:?}", status),
+                }
+            }
+        }
+    }
+    return Some((added_files, deleted_files, modified_files));
+}
+
+fn get_modified_hunk_lines(modified_files: &Vec<String>, clone_dir: &str, commit_range: &str) -> HunkDiffMap {
+    let mut file_hunk_map = HunkDiffMap {
+        file_line_map: HashMap::new(),
+        added_files: Vec::new(),
+        deleted_files: Vec::new()};
+    for filepath in modified_files {
         log::debug!("[get_changed_hunk_lines] | clone_dir = {:?}, filepath = {:?}", clone_dir, filepath);
-
         let output_res = Command::new("git")
             .arg("diff")
             .arg("--unified=0")
             .arg("--ignore-space-change")
-            .arg(&commit_range)
+            .arg(commit_range)
             .arg(&filepath)
             .current_dir(clone_dir)
             .output();
@@ -255,7 +316,7 @@ pub fn get_changed_hunk_lines(diff_files: &Vec<StatItem>, review: &Review) -> Hu
             });
         }
 
-        let abs_filepath = Path::new(review.clone_dir());
+        let abs_filepath = Path::new(clone_dir);
         let abs_file_pathbuf = abs_filepath.join(Path::new(filepath));
         file_hunk_map.file_line_map.insert(
             abs_file_pathbuf.to_str().expect("Unable to deserialize pathbuf").to_string(),

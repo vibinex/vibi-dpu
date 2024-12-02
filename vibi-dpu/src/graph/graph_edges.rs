@@ -6,19 +6,19 @@ use super::{elements::MermaidGraphElements, file_imports::{ImportDefIdentifier, 
 pub async fn graph_edges(base_filepaths: &Vec<PathBuf>, review: &Review, diff_graph: &DiffGraph, graph_elems: &mut MermaidGraphElements) {
     let func_call_identifier_opt = FunctionCallIdentifier::new();
     if func_call_identifier_opt.is_none() {
-        log::error!("[outgoing_edges] Unable to create new FunctionCallIdentifier");
+        log::error!("[graph_edges] Unable to create new FunctionCallIdentifier");
         return;
     }
     let mut func_call_identifier = func_call_identifier_opt.expect("Empty func_call_identifier_opt");
     let import_identifier_opt = ImportIdentifier::new();
     if import_identifier_opt.is_none() {
-        log::debug!("[outgoing_edges] Unable to create import identifier");
+        log::debug!("[graph_edges] Unable to create import identifier");
         return;
     }
     let mut import_identifier = import_identifier_opt.expect("Empty import_identifier_opt");
     let func_def_identifier_opt = FunctionDefIdentifier::new();
     if func_def_identifier_opt.is_none() {
-        log::debug!("[outgoing_edges] Unable to create func def identifier");
+        log::debug!("[graph_edges] Unable to create func def identifier");
         return;
     }
     let mut funcdef_identifier = func_def_identifier_opt.expect("Empty func_def_identifier_opt");
