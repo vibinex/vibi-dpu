@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use super::utils::{call_llm_api, read_file, strip_json_prefix};
+use super::{function_line_range::FunctionDefIdentifier, utils::{call_llm_api, numbered_content, read_file, strip_json_prefix}};
 
 // Struct to represent the output schema
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -209,5 +209,198 @@ impl FunctionNameIdentifier {
         }
         self.cached_output.insert(code_line.trim().to_string(), func_name.clone());
         return Some(func_name);
+    }
+}
+
+
+// Input Schema
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DefinitionInputSchema {
+    pub code_chunk: String, // A chunk of code with line numbers
+    pub language: String,   // The programming language (e.g., "Python", "Rust")
+}
+
+// Output Schema
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FunctionDefinition {
+    pub line_number: u32,       // The line number where the structure is defined
+    pub structure_name: String, // The name of the function, object, or structure
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DefinitionOutputSchema {
+    pub function_definition: Option<FunctionDefinition>, // Optional, in case no definition is found
+    pub notes: Option<String>,                           // Optional notes about the result
+}
+
+// Full Instruction Set
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DefinitionInstructions {
+    pub input_schema: DefinitionInputSchema,
+    pub output_schema: DefinitionOutputSchema,
+    pub task_description: String, // Task description as described in the prompt
+}
+
+// Example Input
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DefintionExampleInput {
+    pub code_chunk: String, // A code chunk with numbered lines
+    pub language: String,   // Programming language of the code
+}
+
+// Example Output
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DefintionExampleOutput {
+    pub definitions: Option<Vec<FunctionDefinition>>,
+    pub notes: Option<String>,
+}
+
+// Top-Level Prompt Struct
+#[derive(Serialize, Deserialize, Debug)]
+struct DefintionPrompt {
+    instructions: DefinitionInstructions,
+    sample_input: DefintionExampleInput,
+    expected_output: DefintionExampleOutput,
+    input: Option<DefintionExampleInput>,
+}
+
+impl DefintionPrompt {
+    fn set_input(&mut self, input_val: DefintionExampleInput) {
+        self.input = Some(input_val);
+    }
+}
+
+
+pub struct DefintionIdentifier {
+    prompt: DefintionPrompt,
+    validation_prompt: ValidationPrompt
+}
+
+impl DefintionIdentifier {
+    pub fn new() -> Option<Self> {
+        let def_system_prompt_opt = read_file("/app/prompts/prompt_definition");
+        if def_system_prompt_opt.is_none() {
+            log::error!("[DefintionIdentifier/new] Unable to read prompt_definition");
+            return None;
+        }
+        let def_system_prompt_lines = def_system_prompt_opt.expect("Empty def_system_prompt");
+        let def_prompt_json_res = serde_json::from_str(&def_system_prompt_lines);
+        if def_prompt_json_res.is_err() {
+            log::error!("[DefintionIdentifier/new] Unable to deserialize def_prompt_json: {:?}",
+                def_prompt_json_res.expect("Empty def_prompt_json_res"));
+            return None;
+        }
+        let def_prompt_json: DefintionPrompt = def_prompt_json_res.expect("Empty error in def_prompt_json_res");
+
+        let system_prompt_validation_opt = read_file("/app/prompts/prompt_valid_function_def");
+        if system_prompt_validation_opt.is_none() {
+            log::error!("[DefintionIdentifier/new] Unable to read prompt_valid_function_def");
+            return None;
+        }
+        let system_prompt_validation_lines = system_prompt_validation_opt.expect("Empty system_prompt");
+        let prompt_validation_json_res = serde_json::from_str(&system_prompt_validation_lines);
+        if prompt_validation_json_res.is_err() {
+            log::error!("[DefintionIdentifier/new] Unable to deserialize prompt_json: {:?}",
+                prompt_validation_json_res.expect("Empty prompt_json_res"));
+            return None;
+        }
+        let prompt_validation_json: ValidationPrompt = prompt_validation_json_res.expect("Empty error in prompt_json_res");
+        return Some(Self { prompt: def_prompt_json, validation_prompt: prompt_validation_json});
+    }
+
+    pub async fn identify_defs_in_file(&mut self, filepath: &str, lang: &str) {
+        // batch up file
+        let file_contents_res = std::fs::read_to_string(filepath.clone());
+        if file_contents_res.is_err() {
+            log::error!(
+                "[DefintionIdentifier/identify_defs_in_file] Unable to read file: {:?}, error: {:?}",
+                &filepath, file_contents_res.expect_err("Empty error in file_contents_res")
+            );
+            return;
+            // return None;
+        }
+        let file_contents = file_contents_res.expect("Uncaught error in file_contents_res");
+        let numbered_content = numbered_content(file_contents);
+        let chunk_size = 20;
+        let chunks = numbered_content.chunks(chunk_size);
+        let mut idx = 1;
+        let mut batch_idx = 0;
+        for chunk in chunks {
+            let final_idx = idx + (batch_idx*chunk_size);
+            let chunk_str = chunk.join("\n");
+            // ask to identify def lines in each batch
+            let def_input = DefintionExampleInput{
+                code_chunk: chunk_str,
+                language: lang.to_string(),
+            };
+            self.prompt.set_input(def_input);
+            let def_prompt_str_res = serde_json::to_string(&self.prompt);
+            if def_prompt_str_res.is_err() {
+                log::error!(
+                    "[DefintionIdentifier/identify_defs_in_file] Unable to serialize prompt: {:?}",
+                    def_prompt_str_res.expect_err("Empty error in def_prompt_str_res"));
+                    return;
+            }
+            let def_prompt_str = def_prompt_str_res.expect("Uncaught error in def_prompt_str_res");
+            let def_final_prompt = format!("{}\nOutput - ", &def_prompt_str);
+            log::debug!("[DefintionIdentifier/identify_defs_in_file] def prompt: {}", &def_final_prompt);
+            let def_prompt_response_opt =  call_llm_api(def_final_prompt).await;
+            if def_prompt_response_opt.is_none() {
+                log::error!("[DefintionIdentifier/identify_defs_in_file] Unable to call llm for def prompt: {:?}", def_final_prompt);
+                return;
+            }
+            let mut def_prompt_response = def_prompt_response_opt.expect("Empty prompt_response_opt");
+            if let Some(stripped_json) = strip_json_prefix(&def_prompt_response) {
+                def_prompt_response = stripped_json.to_string();
+            }
+            let deserialized_def_response = serde_json::from_str(&def_prompt_response);
+            if deserialized_def_response.is_err() {
+                let e = deserialized_def_response.expect_err("Empty error in deserialized_def_response");
+                log::error!("[FunctionNameIdentifier/function_name_in_line] Error in deserializing def response: {:?}", e);
+                return;
+            }
+            let def_out: DefintionExampleOutput = deserialized_def_response.expect("Empty error in deserialized_def_response");
+            if let Some(func_defs) = def_out.definitions {
+                for func_def in func_defs {
+                    // ask validator to validate each line
+
+                    let validation_input = ValidationPromptInput { code_line: code_line.to_string(), language: lang.to_string() };
+                    self.validation_prompt.set_input(validation_input);
+                    let validation_prompt_str_res = serde_json::to_string(&self.validation_prompt);
+                    if validation_prompt_str_res.is_err() {
+                        log::error!(
+                            "[FunctionNameIdentifier/function_name_in_line] Unable to serialize prompt: {:?}",
+                            validation_prompt_str_res.expect_err("Empty error in validation_prompt_str_res"));
+                            return None;
+                    }
+                    let validation_prompt_str = validation_prompt_str_res.expect("Uncaught error in validation_prompt_str_res");
+                    let validation_final_prompt = format!("{}\nOutput - ", &validation_prompt_str);
+                    log::debug!("[FunctionNameIdentifier/function_name_in_line] validation code_line: {}", code_line);
+                    let validation_prompt_response_opt =  call_llm_api(validation_final_prompt).await;
+                    if validation_prompt_response_opt.is_none() {
+                        log::error!("[FunctionNameIdentifier/function_name_in_line] Unable to call llm for validation code line: {:?}", code_line);
+                        return None;
+                    }
+                    let mut validation_prompt_response = validation_prompt_response_opt.expect("Empty prompt_response_opt");
+                    if let Some(stripped_json) = strip_json_prefix(&validation_prompt_response) {
+                        validation_prompt_response = stripped_json.to_string();
+                    }
+                    let deserialized_response = serde_json::from_str(&validation_prompt_response);
+                    if deserialized_response.is_err() {
+                        let e = deserialized_response.expect_err("Empty error in deserialized_response");
+                        log::error!("[FunctionNameIdentifier/function_name_in_line] Error in deserializing response: {:?}", e);
+                        return None;
+                    }
+                    let validation_out: ValidationPromptOutput = deserialized_response.expect("Empty error in deserialized_response");
+                    log::debug!("[FunctionNameIdentifier/function_name_in_line] validation response obj: {:#?}", &validation_out);
+                    if !validation_out.is_definition || validation_out.status != "valid" {
+                        log::error!("[FunctionNameIdentifier/function_name_in_line] Given code line is not valid function def");
+                        return None;
+                    }
+                }
+            }
+            // add filtered lines and defs to vec
+        }
+        // return this vec of defs
     }
 }

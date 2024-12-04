@@ -91,6 +91,10 @@ async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review) -> 
     return Some(diff_graph);
 }
 
+async fn set_func_def_added(added_files: &str) {
+    // send to prompt object and get vec of all defs, which should be stored in diff map? db?
+}
+
 async fn set_func_def_info(hunk_diff_map: &mut HunkDiffMap, func_name_identifier: &mut FunctionNameIdentifier, added: bool) {
     for (filepath, file_func_diff) in hunk_diff_map.file_line_map_mut() {
         let file_hunks;
