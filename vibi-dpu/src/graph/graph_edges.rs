@@ -120,6 +120,11 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
             continue;
         }
         let lang = lang_opt.expect("Empty lang_opt");
+        let mut source_file_name = source_filepath.to_owned();
+        // get func calls
+        if let Some(source_file) = absolute_to_relative_path(source_filepath, review) {
+            source_file_name = source_file.clone();
+        }
         let src_filepath = Path::new(source_filepath);
         let src_file_pathbuf = src_filepath.to_path_buf();
         if let Some(func_calls) = func_call_identifier.functions_in_file(&src_file_pathbuf, &lang).await {
@@ -139,7 +144,7 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
             // for each function call, try to find import and dest func def eventutally
             for (func_def, func_calls_vec) in func_def_call_map {
                 search_func_call(&func_calls_vec, source_filepath, import_identifier, &lang, diff_graph, 
-                    review, edge_color, graph_elems, source_filepath, base_filepaths,
+                    review, edge_color, graph_elems, &source_file_name, base_filepaths,
                     funcdef_identifier, &func_def.structure_name, &func_def.line_number).await;
             }
         }
@@ -225,36 +230,21 @@ async fn search_func_call(func_calls: &Vec<FunctionCall>,
                 }                                
             }
             if !edge_added {
-                // if let Some(possible_file_rel) = absolute_to_relative_path(import_filepath.get_matching_import().possible_file_path(), review) {
+                let mut dest_file_path = import_filepath.get_matching_import().possible_file_path().to_owned();
+                if let Some(dest_file_rel) = absolute_to_relative_path(import_filepath.get_matching_import().possible_file_path(), review) {
+                    dest_file_path = dest_file_rel.clone();
+                }
                 graph_elems.add_edge(
                     edge_color,
                     dest_func_call.line_number().to_owned() as usize,
                     src_func_name, 
                     dest_func_call.function_name(), 
                     &source_file_name,
-                    import_filepath.get_matching_import().possible_file_path(),
+                    &dest_file_path,
                     "yellow",
                     "",
                     src_func_line_number,
                     &0);
-    
-                // }
-                    // for possible_file_pathbuf in possible_file_pathbufs {
-                    //     let possible_file_path: String = possible_file_pathbuf.to_string_lossy().to_string();
-                    //     if let Some(possible_file_rel) = 
-                    //                         absolute_to_relative_path(&possible_file_path, review) {
-                    //         // search only for func def with specific name
-                    //         // if something comes up, add edge!
-                    //         // thread::sleep(Duration::from_secs(1));
-                    //         if let Some(func_def) = funcdef_identifier.function_defs_in_file(
-                    //             possible_file_pathbuf, &lang, dest_func_call.function_name()).await {
-                    //                 log::debug!("[search_func_call] func_def ={:#?}", &func_def);
-                    //             if let Some(dest_func_def_line) = func_def.get_function_line_number() {
-                                    
-                    //         }
-                    //     }
-                    // }
-                // }
             }
         }    
     }
