@@ -1,5 +1,7 @@
+use std::{collections::HashMap, path::Path};
+
 use crate::{graph::gitops::get_hunks_all_files, utils::{gitops::{git_checkout_commit, StatItem}, review::Review}};
-use super::{function_call::{FunctionCallChunk, FunctionCallsOutput}, function_line_range::HunkFuncDef, function_name::FunctionNameIdentifier, gitops::HunkDiffMap, utils::{detect_language, read_file}};
+use super::{function_call::{FunctionCallChunk, FunctionCallsOutput}, function_line_range::HunkFuncDef, function_name::{DefinitionIdentifier, FunctionDefinition, FunctionNameIdentifier}, gitops::HunkDiffMap, utils::{detect_language, read_file}};
 
 #[derive(Debug, Default, Clone)]
 pub struct DiffFuncDefs {
@@ -54,7 +56,7 @@ impl DiffFuncCall {
 
 #[derive(Debug, Default, Clone)]
 pub struct DiffGraph {
-    hunk_diff_map: HunkDiffMap
+    pub hunk_diff_map: HunkDiffMap
 }
 
 impl DiffGraph {
@@ -81,18 +83,41 @@ async fn process_hunk_diff(hunk_diff_map: &mut HunkDiffMap, review: &Review) -> 
         return None;
     }
     let mut func_name_identifier = func_name_identifier_opt.expect("Empty func_name_identifier_opt");
+    let def_identifier_opt = DefinitionIdentifier::new();
+    if def_identifier_opt.is_none() {
+        log::error!("[process_hunk_diff] Unable to initialize definition identifier");
+        return None;
+    }
+    let mut def_identifier = def_identifier_opt.expect("Empty def_identifier_opt");
     git_checkout_commit(review, review.pr_head_commit());
     set_func_def_info(hunk_diff_map, &mut func_name_identifier, true).await;
+    let added_files_defs = set_func_def_whole_file(review, hunk_diff_map.added_files(), &mut def_identifier).await;
+    hunk_diff_map.add_added_files_map(added_files_defs);
     git_checkout_commit(review, review.base_head_commit());
     set_func_def_info(hunk_diff_map, &mut func_name_identifier, false).await;
+    let deleted_files_defs = set_func_def_whole_file(review, hunk_diff_map.deleted_files(), &mut def_identifier).await;
+    hunk_diff_map.add_deleted_files_map(deleted_files_defs);
     let diff_graph = DiffGraph {
         hunk_diff_map: hunk_diff_map.to_owned()
     };
     return Some(diff_graph);
 }
 
-async fn set_func_def_added(added_files: &str) {
+async fn set_func_def_whole_file(review: &Review, added_deleted_files: Vec<&String>, def_identifier: &mut DefinitionIdentifier) -> HashMap<String, Vec<FunctionDefinition>> {
     // send to prompt object and get vec of all defs, which should be stored in diff map? db?
+    let mut file_def_map = HashMap::new();
+    let base_path = Path::new(review.clone_dir());
+    for rel_filepath in added_deleted_files {
+        let rel_path = Path::new(rel_filepath);
+        let abs_filepath = base_path.join(rel_path);
+        let abs_filepath_str = abs_filepath.to_string_lossy();
+        if let Some(lang) = detect_language(&abs_filepath_str) {
+            log::debug!("[set_func_def_whole_file] file = {:?}, lang = {:?}", &abs_filepath_str, &lang);
+            let func_defs = def_identifier.identify_defs_in_file(&abs_filepath_str, &lang).await;
+            file_def_map.insert(abs_filepath_str.to_string(), func_defs);
+        } else { log::error!("[set_func_def_whole_file] Unable to detect lang for {:?}", &abs_filepath_str);}
+    }
+    return file_def_map;
 }
 
 async fn set_func_def_info(hunk_diff_map: &mut HunkDiffMap, func_name_identifier: &mut FunctionNameIdentifier, added: bool) {

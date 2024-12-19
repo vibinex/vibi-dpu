@@ -221,7 +221,7 @@ pub struct DefinitionInputSchema {
 }
 
 // Output Schema
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FunctionDefinition {
     pub line_number: usize,       // The line number where the structure is defined
     pub structure_name: String, // The name of the function, object, or structure
@@ -271,12 +271,12 @@ impl DefintionPrompt {
 }
 
 
-pub struct DefintionIdentifier {
+pub struct DefinitionIdentifier {
     prompt: DefintionPrompt,
     validation_prompt: ValidationPrompt
 }
 
-impl DefintionIdentifier {
+impl DefinitionIdentifier {
     pub fn new() -> Option<Self> {
         let def_system_prompt_opt = read_file("/app/prompts/prompt_definition");
         if def_system_prompt_opt.is_none() {

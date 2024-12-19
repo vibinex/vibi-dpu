@@ -1,8 +1,8 @@
-use std::{collections::HashMap, path::{Path, PathBuf}, process::Command, str::{self, FromStr}};
+use std::{collections::HashMap, path::{Path, PathBuf}, process::Command, str::{self}};
 
-use crate::utils::{gitops::StatItem, review::Review};
+use crate::utils::review::Review;
 
-use super::utils::detect_language;
+use super::{function_name::FunctionDefinition, graph_info::DiffGraph, utils::detect_language};
 
 #[derive(Debug, Default, Clone)]
 pub struct HunkDiffLines {
@@ -87,9 +87,9 @@ impl FileHunks {
 
 #[derive(Debug, Default, Clone)]
 pub struct HunkDiffMap {
-    file_line_map: HashMap<String, FileHunks>,
-    added_files: Vec<String>,
-    deleted_files: Vec<String>,
+    pub(crate) file_line_map: HashMap<String, FileHunks>,
+    pub(crate) added_files_map: HashMap<String, Vec<FunctionDefinition>>,
+    pub(crate) deleted_files_map: HashMap<String, Vec<FunctionDefinition>>,
 }
 
 impl HunkDiffMap {
@@ -121,11 +121,39 @@ impl HunkDiffMap {
     }
 
     pub fn add_added_files(&mut self, added_files: &mut Vec<String>) {
-        self.added_files.append(added_files);
+        for added_file in added_files {
+            self.added_files_map.insert(added_file.to_string(), Vec::new());
+        }
     }
 
     pub fn add_deleted_files(&mut self, deleted_files: &mut Vec<String>) {
-        self.deleted_files.append(deleted_files);
+        for deleted_file in deleted_files {
+            self.deleted_files_map.insert(deleted_file.to_string(), Vec::new());
+        }
+    }
+
+    pub fn added_files(&self) -> Vec<&String> {
+        self.added_files_map.keys().collect()
+    }
+
+    pub fn added_files_map(&self) -> &HashMap<String, Vec<FunctionDefinition>> {
+        &self.added_files_map
+    }
+
+    pub fn deleted_files_map(&self) -> &HashMap<String, Vec<FunctionDefinition>> {
+        &self.deleted_files_map
+    }
+
+    pub fn deleted_files(&self) -> Vec<&String> {
+        self.deleted_files_map.keys().collect()
+    }
+
+    pub fn add_added_files_map(&mut self, added_map: HashMap<String, Vec<FunctionDefinition>>) {
+        self.added_files_map = added_map;
+    }
+
+    pub fn add_deleted_files_map(&mut self, deleted_map: HashMap<String, Vec<FunctionDefinition>>) {
+        self.deleted_files_map = deleted_map;
     }
 }
 
@@ -185,8 +213,8 @@ fn get_separated_files(clone_dir: &str, commit_range: &str) -> Option<(Vec<Strin
 fn get_modified_hunk_lines(modified_files: &Vec<String>, clone_dir: &str, commit_range: &str) -> HunkDiffMap {
     let mut file_hunk_map = HunkDiffMap {
         file_line_map: HashMap::new(),
-        added_files: Vec::new(),
-        deleted_files: Vec::new()};
+        added_files_map: HashMap::new(),
+        deleted_files_map: HashMap::new()};
     for filepath in modified_files {
         log::debug!("[get_changed_hunk_lines] | clone_dir = {:?}, filepath = {:?}", clone_dir, filepath);
         let output_res = Command::new("git")
