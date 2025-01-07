@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use walkdir::WalkDir;
 use std::fs;
 use rand::Rng;
-
+use once_cell::sync::Lazy;
 
 use crate::utils::{gitops::StatItem, reqwest_client::get_client, review::Review};
 
@@ -17,69 +17,79 @@ struct LlmResponse {
     done: bool
 }
 
+static TOKEN: Lazy<String> = Lazy::new(|| {
+    fs::read_to_string("/app/prompts/hf_token").expect("Failed to read hf_token file")
+});
+
 pub async fn call_llm_api(prompt: String) -> Option<String> {
     let client = get_client();
-    let url = "http://34.100.208.132/api/generate";
-    let response_res = client.post(url)
-        .json(&json!({"model": "phind-codellama", "prompt": prompt}))
+    let url = "https://api-inference.huggingface.co/models/codellama/CodeLlama-34b-Instruct-hf/v1/chat/completions";
+    let token = &*TOKEN;
+    let response_res = client
+        .post(url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .json(&json!({
+            "model": "codellama/CodeLlama-34b-Instruct-hf",
+            "messages": [
+                { "role": "user", "content": prompt }
+            ],
+            "temperature": 0.5,
+            "max_tokens": 2048,
+            "top_p": 0.7,
+            "stream": true
+        }))
         .send()
         .await;
 
     if let Err(err) = response_res {
-        log::error!("[call_llm_api] Error in calling api: {:?}", err);
+        log::error!("[call_llm_api] Error in calling API: {:?}", err);
         return None;
     }
 
     let response = response_res.unwrap();
-    let mut final_response = String::new();
+
+    // Ensure we can read the response stream
     let resp_text_res = response.text().await;
-    if resp_text_res.is_err() {
-        let e = resp_text_res.expect_err("Empty error in resp_text_res");
-        log::error!("[call_llm_api] Error while deserializing response to text: {:?}", e);
+    if let Err(err) = resp_text_res {
+        log::error!("[call_llm_api] Error reading response text: {:?}", err);
         return None;
     }
-    let resp_text = resp_text_res.expect("Uncaught error in resp_text");
-    // Split the string by the sequence "}\n{"
-    let split_seq = "}\n{";
-    let mut chunks = Vec::new();
-    let mut start = 0;
-    while let Some(pos) = &resp_text[start..].find(split_seq) {
-        let end = start + pos + 1;
-        chunks.push(&resp_text[start..end]);
-        start = end + 1;
-    }
 
-    // Process each chunk
+    let resp_text = resp_text_res.unwrap();
+    // Split response on "data: " to process each chunk
+    let chunks: Vec<&str> = resp_text.split("data: ").filter(|s| !s.trim().is_empty()).collect();
+    let mut final_response = String::new();
+
     for chunk in chunks {
-        // Attempt to fix incomplete chunks
-        let fixed_chunk = if !chunk.starts_with("{") {
-            format!("{{{}", chunk)
-        } else if !chunk.ends_with("}") {
-            format!("{}{}", chunk, "}")
-        } else {
-            chunk.to_string()
-        };
-        let parsed_chunk_res = serde_json::from_str::<Value>(&fixed_chunk);
-        if parsed_chunk_res.is_err() {
-            let e = parsed_chunk_res.expect_err("Empty error in parsed_chunk_res");
-            log::error!("[call_llm_api] Unable to deserialize {}: {:?}", chunk, e);
+        // Skip the special "[DONE]" marker
+        if chunk.trim() == "[DONE]" {
+            break;
+        }
+
+        // Deserialize the JSON chunk
+        let parsed_chunk_res = serde_json::from_str::<serde_json::Value>(chunk);
+        if let Err(err) = parsed_chunk_res {
+            log::error!("[call_llm_api] Unable to deserialize chunk: {:?}, error: {:?}", chunk, err);
             continue;
         }
-        let parsed_chunk = parsed_chunk_res.expect("Uncaught error in parsed_chunk_res");
-        if let Some(parsed_response) =  parsed_chunk.get("response").and_then(|v| v.as_str()){
+
+        let parsed_chunk = parsed_chunk_res.unwrap();
+
+        // Extract the "content" field from the parsed JSON
+        if let Some(parsed_response) = parsed_chunk
+            .get("choices")
+            .and_then(|choices| choices.as_array())
+            .and_then(|choices| choices.first())
+            .and_then(|choice| choice.get("delta"))
+            .and_then(|delta| delta.get("content"))
+            .and_then(|content| content.as_str())
+        {
             final_response.push_str(parsed_response);
         }
-        if let Some(done_field) = parsed_chunk.get("done").and_then(|v| v.as_bool()) {
-            if done_field {
-                break;
-            }
-        }
     }
-    log::debug!("[call_llm_api] final response = {}", &final_response);
-    let final_response_trimmed = final_response.trim();
-    if final_response_trimmed.starts_with("{") && !final_response_trimmed.ends_with("}") {
-        final_response.push_str("}");
-    }
+
+    log::info!("[call_llm_api] Final aggregated response: {:#?}", final_response);
     Some(final_response)
 }
 
@@ -119,11 +129,12 @@ pub fn all_code_files(dir: &str, diff_files: &Vec<StatItem>) -> Option<Vec<PathB
         log::error!("[all_code_files] No known language files detected in diff");
         return None;
     }
+    log::debug!("[all_code_files] dir = {}", dir);
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path().to_owned();
-        log::debug!("[all_code_files] path = {:?}", path);
+        // log::debug!("[all_code_files] path = {:?}", path);
         let ext = path.extension().and_then(|ext| ext.to_str());
-        log::debug!("[all_code_files] extension = {:?}", &ext);
+        // log::debug!("[all_code_files] extension = {:?}", &ext);
         if let Some(file_lang) = detect_language(&path.to_string_lossy()) {
             if all_diff_langs.contains(&file_lang) {
                 match path.canonicalize() {
@@ -161,21 +172,6 @@ pub fn match_imported_filename_to_path(paths: &Vec<PathBuf>, filename: &str) -> 
     None
 }
 
-pub fn source_diff_files(diff_files: &Vec<StatItem>) -> Option<Vec<StatItem>> {
-    let mut code_files = Vec::<StatItem>::new();
-    for stat_item in diff_files {
-        let filepath_str = &stat_item.filepath;
-        let filepath = Path::new(filepath_str);  
-        if let Some(lang) = detect_language(&filepath_str) {
-            code_files.push(stat_item.clone());
-        } 
-    }
-    if code_files.is_empty() {
-        return None;
-    }
-    return Some(code_files);
-}
-
 pub fn numbered_content(file_contents: String) -> Vec<String> {
     let lines = file_contents
         .lines()
@@ -206,6 +202,11 @@ pub fn strip_json_prefix(json_str: &str) -> Option<String> {
         if let Some(end) = json_str[start + 7..].find("```") {
             // Return the substring between "```json" and "```"
             extracted_json = json_str[start + 7..start + 7 + end].to_string();
+        }
+    } else if let Some(start) = json_str.find("```") {
+        if let Some(end) = json_str[start + 7..].find("```") {
+            // Return the substring between "```" and "```"
+            extracted_json = json_str[start + 3..start + 3 + end].to_string();
         }
     }
     if extracted_json.starts_with('[') && extracted_json.ends_with(']') {

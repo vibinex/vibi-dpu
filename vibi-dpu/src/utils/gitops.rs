@@ -167,7 +167,7 @@ pub fn get_excluded_files(review: &Review) -> Option<(Vec<StatItem>, Vec<StatIte
 	let stat_res = str::from_utf8(&stat);
 	if stat_res.is_err() {
 		let staterr = stat_res.expect_err("No error in git command");
-		log::error!("[get_excluded_files] git diff stat command failed to start : {:?}", staterr);
+		log::error!("[get_excluded_files] git diff stat command parse error : {:?}, review: {:#?}", staterr, review);
 		return None;
 	}
 	let statstr = stat_res.expect("Uncaught error in stat_res");

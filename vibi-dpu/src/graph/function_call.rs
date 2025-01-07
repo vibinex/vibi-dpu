@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::io::BufRead;
 use crate::utils::review::Review;
 
-use super::{file_imports::ImportDefOutput, gitops::HunkDiffLines, utils::{call_llm_api, detect_language, numbered_content, read_file, strip_json_prefix}};
+use super::{file_imports::ImportDefOutput, function_name::FunctionDefinition, gitops::HunkDiffLines, utils::{call_llm_api, detect_language, numbered_content, read_file, strip_json_prefix}};
 
 #[derive(Debug, Serialize, Default, Deserialize, Clone)]
 pub struct FunctionCallChunk {
@@ -183,6 +183,51 @@ impl FunctionCallsOutput {
     }
 }
 
+pub fn associate_function_calls(
+    function_definitions: &Vec<FunctionDefinition>,
+    function_calls: &Vec<FunctionCall>,
+) -> HashMap<FunctionDefinition, Vec<FunctionCall>> {
+     // Sort function definitions by line number
+    let mut sorted_definitions = function_definitions.clone();
+    sorted_definitions.sort_by_key(|def| def.line_number);
+
+    // Sort function calls by line number
+    let mut sorted_calls = function_calls.clone();
+    sorted_calls.sort_by_key(|call| call.line_number);
+
+    let mut result: HashMap<FunctionDefinition, Vec<FunctionCall>> = HashMap::new();
+
+    // Use a Peekable iterator for the function definitions
+    let mut definition_iter = sorted_definitions.iter().peekable();
+
+    for call in sorted_calls {
+        while let Some(current_def) = definition_iter.peek().cloned() {
+            // Check the next definition's line number, if it exists
+            let next_def_line_opt = definition_iter.clone().peek().and_then(|_| {
+                let mut temp_iter = definition_iter.clone();
+                temp_iter.next(); // Skip the current one
+                temp_iter.peek().map(|next_def| next_def.line_number)
+            });
+
+            if call.line_number as usize >= current_def.line_number
+                && (next_def_line_opt.is_none()
+                || (call.line_number as usize) < next_def_line_opt.expect("Empty next_def_line_opt"))
+            {
+                // Add the function call to the current definition
+                result
+                    .entry((*current_def).clone())
+                    .or_insert_with(Vec::new)
+                    .push(call);
+                break;
+            }
+
+            // Move to the next definition if the call doesn't belong to the current one
+            definition_iter.next();
+        }
+    }
+    result
+}
+
 // Instruction structure
 #[derive(Serialize, Deserialize, Debug)]
 struct Instructions {
@@ -355,7 +400,7 @@ impl FunctionCallIdentifier {
     
 }
 
-pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -> Option<HashSet<(String, usize, String)>>{
+pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -> Option<HashMap<String, Vec<(usize, String)>>>{
     let pattern = format!(r"{}\([^\)]*\)", function_name); // Regex pattern for the specific function call
     let directory = review.clone_dir();                    // The directory to search in
 
@@ -383,7 +428,7 @@ pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -
     let reader = BufReader::new(stdout);
 
     // Use a HashSet to avoid duplicate entries (file, line_number)
-    let mut results: HashSet<(String, usize, String)> = HashSet::new();
+    let mut results: HashMap<String, Vec<(usize, String)>> = HashMap::new();
 
     // Read the output line by line
     for line in reader.lines() {
@@ -393,10 +438,14 @@ pub fn function_calls_search(review: &Review, function_name: &str, lang: &str) -
             if parts.len() >= 3 {
                 let file = parts[0].to_string();
                 if let Some(file_lang) = detect_language(&file) {
-                    if lang == &file_lang {
-                        if let Ok(line_number) = parts[1].parse::<usize>() {
-                            let matching_line = parts[2].to_string();
-                            results.insert((file, line_number, matching_line));
+                    if let Ok(line_number) = parts[1].parse::<usize>() {
+                        let matching_line = parts[2].to_string();
+                        if let Some(results_vec) = results.get_mut(&file) {
+                            results_vec.push((line_number, matching_line));
+                        } else {
+                            let mut results_vec = Vec::new();
+                            results_vec.push((line_number, matching_line));
+                            results.insert(file, results_vec);
                         }
                     }
                 }

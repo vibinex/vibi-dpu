@@ -152,7 +152,8 @@ impl ImportIdentifier {
         }
         let import_path: ImportPathOutput = import_path_res.expect("Unacaught error in import_path_res");
         log::debug!("[ImportIdentifier/get_import_path] import_path: {:?}", &import_path);
-        if !import_path.get_matching_import().possible_file_path().is_empty() {
+        if import_path.get_matching_import().possible_file_path().is_empty() {
+            log::debug!("[ImportIdentifier/get_import_path] import path not valid: {:#?}", &import_path);
             return None;
         }
         return Some(import_path);
@@ -303,7 +304,10 @@ impl ImportLinesIdentifier {
             let end_idx = start_idx + chunk_size - 1;
             let import_lines_opt = self.import_lines_in_chunk(&chunk_str, lang, start_idx, end_idx).await;
             if import_lines_opt.is_some() {
-                results.push(import_lines_opt.expect("Empty import_lines_opt"));
+                let import_lines = import_lines_opt.expect("Empty import_lines_opt");
+                if import_lines.status == "valid" {
+                    results.push(import_lines);
+                }
             }
         }
         if results.is_empty() {
