@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use walkdir::WalkDir;
 use std::fs;
 use rand::Rng;
-
+use once_cell::sync::Lazy;
 
 use crate::utils::{gitops::StatItem, reqwest_client::get_client, review::Review};
 
@@ -17,10 +17,14 @@ struct LlmResponse {
     done: bool
 }
 
+static TOKEN: Lazy<String> = Lazy::new(|| {
+    fs::read_to_string("/app/prompts/hf_token").expect("Failed to read hf_token file")
+});
+
 pub async fn call_llm_api(prompt: String) -> Option<String> {
     let client = get_client();
     let url = "https://api-inference.huggingface.co/models/codellama/CodeLlama-34b-Instruct-hf/v1/chat/completions";
-    let token = ""; // Replace this with the actual token or retrieve it securely
+    let token = &*TOKEN;
     let response_res = client
         .post(url)
         .header("Authorization", format!("Bearer {}", token))
@@ -125,11 +129,12 @@ pub fn all_code_files(dir: &str, diff_files: &Vec<StatItem>) -> Option<Vec<PathB
         log::error!("[all_code_files] No known language files detected in diff");
         return None;
     }
+    log::debug!("[all_code_files] dir = {}", dir);
     for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path().to_owned();
-        log::debug!("[all_code_files] path = {:?}", path);
+        // log::debug!("[all_code_files] path = {:?}", path);
         let ext = path.extension().and_then(|ext| ext.to_str());
-        log::debug!("[all_code_files] extension = {:?}", &ext);
+        // log::debug!("[all_code_files] extension = {:?}", &ext);
         if let Some(file_lang) = detect_language(&path.to_string_lossy()) {
             if all_diff_langs.contains(&file_lang) {
                 match path.canonicalize() {
