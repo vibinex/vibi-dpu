@@ -461,7 +461,6 @@ pub struct FunctionCallValidatorInput {
     code_line: String,               // A line of code that potentially contains the function call or object usage
     function_or_object_name: String, // The name of the function or object being used
     file_path: String,               // The file path or module from which the function or object is imported
-    import_statement: String,        // The actual import statement for the function or object
     language: String,                // The programming language of the code
 }
 
@@ -533,7 +532,7 @@ impl FunctionCallValidator {
     }
 
     pub async fn valid_func_calls_in_file(&mut self, file_path_buf: &PathBuf, lang: &str, 
-        func_name: &str, func_call_line: &str, import_def: &ImportDefOutput) -> bool {
+        func_name: &str, func_call_line: &str) -> bool {
         let file_contents_res = std::fs::read_to_string(file_path_buf);
         if file_contents_res.is_err() {
             let e = file_contents_res.expect_err("Empty error in file_content_res");
@@ -541,32 +540,18 @@ impl FunctionCallValidator {
             return false;
         }
         let file_contents = file_contents_res.expect("Uncaught error in file_content_res");
-        let numbered_content = numbered_content(file_contents);
-        let import_line_opt = import_def.line_range();
-        if import_line_opt.is_none() {
-            log::error!(
-                "[FunctionCallValidator/valid_func_calls_in_file] No line range in import def: {:#?}",
-                &import_def);
-            return false;
-        }
-        let import_line_range = import_line_opt.as_ref().expect("EMpty import_line_opt");
-        let import_content = numbered_content[
-            (import_line_range.start_line().to_owned() - 1)..(import_line_range.end_line().to_owned() - 1)
-            ].join("\n");
-        let call_validity = self.valid_func_calls(
-            &import_content, &func_call_line, func_name,
+        let call_validity = self.valid_func_calls(&func_call_line, func_name,
             &file_path_buf.to_string_lossy(), lang).await;
         return call_validity;
     }
 
-    async fn valid_func_calls(&mut self, import_content: &str, code_chunk: &str, 
+    async fn valid_func_calls(&mut self, code_chunk: &str, 
         func_name: &str, file_path: &str, lang: &str) -> bool
     {
         let func_call_validator_input = FunctionCallValidatorInput {
             code_line: code_chunk.to_owned(),
             function_or_object_name: func_name.to_owned(),
             file_path: file_path.to_owned(),
-            import_statement: import_content.to_owned(),
             language: lang.to_owned(),
         };
         self.prompt.set_input(func_call_validator_input);

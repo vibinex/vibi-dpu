@@ -336,12 +336,12 @@ async fn search_func_defs(possible_filepaths: &HashMap<String, Vec<(usize, Strin
         }
         let lang_opt = detect_language(&possible_filepath);
         if lang_opt.is_none() {
-            log::debug!("[process_func_defs] Unable to determine language: {}", &possible_filepath);
+            log::debug!("[search_func_defs] Unable to determine language: {}", &possible_filepath);
             continue;
         }
         let lang = lang_opt.expect("Empty lang_opt");
         if lang != dest_lang {
-            log::debug!("[process_func_defs] Different languages: {}, {}", &lang, &dest_lang);
+            log::debug!("[search_func_defs] Different languages: {}, {}", &lang, &dest_lang);
             continue;
         }
         let possible_path = Path::new(&possible_filepath);
@@ -349,16 +349,16 @@ async fn search_func_defs(possible_filepaths: &HashMap<String, Vec<(usize, Strin
     
         // TODO FIXME - filter line_num for being in import range
         for (line_num, line_content) in lines_info {
-            if let Some(import_hunks) = import_lines_identifier.import_lines_range_in_file(&possible_pathbuf, &lang).await {
-                if let Some(import_def) = import_def_identifier.identify_import_def(&possible_pathbuf, &dest_func_name, &lang, &import_hunks).await {
-                    log::debug!("[process_func_defs] import_def = {:#?}, possible file names - {}, filename - {}", &import_def , &possible_filepath, dest_filename);
-                    if func_call_validator.valid_func_calls_in_file(&possible_pathbuf, &lang, &dest_func_name, &line_content, &import_def).await {
+            // if let Some(import_hunks) = import_lines_identifier.import_lines_range_in_file(&possible_pathbuf, &lang).await {
+                // if let Some(import_def) = import_def_identifier.identify_import_def(&possible_pathbuf, &dest_func_name, &lang, &import_hunks).await {
+                    // log::debug!("[search_func_defs] import_def = {:#?}, possible file names - {}, filename - {}", &import_def , &possible_filepath, dest_filename);
+                    if func_call_validator.valid_func_calls_in_file(&possible_pathbuf, &lang, &dest_func_name, &line_content).await {
                         if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
                             if let Some(src_func_def) = get_function_def_for_func_call(
                                 &possible_pathbuf, line_num.to_owned()
                             ).await {
                                 // add edge
-                                log::debug!("[process_func_defs] src_func_def = {:#?}, filename = {}", &src_func_def, dest_filename);
+                                log::debug!("[search_func_defs] src_func_def = {:#?}, filename = {}", &src_func_def, dest_filename);
                                 let mut dest_file_rel = dest_filename.to_string();
                                 if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
                                     dest_file_rel = dest_file_relative_path;
@@ -394,47 +394,47 @@ async fn search_func_defs(possible_filepaths: &HashMap<String, Vec<(usize, Strin
                             }
                         }
                     }
-                } else {
-                    // Add edge for file subgroup
-                    if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
-                        let src_func_def_name = format!("{}", line_num);
-                        let src_func_def_line = line_num;
-                        let mut dest_file_rel = dest_filename.to_string();
-                        if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
-                            dest_file_rel = dest_file_relative_path;
-                        }
-                        graph_elems.add_edge("",
-                        line_num.to_owned(),
-                        &src_func_def_name,
-                        dest_func_name,
-                        &source_filename,
-                        &dest_file_rel,
-                        "",
-                        "yellow",
-                        src_func_def_line,
-                        dest_funcdef_line);
-                    }
-                }
-            } else {
-                if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
-                    let src_func_def_name = format!("{}", line_num);
-                    let src_func_def_line = line_num;
-                    let mut dest_file_rel = dest_filename.to_string();
-                    if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
-                        dest_file_rel = dest_file_relative_path;
-                    }
-                    graph_elems.add_edge("",
-                    line_num.to_owned(),
-                    &src_func_def_name,
-                    dest_func_name,
-                    &source_filename,
-                    &dest_file_rel,
-                    "",
-                    "yellow",
-                    src_func_def_line,
-                    dest_funcdef_line);
-                }
-            }
+                // } else {
+                //     // Add edge for file subgroup
+                //     if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
+                //         let src_func_def_name = format!("{}", line_num);
+                //         let src_func_def_line = line_num;
+                //         let mut dest_file_rel = dest_filename.to_string();
+                //         if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
+                //             dest_file_rel = dest_file_relative_path;
+                //         }
+                //         graph_elems.add_edge("",
+                //         line_num.to_owned(),
+                //         &src_func_def_name,
+                //         dest_func_name,
+                //         &source_filename,
+                //         &dest_file_rel,
+                //         "",
+                //         "yellow",
+                //         src_func_def_line,
+                //         dest_funcdef_line);
+                //     }
+                // }
+            // } else {
+            //     if let Some(source_filename) = absolute_to_relative_path(&possible_filepath, review) {
+            //         let src_func_def_name = format!("{}", line_num);
+            //         let src_func_def_line = line_num;
+            //         let mut dest_file_rel = dest_filename.to_string();
+            //         if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
+            //             dest_file_rel = dest_file_relative_path;
+            //         }
+            //         graph_elems.add_edge("",
+            //         line_num.to_owned(),
+            //         &src_func_def_name,
+            //         dest_func_name,
+            //         &source_filename,
+            //         &dest_file_rel,
+            //         "",
+            //         "yellow",
+            //         src_func_def_line,
+            //         dest_funcdef_line);
+            //     }
+            // }
         }
     }
 }
