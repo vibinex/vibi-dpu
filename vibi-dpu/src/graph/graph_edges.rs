@@ -135,7 +135,7 @@ async fn process_func_calls(import_identifier: &mut ImportIdentifier, func_call_
                 for func_call in func_calls.function_calls() {
                     let fake_func_def = FunctionDefinition {
                         line_number: (func_call.line_number().to_owned() as usize),
-                        structure_name: format!("{}", func_call.line_number()),
+                        structure_name: func_call.function_name().to_owned(),
                     };
                     func_def_call_map.insert(fake_func_def, vec![func_call.to_owned()]);
                 }
@@ -347,7 +347,6 @@ async fn search_func_defs(possible_filepaths: &HashMap<String, Vec<(usize, Strin
         let possible_path = Path::new(&possible_filepath);
         let possible_pathbuf = possible_path.to_path_buf();
     
-        // TODO FIXME - filter line_num for being in import range
         for (line_num, line_content) in lines_info {
             // if let Some(import_hunks) = import_lines_identifier.import_lines_range_in_file(&possible_pathbuf, &lang).await {
                 // if let Some(import_def) = import_def_identifier.identify_import_def(&possible_pathbuf, &dest_func_name, &lang, &import_hunks).await {
@@ -375,7 +374,8 @@ async fn search_func_defs(possible_filepaths: &HashMap<String, Vec<(usize, Strin
                                 dest_funcdef_line);
                             } else {
                                 // Add edge for file subgroup
-                                let src_func_def_name = format!("{}", line_num);
+
+                                let src_func_def_content = line_content;
                                 let src_func_def_line = line_num;
                                 let mut dest_file_rel = dest_filename.to_string();
                                 if let Some(dest_file_relative_path) = absolute_to_relative_path(&dest_filename, review) {
@@ -383,7 +383,7 @@ async fn search_func_defs(possible_filepaths: &HashMap<String, Vec<(usize, Strin
                                 }
                                 graph_elems.add_edge("",
                                 line_num.to_owned(),
-                                &src_func_def_name,
+                                src_func_def_content,
                                 dest_func_name,
                                 &source_filename,
                                 &dest_file_rel,
