@@ -360,42 +360,43 @@ impl DefinitionIdentifier {
             let def_out: DefintionExampleOutput = deserialized_def_response.expect("Empty error in deserialized_def_response");
             if let Some(func_defs) = def_out.definitions {
                 for func_def in func_defs {
-                    // ask validator to validate each line
-                    let code_line = numbered_content[func_def.line_number-1].to_string();
-                    let validation_input = ValidationPromptInput { code_line: code_line.to_string(), language: lang.to_string() };
-                    self.validation_prompt.set_input(validation_input);
-                    let validation_prompt_str_res = serde_json::to_string(&self.validation_prompt);
-                    if validation_prompt_str_res.is_err() {
-                        log::error!(
-                            "[DefintionIdentifier/identify_defs_in_file] Unable to serialize prompt: {:?}",
-                            validation_prompt_str_res.expect_err("Empty error in validation_prompt_str_res"));
-                            continue;
-                    }
-                    let validation_prompt_str = validation_prompt_str_res.expect("Uncaught error in validation_prompt_str_res");
-                    let validation_final_prompt = format!("{}\nOutput - ", &validation_prompt_str);
-                    log::debug!("[DefintionIdentifier/identify_defs_in_file] validation code_line: {}", &validation_final_prompt);
-                    let validation_prompt_response_opt =  call_llm_api(validation_final_prompt).await;
-                    if validation_prompt_response_opt.is_none() {
-                        log::error!("[DefintionIdentifier/identify_defs_in_file] Unable to call llm for validation code line: {:?}", code_line);
-                        continue;
-                    }
-                    let mut validation_prompt_response = validation_prompt_response_opt.expect("Empty prompt_response_opt");
-                    if let Some(stripped_json) = strip_json_prefix(&validation_prompt_response) {
-                        validation_prompt_response = stripped_json.to_string();
-                    }
-                    let deserialized_response = serde_json::from_str(&validation_prompt_response);
-                    if deserialized_response.is_err() {
-                        let e = deserialized_response.expect_err("Empty error in deserialized_response");
-                        log::error!("[DefintionIdentifier/identify_defs_in_file] Error in deserializing response: {:?}", e);
-                        continue;
-                    }
-                    let validation_out: ValidationPromptOutput = deserialized_response.expect("Empty error in deserialized_response");
-                    log::debug!("[DefintionIdentifier/identify_defs_in_file] validation response obj: {:#?}", &validation_out);
-                    if !validation_out.is_definition || validation_out.status != "valid" {
-                        log::debug!("[DefintionIdentifier/identify_defs_in_file] Given code line is not valid function def");
-                        continue;
-                    }
-                    // add filtered lines and defs to vec
+                    // // ask validator to validate each line
+                    // // TODO - incorrect line
+                    // let code_line = numbered_content[func_def.line_number-1].to_string();
+                    // let validation_input = ValidationPromptInput { code_line: code_line.to_string(), language: lang.to_string() };
+                    // self.validation_prompt.set_input(validation_input);
+                    // let validation_prompt_str_res = serde_json::to_string(&self.validation_prompt);
+                    // if validation_prompt_str_res.is_err() {
+                    //     log::error!(
+                    //         "[DefintionIdentifier/identify_defs_in_file] Unable to serialize prompt: {:?}",
+                    //         validation_prompt_str_res.expect_err("Empty error in validation_prompt_str_res"));
+                    //         continue;
+                    // }
+                    // let validation_prompt_str = validation_prompt_str_res.expect("Uncaught error in validation_prompt_str_res");
+                    // let validation_final_prompt = format!("{}\nOutput - ", &validation_prompt_str);
+                    // log::debug!("[DefintionIdentifier/identify_defs_in_file] validation code_line: {}", &validation_final_prompt);
+                    // let validation_prompt_response_opt =  call_llm_api(validation_final_prompt).await;
+                    // if validation_prompt_response_opt.is_none() {
+                    //     log::error!("[DefintionIdentifier/identify_defs_in_file] Unable to call llm for validation code line: {:?}", code_line);
+                    //     continue;
+                    // }
+                    // let mut validation_prompt_response = validation_prompt_response_opt.expect("Empty prompt_response_opt");
+                    // if let Some(stripped_json) = strip_json_prefix(&validation_prompt_response) {
+                    //     validation_prompt_response = stripped_json.to_string();
+                    // }
+                    // let deserialized_response = serde_json::from_str(&validation_prompt_response);
+                    // if deserialized_response.is_err() {
+                    //     let e = deserialized_response.expect_err("Empty error in deserialized_response");
+                    //     log::error!("[DefintionIdentifier/identify_defs_in_file] Error in deserializing response: {:?}", e);
+                    //     continue;
+                    // }
+                    // let validation_out: ValidationPromptOutput = deserialized_response.expect("Empty error in deserialized_response");
+                    // log::debug!("[DefintionIdentifier/identify_defs_in_file] validation response obj: {:#?}", &validation_out);
+                    // if !validation_out.is_definition || validation_out.status != "valid" {
+                    //     log::debug!("[DefintionIdentifier/identify_defs_in_file] Given code line is not valid function def");
+                    //     continue;
+                    // }
+                    // // add filtered lines and defs to vec
                     func_def_vals.push(func_def);
                 }
             }
