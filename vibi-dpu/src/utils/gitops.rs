@@ -685,3 +685,37 @@ pub fn get_git_aliases(repo: &Repository) -> Option<Vec<String>> {
 	log::debug!("[get_git_aliases] Extracted unique git aliases: {:?}", &unique_emails);
 	return Some(unique_emails);
 }
+
+
+pub fn get_file_modification_status(clone_dir: &str, commit_range: &str) -> Option<HashMap<String, Vec<String>>> {
+	let git_res = Command::new("git")
+		.args(&["diff", "--name-status", &commit_range])
+		.current_dir(clone_dir)
+		.output();
+	if git_res.is_err() {
+		let e = git_res.expect_err("No error in git_res");
+		log::error!("[get_file_modification_status] git diff name status cmd error {:?}", e);
+		return None;
+	}
+	let mod_status = git_res.expect("Unable to catch error in git_res");
+	let mod_lines_res = String::from_utf8(mod_status.stdout);
+	if mod_lines_res.is_err() {
+		let e = mod_lines_res.expect_err("No error in mod_lines_res");
+		log::error!("[get_file_modification_status] Unable to parse git diff name cmd output {:?}", e);
+		return None;
+	}
+	let mod_lines = mod_lines_res.expect("Unable to catch error in mod_lines_res");
+	let mut mod_map = HashMap::<String, Vec<String>>::new();
+	for line in mod_lines.lines() {
+		let parts: Vec<&str> = line.split_whitespace().collect();
+		if parts.len() == 2 {
+			match parts[0] {
+				"A" => mod_map.entry("green".to_string()).or_insert_with(Vec::new).push(parts[1].to_string()),
+				"D" => mod_map.entry("red".to_string()).or_insert_with(Vec::new).push(parts[1].to_string()),
+				"M" => mod_map.entry("yellow".to_string()).or_insert_with(Vec::new).push(parts[1].to_string()),
+				_ => {}
+			}
+		}
+	}
+	return Some(mod_map);
+}

@@ -395,6 +395,12 @@ impl MermaidGraphElements {
         }
     }
 
+    pub fn add_file_node(&mut self, file_name: &str, color: &str) {
+        let mut subgraph = MermaidSubgraph::new(file_name.to_string());
+        subgraph.set_color(color);
+        self.add_subgraph(subgraph);
+    }
+
     fn add_edge_to_edges(&mut self, edge: MermaidEdge) {
         let edge_key = edge.get_edge_key();
         if let Some(edge_mut) = self.edges.get_mut(&edge_key) {
