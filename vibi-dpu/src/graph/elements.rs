@@ -91,6 +91,14 @@ impl MermaidSubgraph {
 
     fn render_subgraph_style(&self) -> String {
         let mut class_str = "";
+        if self.nodes.is_empty() {
+            match self.color.as_str() {
+                "yellow" => class_str = "modified",
+                "red" => class_str = "red",
+                "green" => class_str = "green",
+                _ => ()
+            }
+        }
         for (_, node) in self.nodes() {
             match node.color().as_str() {
                 "yellow" => {
