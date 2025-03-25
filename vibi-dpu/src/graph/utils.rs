@@ -23,21 +23,17 @@ static TOKEN: Lazy<String> = Lazy::new(|| {
 
 pub async fn call_llm_api(prompt: String) -> Option<String> {
     let client = get_client();
-    let url = "https://api-inference.huggingface.co/models/codellama/CodeLlama-34b-Instruct-hf/v1/chat/completions";
+    let url = "https://diff-grapher.openai.azure.com/openai/deployments/diff-grapher/chat/completions?api-version=2025-01-01-preview";
     let token = &*TOKEN;
     let response_res = client
         .post(url)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("api-key", format!("{}", token))
         .header("Content-Type", "application/json")
         .json(&json!({
-            "model": "codellama/CodeLlama-34b-Instruct-hf",
             "messages": [
                 { "role": "user", "content": prompt }
             ],
-            "temperature": 0.5,
-            "max_tokens": 2048,
-            "top_p": 0.7,
-            "stream": true
+            "max_tokens": 4000,
         }))
         .send()
         .await;
