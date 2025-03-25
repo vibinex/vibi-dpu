@@ -46,6 +46,7 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
     let response = response_res.unwrap();
 
     // Ensure we can read the response stream
+    log::debug!("[call_llm_api] llm response = {:#?}", &response);
     let resp_text_res = response.text().await;
     if let Err(err) = resp_text_res {
         log::error!("[call_llm_api] Error reading response text: {:?}", err);
@@ -53,6 +54,7 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
     }
 
     let resp_text = resp_text_res.unwrap();
+    log::debug!("[call_llm_api] llm response text = {}", resp_text);
     // Split response on "data: " to process each chunk
     let chunks: Vec<&str> = resp_text.split("data: ").filter(|s| !s.trim().is_empty()).collect();
     let mut final_response = String::new();
