@@ -46,7 +46,6 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
     let response = response_res.unwrap();
 
     // Ensure we can read the response stream
-    log::debug!("[call_llm_api] llm response = {:#?}", &response);
     let resp_text_res = response.text().await;
     if let Err(err) = resp_text_res {
         log::error!("[call_llm_api] Error reading response text: {:?}", err);
@@ -54,39 +53,17 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
     }
 
     let resp_text = resp_text_res.unwrap();
-    log::debug!("[call_llm_api] llm response text = {}", resp_text);
-    // Split response on "data: " to process each chunk
-    let chunks: Vec<&str> = resp_text.split("data: ").filter(|s| !s.trim().is_empty()).collect();
-    let mut final_response = String::new();
+    // Parse the response text as JSON
+    let resp_json: Value = serde_json::from_str(&resp_text).expect("Failed to parse JSON");
 
-    for chunk in chunks {
-        // Skip the special "[DONE]" marker
-        if chunk.trim() == "[DONE]" {
-            break;
-        }
-
-        // Deserialize the JSON chunk
-        let parsed_chunk_res = serde_json::from_str::<serde_json::Value>(chunk);
-        if let Err(err) = parsed_chunk_res {
-            log::error!("[call_llm_api] Unable to deserialize chunk: {:?}, error: {:?}", chunk, err);
-            continue;
-        }
-
-        let parsed_chunk = parsed_chunk_res.unwrap();
-
-        // Extract the "content" field from the parsed JSON
-        if let Some(parsed_response) = parsed_chunk
-            .get("choices")
-            .and_then(|choices| choices.as_array())
-            .and_then(|choices| choices.first())
-            .and_then(|choice| choice.get("delta"))
-            .and_then(|delta| delta.get("content"))
-            .and_then(|content| content.as_str())
-        {
-            final_response.push_str(parsed_response);
-        }
-    }
-
+    // Extract and concatenate all `message.content` values from `choices`
+    let final_response: String = resp_json["choices"]
+        .as_array()
+        .unwrap_or(&vec![]) // Handle case where `choices` might be missing
+        .iter()
+        .filter_map(|choice| choice["message"]["content"].as_str()) // Extract content
+        .collect::<Vec<&str>>() // Collect into a Vec of strings
+        .join("\n"); // Join with newlines
     log::info!("[call_llm_api] Final aggregated response: {:#?}", final_response);
     Some(final_response)
 }
