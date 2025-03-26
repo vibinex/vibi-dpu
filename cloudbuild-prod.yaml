@@ -21,6 +21,7 @@ steps:
     args:
       - 'build'
       - '--build-arg'
+      - '--platform=linux/arm64'
       - 'GCP_CREDENTIALS=$_GCP_CREDENTIALS'
       - '--build-arg'
       - 'SERVER_URL=$_SERVER_URL'
