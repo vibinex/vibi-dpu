@@ -20,8 +20,8 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
-      - '--build-arg'
       - '--platform=linux/arm64'
+      - '--build-arg'
       - 'GCP_CREDENTIALS=$_GCP_CREDENTIALS'
       - '--build-arg'
       - 'SERVER_URL=$_SERVER_URL'
