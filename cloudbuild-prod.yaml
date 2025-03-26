@@ -48,7 +48,7 @@ steps:
       - '-t'
       - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA'
       - '-t'
-      - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest'
+      - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:arm64'
       - '.'
 
   # Push the Docker image to Google Container Registry
