@@ -56,4 +56,4 @@ steps:
     args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA']
   
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest']
+    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:arm64']
