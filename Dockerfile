@@ -39,8 +39,8 @@ ENV GITHUB_PAT=$GITHUB_PAT
 ENV PROVIDER=$PROVIDER
 
 COPY ./vibi-dpu/target/debug/vibi-dpu /app/vibi-dpu
-COPY ./pubsub-sa-test.json /app/pubsub-sa.json
-COPY ./test-repoprofiler.2023-05-15.private-key.pem /app/repo-profiler.pem
+COPY ./pubsub-sa.json /app/pubsub-sa.json
+COPY ./repo-profiler.pem /app/repo-profiler.pem
 COPY ./prompts /app/prompts
 
 # Create directory for configuration
