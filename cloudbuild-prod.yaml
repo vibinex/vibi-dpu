@@ -15,10 +15,15 @@ steps:
     entrypoint: 'cargo'
     args: ['build']
     dir: 'vibi-dpu'
+  
+  # Create a buildx builder instance
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['buildx', 'create', '--use']
 
   # Build the Docker image with the build arguments
   - name: 'gcr.io/cloud-builders/docker'
     args:
+      - 'buildx'
       - 'build'
       - '--platform=linux/amd64,linux/arm64'
       - '--build-arg'
@@ -57,3 +62,8 @@ steps:
   
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest']
+
+# Global options (outside steps)
+options:
+  env:
+    - DOCKER_CLI_EXPERIMENTAL=enabled
