@@ -4,7 +4,7 @@ FROM ubuntu:latest
 # # Install dependencies required by the application
 RUN \
   apt-get update && \
-  apt-get install -y ca-certificates git ripgrep libssl1.1 && \
+  apt-get install -y ca-certificates git ripgrep libssl3 && \
   apt-get clean
 
 ARG GCP_CREDENTIALS
