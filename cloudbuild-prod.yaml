@@ -20,7 +20,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
-      - '--platform=linux/arm64'
+      - '--platform=linux/amd64,linux/arm64'
       - '--build-arg'
       - 'GCP_CREDENTIALS=$_GCP_CREDENTIALS'
       - '--build-arg'
@@ -48,7 +48,7 @@ steps:
       - '-t'
       - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA'
       - '-t'
-      - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:arm64'
+      - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest'
       - '.'
 
   # Push the Docker image to Google Container Registry
@@ -56,4 +56,4 @@ steps:
     args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA']
   
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:arm64']
+    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest']
