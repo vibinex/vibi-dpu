@@ -4,12 +4,8 @@ FROM ubuntu:latest
 # # Install dependencies required by the application
 RUN \
   apt-get update && \
-  apt-get install ca-certificates git ripgrep -y && \
+  apt-get install -y ca-certificates git ripgrep libssl3 && \
   apt-get clean
-ADD http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb /tmp
-RUN chmod a+x /tmp/libssl1.1_1.1.1f-1ubuntu2_amd64.deb && \
-    apt-get install /tmp/libssl1.1_1.1.1f-1ubuntu2_amd64.deb -y && \
-    rm -rf /tmp/*.deb
 
 ARG GCP_CREDENTIALS
 ARG TOPIC_NAME 
@@ -46,6 +42,7 @@ COPY ./vibi-dpu/target/debug/vibi-dpu /app/vibi-dpu
 COPY ./pubsub-sa.json /app/pubsub-sa.json
 COPY ./repo-profiler.pem /app/repo-profiler.pem
 COPY ./prompts /app/prompts
+
 # Create directory for configuration
 RUN mkdir /app/config
 
