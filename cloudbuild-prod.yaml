@@ -26,6 +26,7 @@ steps:
       - 'buildx'
       - 'build'
       - '--platform=linux/amd64,linux/arm64'
+      - '--push'
       - '--build-arg'
       - 'GCP_CREDENTIALS=$_GCP_CREDENTIALS'
       - '--build-arg'
@@ -55,13 +56,6 @@ steps:
       - '-t'
       - 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest'
       - '.'
-
-  # Push the Docker image to Google Container Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:$SHORT_SHA']
-  
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia.gcr.io/$PROJECT_ID/dpu/dpu:latest']
 
 # Global options (outside steps)
 options:
