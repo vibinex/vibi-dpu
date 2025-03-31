@@ -51,19 +51,19 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
 
         if let Err(err) = response_res {
             log::error!("[call_llm_api] Error in calling API: {:?}", err);
-            return None;
+            continue;
         }
 
-        let response = response_res.unwrap();
+        let response = response_res.expect("Uncaught error in response_res");
 
         // Ensure we can read the response stream
         let resp_text_res = response.text().await;
         if let Err(err) = resp_text_res {
             log::error!("[call_llm_api] Error reading response text: {:?}", err);
-            return None;
+            continue;
         }
 
-        let resp_text = resp_text_res.unwrap();
+        let resp_text = resp_text_res.expect("Uncaught error in resp_text_res");
         // Parse the response text as JSON
         let resp_json: Value = serde_json::from_str(&resp_text).expect("Failed to parse JSON");
 
