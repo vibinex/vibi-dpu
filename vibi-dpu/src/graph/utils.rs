@@ -65,8 +65,12 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
 
         let resp_text = resp_text_res.expect("Uncaught error in resp_text_res");
         // Parse the response text as JSON
-        let resp_json: Value = serde_json::from_str(&resp_text).expect("Failed to parse JSON");
-
+        let resp_json_res = serde_json::from_str(&resp_text);
+        if let Err(e) = resp_json_res {
+            log::error!("[call_llm_api] Unable to parse response json {:?}", e);
+            continue;
+        }
+        let resp_json: Value = resp_json_res.expect("Failed to parse JSON");
         // Extract and concatenate all `message.content` values from `choices`
         let final_response: String = resp_json["choices"]
             .as_array()
