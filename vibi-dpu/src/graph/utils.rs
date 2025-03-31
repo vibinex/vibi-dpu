@@ -6,6 +6,8 @@ use walkdir::WalkDir;
 use std::fs;
 use rand::Rng;
 use once_cell::sync::Lazy;
+use std::time::Duration;
+use tokio::time::sleep;
 
 use crate::utils::{gitops::StatItem, reqwest_client::get_client, review::Review};
 
@@ -25,47 +27,67 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
     let client = get_client();
     let url = "https://diff-grapher.openai.azure.com/openai/deployments/diff-grapher/chat/completions?api-version=2025-01-01-preview";
     let token = &*TOKEN;
-    let response_res = client
-        .post(url)
-        .header("api-key", format!("{}", token))
-        .header("Content-Type", "application/json")
-        .json(&json!({
-            "messages": [
-                { "role": "user", "content": prompt }
-            ],
-            "max_tokens": 4000,
-        }))
-        .send()
-        .await;
 
-    if let Err(err) = response_res {
-        log::error!("[call_llm_api] Error in calling API: {:?}", err);
-        return None;
+    // Initial wait of 5 seconds before making the first API call
+    sleep(Duration::from_secs(5)).await;
+
+    let mut wait_time = 10; // Initial backoff time in seconds
+
+    for attempt in 0..5 {
+
+        let response_res = client
+            .post(url)
+            .header("api-key", format!("{}", token))
+            .header("Content-Type", "application/json")
+            .json(&json!({
+                "messages": [
+                    { "role": "user", "content": prompt }
+                ],
+                "max_tokens": 4000,
+            }))
+            .send()
+            .await;
+
+        if let Err(err) = response_res {
+            log::error!("[call_llm_api] Error in calling API: {:?}", err);
+            return None;
+        }
+
+        let response = response_res.unwrap();
+
+        // Ensure we can read the response stream
+        let resp_text_res = response.text().await;
+        if let Err(err) = resp_text_res {
+            log::error!("[call_llm_api] Error reading response text: {:?}", err);
+            return None;
+        }
+
+        let resp_text = resp_text_res.unwrap();
+        // Parse the response text as JSON
+        let resp_json: Value = serde_json::from_str(&resp_text).expect("Failed to parse JSON");
+
+        // Extract and concatenate all `message.content` values from `choices`
+        let final_response: String = resp_json["choices"]
+            .as_array()
+            .unwrap_or(&vec![]) // Handle case where `choices` might be missing
+            .iter()
+            .filter_map(|choice| choice["message"]["content"].as_str()) // Extract content
+            .collect::<Vec<&str>>() // Collect into a Vec of strings
+            .join("\n"); // Join with newlines
+        log::info!("[call_llm_api] Final aggregated response: {:#?}", final_response);
+        if !final_response.is_empty() {
+            return Some(final_response);
+        }
+
+        log::warn!(
+            "[call_llm_api] Empty response, retrying in {} seconds (attempt {}/5)...",
+            wait_time,
+            attempt + 1
+        );
+        sleep(Duration::from_secs(wait_time)).await;
+        wait_time *= 2; // Double the wait time
     }
-
-    let response = response_res.unwrap();
-
-    // Ensure we can read the response stream
-    let resp_text_res = response.text().await;
-    if let Err(err) = resp_text_res {
-        log::error!("[call_llm_api] Error reading response text: {:?}", err);
-        return None;
-    }
-
-    let resp_text = resp_text_res.unwrap();
-    // Parse the response text as JSON
-    let resp_json: Value = serde_json::from_str(&resp_text).expect("Failed to parse JSON");
-
-    // Extract and concatenate all `message.content` values from `choices`
-    let final_response: String = resp_json["choices"]
-        .as_array()
-        .unwrap_or(&vec![]) // Handle case where `choices` might be missing
-        .iter()
-        .filter_map(|choice| choice["message"]["content"].as_str()) // Extract content
-        .collect::<Vec<&str>>() // Collect into a Vec of strings
-        .join("\n"); // Join with newlines
-    log::info!("[call_llm_api] Final aggregated response: {:#?}", final_response);
-    Some(final_response)
+    None
 }
 
 pub fn read_file(file: &str) -> Option<String> {
