@@ -28,8 +28,8 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
     let url = "https://diff-grapher.openai.azure.com/openai/deployments/diff-grapher/chat/completions?api-version=2025-01-01-preview";
     let token = &*TOKEN;
 
-    // Initial wait of 5 seconds before making the first API call
-    sleep(Duration::from_secs(5)).await;
+    // Initial wait of 1 seconds before making the first API call
+    sleep(Duration::from_secs(1)).await;
 
     let mut wait_time = 10; // Initial backoff time in seconds
 
