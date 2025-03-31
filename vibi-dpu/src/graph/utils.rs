@@ -29,9 +29,10 @@ pub async fn call_llm_api(prompt: String) -> Option<String> {
     let token = &*TOKEN;
 
     // Initial wait of 1 seconds before making the first API call
-    sleep(Duration::from_secs(1)).await;
+    let initial_timeoff = 1;
+    sleep(Duration::from_secs(initial_timeoff)).await;
 
-    let mut wait_time = 10; // Initial backoff time in seconds
+    let mut wait_time = 5; // Initial backoff time in seconds
 
     for attempt in 0..5 {
 
