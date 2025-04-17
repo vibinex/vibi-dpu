@@ -194,6 +194,7 @@ pub fn absolute_to_relative_path(abs_path: &str, review: &Review) -> Option<Stri
         return None;
     }
     let rel_path = rel_path_res.expect("Uncaught error in rel_path_res");
+    log::debug!("[absolute_to_relative_path] rel_path = {:?}", rel_path);
     return Some(rel_path.to_str().expect("Unable to deserialze rel_path").to_string());
 }
 
