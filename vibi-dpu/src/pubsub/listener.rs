@@ -31,6 +31,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
 		return;
 	}
 	let msgtype = msgtype_opt.expect("Empty msgtype");
+	log::debug!("[process_message] msgtype = {:?}", msgtype);
 	match msgtype.as_str() {
 		"install_callback" => {
 			process_install_callback(&data_bytes).await;
@@ -151,6 +152,7 @@ pub async fn listen_messages(keypath: &str, topicname: &str) {
 		log::info!("Recieved task, processing...");
 		let attrmap: HashMap<String, String> =
 			message.message.attributes.clone().into_iter().collect();
+		log::debug!("[listen_messages] attrmap = {:?}", &attrmap);
 		let message_hash = digest(&*message.message.data);
 		if !message_hashes.contains(&message_hash) {
 			message_hashes.push_back(message_hash);
