@@ -53,6 +53,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
 		}
 		"manual_trigger" => {
 			log::info!("Processing trigger...");
+			log::debug!("[process_message] data_bytes = {:?}", &data_bytes);
 			process_trigger(&data_bytes).await;
 			log::info!("Trigger task processed!");
 		}
@@ -65,6 +66,7 @@ async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<
 			log::error!("[process_message] Message type not found for message : {:?}", attributes);
 		}
 	};
+	log::debug!("[process_message] msgtype.as_str() = {:?}", msgtype.as_str());
 }
 
 async fn process_install_callback(data_bytes: &[u8]) {

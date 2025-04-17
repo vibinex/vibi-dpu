@@ -13,6 +13,7 @@ struct TriggerReview {
 pub async fn process_trigger(message_data: &Vec<u8>) {
 	// parse message
 	let parse_res = parse_trigger_msg(message_data);
+	log::debug!("[process_trigger] parse_res = {:?}", &parse_res);
 	// create review object from db
 	if parse_res.is_none() {
 		log::error!("[process_trigger] Unable to parse message: {:?}", &message_data);
