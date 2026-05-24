@@ -8,18 +8,15 @@ mod utils;
 mod logger;
 mod health;
 mod graph;
+mod http_queue;
 use github::auth::app_access_token;
 use health::status::send_status_start;
-use tokio::task;
 use crate::{core::github::setup::process_repos, utils::user::ProviderEnum};
 
 #[tokio::main]
 async fn main() {
-	// Get topic subscription and Listen to messages 
-	let gcp_credentials = //"/home/tapishr/dev-profiler/pubsub-sa.json".to_owned();
-	env::var("GCP_CREDENTIALS").expect("GCP_CREDENTIALS must be set");
-	let topic_name = //"rtapish-fromserver".to_owned();
-	env::var("INSTALL_ID").expect("INSTALL_ID must be set");
+	let queue_transport = env::var("DPU_QUEUE_TRANSPORT").unwrap_or_else(|_| "pubsub".to_owned());
+	let installation_id = env::var("INSTALL_ID").expect("INSTALL_ID must be set");
 	let logs_init_status = logger::init::init_logger();
 	if !logs_init_status {
 		log::warn!("[main] Unable to create file logger");
@@ -50,11 +47,18 @@ async fn main() {
 	if !is_pat {
 		load_auth_from_previous_installation().await;
 	}
-	log::debug!("[main] env vars = {}, {}", &gcp_credentials, &topic_name);
-	pubsub::listener::listen_messages(
-		&gcp_credentials, 
-		&topic_name,
-	).await;
+	if queue_transport.eq_ignore_ascii_case("http") {
+		let server_url = env::var("SERVER_URL").expect("SERVER_URL must be set for HTTP DPU queue transport");
+		let dpu_auth_token = env::var("DPU_AUTH_TOKEN").expect("DPU_AUTH_TOKEN must be set for HTTP DPU queue transport");
+		http_queue::listener::poll_messages(&server_url, &installation_id, &dpu_auth_token).await;
+	} else {
+		let gcp_credentials = env::var("GCP_CREDENTIALS").expect("GCP_CREDENTIALS must be set");
+		log::debug!("[main] env vars = {}, {}", &gcp_credentials, &installation_id);
+		pubsub::listener::listen_messages(
+			&gcp_credentials,
+			&installation_id,
+		).await;
+	}
 }
 
 async fn load_auth_from_previous_installation() {

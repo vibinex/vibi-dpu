@@ -24,7 +24,7 @@ struct InstallCallback {
 	installation_code: String,
 }
 
-async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<u8>) {
+pub async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<u8>) {
 	let msgtype_opt = attributes.get("msgtype");
 	if msgtype_opt.is_none() {
 		log::error!("[process_message] msgtype attribute not found in message, attr: {:?}", attributes);
