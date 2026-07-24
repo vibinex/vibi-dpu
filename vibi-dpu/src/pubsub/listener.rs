@@ -24,16 +24,24 @@ struct InstallCallback {
 	installation_code: String,
 }
 
-pub async fn process_message(attributes: &HashMap<String, String>, data_bytes: &Vec<u8>) {
+/// Process an incoming message and return JoinHandles for any background tasks
+/// spawned. Callers MUST await all returned handles before ACKing the message
+/// to prevent silent work loss if the process exits between ACK and task
+/// completion.
+pub async fn process_message(
+	attributes: &HashMap<String, String>,
+	data_bytes: &Vec<u8>,
+) -> Vec<task::JoinHandle<()>> {
+	let mut handles: Vec<task::JoinHandle<()>> = Vec::new();
 	let msgtype_opt = attributes.get("msgtype");
 	if msgtype_opt.is_none() {
 		log::error!("[process_message] msgtype attribute not found in message, attr: {:?}", attributes);
-		return;
+		return handles;
 	}
 	let msgtype = msgtype_opt.expect("Empty msgtype");
 	match msgtype.as_str() {
 		"install_callback" => {
-			process_install_callback(&data_bytes).await;
+			handles.extend(process_install_callback(&data_bytes).await);
 		}
 		"webhook_callback" => {
 			let data_bytes_async = data_bytes.to_owned();
@@ -44,11 +52,13 @@ pub async fn process_message(attributes: &HashMap<String, String>, data_bytes: &
 			let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data).await;
 			if is_reviewable {
 				log::info!("Changes detected in PR, processing...");
-				task::spawn(async move {
+				handles.push(task::spawn(async move {
 					process_review(&data_bytes_async).await;
 					log::info!("Webhook Callback Processed!");
-				});
-			} else { log::info!("No changes detected in PR, Webhook Callback Processed!");}
+				}));
+			} else {
+				log::info!("No changes detected in PR, Webhook Callback Processed!");
+			}
 		}
 		"manual_trigger" => {
 			log::info!("Processing trigger...");
@@ -64,30 +74,33 @@ pub async fn process_message(attributes: &HashMap<String, String>, data_bytes: &
 			log::error!("[process_message] Message type not found for message : {:?}", attributes);
 		}
 	};
+	handles
 }
 
-async fn process_install_callback(data_bytes: &[u8]) {
+async fn process_install_callback(data_bytes: &[u8]) -> Vec<task::JoinHandle<()>> {
+	let mut handles: Vec<task::JoinHandle<()>> = Vec::new();
 	log::info!("Beginning installation...");
 	let msg_data_res = serde_json::from_slice::<InstallCallback>(data_bytes);
 	if msg_data_res.is_err() {
 		log::error!("[process_install_callback] Error deserializing install callback: {:?}", msg_data_res);
-		return;
+		return handles;
 	}
 	let data = msg_data_res.expect("msg_data not found");
 	if data.repository_provider == ProviderEnum::Github.to_string().to_lowercase() {
 		let code_async = data.installation_code.clone();
-		task::spawn(async move {
+		handles.push(task::spawn(async move {
 			handle_install_github(&code_async).await;
 			log::info!("Installation Completed!");
-		});
+		}));
 	}
 	if data.repository_provider == ProviderEnum::Bitbucket.to_string().to_lowercase() {
 		let code_async = data.installation_code.clone();
-		task::spawn(async move {
+		handles.push(task::spawn(async move {
 			handle_install_bitbucket(&code_async).await;
 			log::info!("Installation Completed!");
-		});
+		}));
 	}
+	handles
 }
 
 pub async fn get_pubsub_client_config(keypath: &str) -> ClientConfig {
@@ -160,9 +173,14 @@ pub async fn listen_messages(keypath: &str, topicname: &str) {
 				}
 			}
 			let msg_bytes = message.message.data.clone();
-			process_message(&attrmap, &msg_bytes).await;
+			let handles = process_message(&attrmap, &msg_bytes).await;
+			for handle in handles {
+				if let Err(e) = handle.await {
+					log::error!("[pubsub] Background task panicked: {:?}", e);
+				}
+			}
 		}
-		// Ack or Nack message.
+		// Ack or Nack message only after all background work has completed.
 		let _ = message.ack().await;
 	}
 }

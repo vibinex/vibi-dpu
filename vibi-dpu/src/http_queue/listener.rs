@@ -139,13 +139,14 @@ async fn process_job(
 	};
 	let mut attributes = HashMap::new();
 	attributes.insert("msgtype".to_string(), job.msg_type.clone());
-	// NOTE: process_message internally spawns background tasks for some message types
-	// (e.g. webhook_callback → process_review, install_callback → handle_install_*).
-	// The ACK below happens after process_message returns, but those spawned tasks may
-	// still be running. If the DPU is killed between ACK and task completion, work is
-	// silently lost. Tracked as a known limitation; a proper fix requires process_message
-	// to expose JoinHandles so they can be awaited before ACK.
-	process_message(&attributes, &msg_bytes).await;
+	let handles = process_message(&attributes, &msg_bytes).await;
+	// Await all background tasks before ACKing so work is never silently lost
+	// if the process exits between ACK and task completion.
+	for handle in handles {
+		if let Err(e) = handle.await {
+			log::error!("[http_queue] Background task panicked for job {}: {:?}", job.id, e);
+		}
+	}
 	if let Err(err) = ack_job(client, server_url, installation_id, auth_token, &job.id).await {
 		log::error!("[http_queue] Failed to ack job {}: {:?}", job.id, err);
 	}
