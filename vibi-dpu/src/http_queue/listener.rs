@@ -140,15 +140,24 @@ async fn process_job(
 	let mut attributes = HashMap::new();
 	attributes.insert("msgtype".to_string(), job.msg_type.clone());
 	let handles = process_message(&attributes, &msg_bytes).await;
-	// Await all background tasks before ACKing so work is never silently lost
-	// if the process exits between ACK and task completion.
+	// Await all background tasks and track success before deciding ACK vs fail.
+	// A join error means a spawned task panicked; requeue the job so it is retried
+	// rather than silently lost.
+	let mut all_ok = true;
 	for handle in handles {
 		if let Err(e) = handle.await {
 			log::error!("[http_queue] Background task panicked for job {}: {:?}", job.id, e);
+			all_ok = false;
 		}
 	}
-	if let Err(err) = ack_job(client, server_url, installation_id, auth_token, &job.id).await {
-		log::error!("[http_queue] Failed to ack job {}: {:?}", job.id, err);
+	if all_ok {
+		if let Err(err) = ack_job(client, server_url, installation_id, auth_token, &job.id).await {
+			log::error!("[http_queue] Failed to ack job {}: {:?}", job.id, err);
+		}
+	} else {
+		if let Err(err) = fail_job(client, server_url, installation_id, auth_token, &job.id, "background task panicked", true).await {
+			log::error!("[http_queue] Failed to fail job {}: {:?}", job.id, err);
+		}
 	}
 }
 
