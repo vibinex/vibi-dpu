@@ -49,7 +49,11 @@ struct FailRequest<'a> {
 }
 
 pub async fn poll_messages(server_url: &str, installation_id: &str, auth_token: &str) {
-	let client = Client::new();
+	let client = Client::builder()
+		.connect_timeout(Duration::from_secs(10))
+		.timeout(Duration::from_secs(30))
+		.build()
+		.expect("Failed to build HTTP client");
 	let poll_interval = std::env::var("DPU_POLL_INTERVAL_MS")
 		.ok()
 		.and_then(|value| value.parse::<u64>().ok())
@@ -135,6 +139,12 @@ async fn process_job(
 	};
 	let mut attributes = HashMap::new();
 	attributes.insert("msgtype".to_string(), job.msg_type.clone());
+	// NOTE: process_message internally spawns background tasks for some message types
+	// (e.g. webhook_callback → process_review, install_callback → handle_install_*).
+	// The ACK below happens after process_message returns, but those spawned tasks may
+	// still be running. If the DPU is killed between ACK and task completion, work is
+	// silently lost. Tracked as a known limitation; a proper fix requires process_message
+	// to expose JoinHandles so they can be awaited before ACK.
 	process_message(&attributes, &msg_bytes).await;
 	if let Err(err) = ack_job(client, server_url, installation_id, auth_token, &job.id).await {
 		log::error!("[http_queue] Failed to ack job {}: {:?}", job.id, err);

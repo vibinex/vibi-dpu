@@ -39,11 +39,15 @@ To run Vibi-DPU locally:
 11. **Run the Docker container**: After building the image, you can run it using the following command.
 
     ```bash
+    # Create an env file to keep secrets out of shell history (chmod 600 .env.dpu)
+    # .env.dpu contents:
+    #   DPU_AUTH_TOKEN=your-shared-dpu-token
+
     docker run \
+      --env-file .env.dpu \
       -e DPU_QUEUE_TRANSPORT=http \
       -e INSTALL_ID=your-install-id \
       -e SERVER_URL=your-server-url \
-      -e DPU_AUTH_TOKEN=your-shared-dpu-token \
       dpu
     ```
 12. For bitbucket, replace your url in this url and paste it on your browser and visit it. If you are using ngrok, you might get a "visit site" ngrok welcome page. Click and visit site. Grant any permissions asked from your user to bitbucket. Example URL - `https://bitbucket.org/site/oauth2/authorize?response_type=code&client_id=raFykYJRvEBHPttQAm&redirect_uri=https%3A%2F%2F5bef-171-76-86-89.ngrok-free.app%2Fapi%2Fbitbucket%2Fcallbacks%2Finstall&scope=repository%20pullrequest%20pullrequest:write%20webhook%20account%20repository:write`. You only need to replace the `5bef-171-76-86-89.ngrok-free.app` part with your own ngrok url instead of generating a new formatted url.

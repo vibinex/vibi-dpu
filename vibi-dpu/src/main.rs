@@ -51,13 +51,15 @@ async fn main() {
 		let server_url = env::var("SERVER_URL").expect("SERVER_URL must be set for HTTP DPU queue transport");
 		let dpu_auth_token = env::var("DPU_AUTH_TOKEN").expect("DPU_AUTH_TOKEN must be set for HTTP DPU queue transport");
 		http_queue::listener::poll_messages(&server_url, &installation_id, &dpu_auth_token).await;
-	} else {
+	} else if queue_transport.eq_ignore_ascii_case("pubsub") {
 		let gcp_credentials = env::var("GCP_CREDENTIALS").expect("GCP_CREDENTIALS must be set");
-		log::debug!("[main] env vars = {}, {}", &gcp_credentials, &installation_id);
+		log::debug!("[main] PubSub transport selected for installation_id={}", &installation_id);
 		pubsub::listener::listen_messages(
 			&gcp_credentials,
 			&installation_id,
 		).await;
+	} else {
+		panic!("Unknown DPU_QUEUE_TRANSPORT value: '{}'. Expected 'http' or 'pubsub'.", queue_transport);
 	}
 }
 
