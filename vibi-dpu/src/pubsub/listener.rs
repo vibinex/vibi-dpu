@@ -46,7 +46,13 @@ pub async fn process_message(
 		"webhook_callback" => {
 			let data_bytes_async = data_bytes.to_owned();
 			let deserialized_data_opt = deserialized_data(&data_bytes_async);
-			let deserialised_msg_data = deserialized_data_opt.expect("Failed to deserialize data");
+			let deserialised_msg_data = match deserialized_data_opt {
+				Some(v) => v,
+				None => {
+					log::error!("[process_message] webhook_callback: malformed payload, cannot deserialize");
+					return handles;
+				}
+			};
 			log::info!("Processing Webhook Callback...");
 			log::debug!("[process_message] [webhook_callback | deserialised_msg data] {} ", deserialised_msg_data);
 			let is_reviewable = process_and_update_pr_if_different(&deserialised_msg_data).await;
@@ -174,14 +180,23 @@ pub async fn listen_messages(keypath: &str, topicname: &str) {
 			}
 			let msg_bytes = message.message.data.clone();
 			let handles = process_message(&attrmap, &msg_bytes).await;
+			let mut all_ok = true;
 			for handle in handles {
 				if let Err(e) = handle.await {
 					log::error!("[pubsub] Background task panicked: {:?}", e);
+					all_ok = false;
 				}
 			}
+			// Only ACK when all background work completed without a join error.
+			// NACK on panic so Pub/Sub redelivers the message.
+			if all_ok {
+				let _ = message.ack().await;
+			} else {
+				let _ = message.nack().await;
+			}
+		} else {
+			let _ = message.ack().await;
 		}
-		// Ack or Nack message only after all background work has completed.
-		let _ = message.ack().await;
 	}
 }
 
