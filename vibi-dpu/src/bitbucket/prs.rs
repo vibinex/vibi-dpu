@@ -81,10 +81,10 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
 
 fn parse_pr_info(pr_data: &Value) -> Option<PrInfo> {
     match (
-        pr_data["destination"]["commit"]["hash"].as_str(),
-        pr_data["source"]["commit"]["hash"].as_str(),
-        pr_data["state"].as_str(),
-        pr_data["source"]["branch"]["name"].as_str(),
+        pr_data["destination"]["commit"]["hash"].as_str().filter(|value| !value.trim().is_empty()),
+        pr_data["source"]["commit"]["hash"].as_str().filter(|value| !value.trim().is_empty()),
+        pr_data["state"].as_str().filter(|value| !value.trim().is_empty()),
+        pr_data["source"]["branch"]["name"].as_str().filter(|value| !value.trim().is_empty()),
     ) {
         (Some(base_head_commit), Some(pr_head_commit), Some(state), Some(pr_branch)) => {
             Some(PrInfo {
@@ -98,6 +98,38 @@ fn parse_pr_info(pr_data: &Value) -> Option<PrInfo> {
         _ => {
             log::error!("[parse_pr_info] Bitbucket PR response is missing expected fields");
             None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_pr_info;
+    use serde_json::json;
+
+    #[test]
+    fn parse_pr_info_rejects_empty_or_whitespace_required_fields() {
+        let required_fields = [
+            "/destination/commit/hash",
+            "/source/commit/hash",
+            "/state",
+            "/source/branch/name",
+        ];
+
+        for field in required_fields {
+            for invalid_value in ["", " \t\n "] {
+                let mut pr_data = json!({
+                    "destination": { "commit": { "hash": "base-hash" } },
+                    "source": {
+                        "commit": { "hash": "head-hash" },
+                        "branch": { "name": "feature" }
+                    },
+                    "state": "OPEN"
+                });
+                *pr_data.pointer_mut(field).expect("required field exists") = json!(invalid_value);
+
+                assert!(parse_pr_info(&pr_data).is_none(), "{field} should reject {invalid_value:?}");
+            }
         }
     }
 }
