@@ -79,6 +79,61 @@ async fn get_list_prs(headers: &HeaderMap, params: &HashMap<String, String>, rep
     return Some(pr_list);
 }
 
+fn parse_pr_info(pr_data: &Value) -> Option<PrInfo> {
+    match (
+        pr_data["destination"]["commit"]["hash"].as_str().filter(|value| !value.trim().is_empty()),
+        pr_data["source"]["commit"]["hash"].as_str().filter(|value| !value.trim().is_empty()),
+        pr_data["state"].as_str().filter(|value| !value.trim().is_empty()),
+        pr_data["source"]["branch"]["name"].as_str().filter(|value| !value.trim().is_empty()),
+    ) {
+        (Some(base_head_commit), Some(pr_head_commit), Some(state), Some(pr_branch)) => {
+            Some(PrInfo {
+                base_head_commit: base_head_commit.to_string(),
+                pr_head_commit: pr_head_commit.to_string(),
+                state: state.to_string(),
+                pr_branch: pr_branch.to_string(),
+                author: None,
+            })
+        }
+        _ => {
+            log::error!("[parse_pr_info] Bitbucket PR response is missing expected fields");
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_pr_info;
+    use serde_json::json;
+
+    #[test]
+    fn parse_pr_info_rejects_empty_or_whitespace_required_fields() {
+        let required_fields = [
+            "/destination/commit/hash",
+            "/source/commit/hash",
+            "/state",
+            "/source/branch/name",
+        ];
+
+        for field in required_fields {
+            for invalid_value in ["", " \t\n "] {
+                let mut pr_data = json!({
+                    "destination": { "commit": { "hash": "base-hash" } },
+                    "source": {
+                        "commit": { "hash": "head-hash" },
+                        "branch": { "name": "feature" }
+                    },
+                    "state": "OPEN"
+                });
+                *pr_data.pointer_mut(field).expect("required field exists") = json!(invalid_value);
+
+                assert!(parse_pr_info(&pr_data).is_none(), "{field} should reject {invalid_value:?}");
+            }
+        }
+    }
+}
+
 pub async fn get_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str,pr_number: &str) -> Option<PrInfo> {
     let base_url = bitbucket_base_url();
     let url = format!(
@@ -106,13 +161,7 @@ pub async fn get_pr_info(workspace_slug: &str,repo_slug: &str,access_token: &str
         return None;
     }
     let pr_data: Value = response.json().await.expect("Error parsing PR data");
-    let pr_info = PrInfo {
-        base_head_commit: pr_data["destination"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
-        pr_head_commit: pr_data["source"]["commit"]["hash"].to_string().trim_matches('"').to_string(),
-        state: pr_data["state"].to_string().trim_matches('"').to_string(),
-        pr_branch: pr_data["source"]["branch"]["name"].to_string().trim_matches('"').to_string(),
-        author: None,
-    };
+    let pr_info = parse_pr_info(&pr_data)?;
     log::debug!("[get_pr_info] pr_info: {:?}", &pr_info);
     Some(pr_info)
 }
