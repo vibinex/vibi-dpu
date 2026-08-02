@@ -17,6 +17,11 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates git ripgrep libssl3 \
   && rm -rf /var/lib/apt/lists/*
 
+# Run the DPU with a stable, unprivileged identity. The fixed IDs let operators
+# grant write access to bind-mounted configuration without using root.
+RUN groupadd --gid 10001 dpu && \
+  useradd --uid 10001 --gid dpu --home-dir /app --no-create-home --shell /usr/sbin/nologin dpu
+
 ARG GCP_CREDENTIALS
 ARG TOPIC_NAME
 ARG SUBSCRIPTION_NAME
@@ -54,8 +59,14 @@ ENV GITHUB_PAT=$GITHUB_PAT
 ENV PROVIDER=$PROVIDER
 
 WORKDIR /app
-COPY --from=builder /build/target/release/vibi-dpu /app/vibi-dpu
-COPY prompts /app/prompts
-RUN mkdir /app/config
+COPY --from=builder --chown=dpu:dpu /build/target/release/vibi-dpu /app/vibi-dpu
+COPY --chown=dpu:dpu prompts /app/prompts
+
+# The DPU persists credentials under /app/config and writes rotated logs under
+# /var/log/dpu. Repository checkouts and the embedded database use /tmp.
+RUN mkdir -p /app/config /var/log/dpu && \
+  chown -R dpu:dpu /app /var/log/dpu
+
+USER dpu:dpu
 
 CMD ["/app/vibi-dpu"]
