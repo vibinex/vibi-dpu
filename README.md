@@ -22,9 +22,8 @@ To run Vibi-DPU locally:
 5. Fire up cloud sql proxy - `./cloud-sql-proxy --port 5432 vibi-test-394606:asia-south1:test-db`
 6. Change url in vibinex-server in .env.local - `NEXTAUTH_URL=https://example.ngrok-free.app`
 7. Start vibinex-server - `npm run dev`
-8. Build vibi-dpu, go to vibi-dpu/vibi-dpu and run - `cargo build --release`
-9. Go up to the root directory of vibi-dpu - `cd ../`
-10. **Build the Docker image**: In the root directory of the project, run the following command to build a Docker image with the name "dpu".
+8. Go to the root directory of `vibi-dpu`. The multi-stage Docker build compiles the Rust binary, so a separate host build is not required.
+9. **Build the Docker image**: Run the following command to build a Docker image with the name "dpu".
 
     ```bash
     docker build \
@@ -36,7 +35,7 @@ To run Vibi-DPU locally:
       --build-arg SERVER_URL=your-server-url \
       -t dpu .
     ```
-11. **Run the Docker container**: After building the image, you can run it using the following command.
+10. **Run the Docker container**: After building the image, you can run it using the following command.
 
     ```bash
     # Create an env file to keep secrets out of shell history (chmod 600 .env.dpu)
@@ -50,9 +49,21 @@ To run Vibi-DPU locally:
       -e SERVER_URL=your-server-url \
       dpu
     ```
-12. For bitbucket, replace your url in this url and paste it on your browser and visit it. If you are using ngrok, you might get a "visit site" ngrok welcome page. Click and visit site. Grant any permissions asked from your user to bitbucket. Example URL - `https://bitbucket.org/site/oauth2/authorize?response_type=code&client_id=raFykYJRvEBHPttQAm&redirect_uri=https%3A%2F%2F5bef-171-76-86-89.ngrok-free.app%2Fapi%2Fbitbucket%2Fcallbacks%2Finstall&scope=repository%20pullrequest%20pullrequest:write%20webhook%20account%20repository:write`. You only need to replace the `5bef-171-76-86-89.ngrok-free.app` part with your own ngrok url instead of generating a new formatted url.
-13. This would start the "setting up" part of dpu, where it calls bitbucket apis and collects repo info, user info, workspace info and pr info.
-14. Next begin your testing. For instance, if you push to a PR, you should be able to see logs in next server, in dpu and see the required actions being performed on the PR.
+11. For bitbucket, replace your url in this url and paste it on your browser and visit it. If you are using ngrok, you might get a "visit site" ngrok welcome page. Click and visit site. Grant any permissions asked from your user to bitbucket. Example URL - `https://bitbucket.org/site/oauth2/authorize?response_type=code&client_id=raFykYJRvEBHPttQAm&redirect_uri=https%3A%2F%2F5bef-171-76-86-89.ngrok-free.app%2Fapi%2Fbitbucket%2Fcallbacks%2Finstall&scope=repository%20pullrequest%20pullrequest:write%20webhook%20account%20repository:write`. You only need to replace the `5bef-171-76-86-89.ngrok-free.app` part with your own ngrok url instead of generating a new formatted url.
+12. This would start the "setting up" part of dpu, where it calls bitbucket apis and collects repo info, user info, workspace info and pr info.
+13. Next begin your testing. For instance, if you push to a PR, you should be able to see logs in next server, in dpu and see the required actions being performed on the PR.
+
+## Published container images
+
+Merges to `main` publish a multi-platform image for `linux/amd64` and `linux/arm64` to `ghcr.io/vibinex/dpu`. The workflow publishes both a commit-SHA tag and `latest`.
+
+For deployments, use the manifest digest shown in the workflow summary instead of a mutable tag:
+
+```bash
+docker pull ghcr.io/vibinex/dpu@sha256:<manifest-digest>
+```
+
+A digest pins the exact multi-platform manifest while Docker automatically selects the image matching the host architecture. If the package is private, authenticate to `ghcr.io` before pulling it; package visibility is managed separately from this build workflow.
 
 ## Contributing
 

@@ -1,14 +1,24 @@
-# Use a lightweight Linux distribution as the base image
-FROM ubuntu:latest
+# Build inside the target-platform container so Buildx can produce both amd64 and arm64 images.
+FROM rust:1-bookworm AS builder
 
-# # Install dependencies required by the application
-RUN \
-  apt-get update && \
-  apt-get install -y ca-certificates git ripgrep libssl3 && \
-  apt-get clean
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libssl-dev pkg-config \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY vibi-dpu/Cargo.toml ./
+COPY vibi-dpu/src ./src
+RUN cargo build --release
+
+# Keep the existing Ubuntu runtime and its required command-line tools/libraries.
+FROM ubuntu:24.04
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates git ripgrep libssl3 \
+  && rm -rf /var/lib/apt/lists/*
 
 ARG GCP_CREDENTIALS
-ARG TOPIC_NAME 
+ARG TOPIC_NAME
 ARG SUBSCRIPTION_NAME
 ARG DPU_QUEUE_TRANSPORT
 ARG DPU_POLL_INTERVAL_MS
@@ -25,8 +35,7 @@ ARG GITHUB_BASE_URL
 ARG GITHUB_PAT
 ARG PROVIDER
 
-
-ENV GCP_CREDENTIALS=$GCP_CREDENTIALS  
+ENV GCP_CREDENTIALS=$GCP_CREDENTIALS
 ENV TOPIC_NAME=$TOPIC_NAME
 ENV SUBSCRIPTION_NAME=$SUBSCRIPTION_NAME
 ENV DPU_QUEUE_TRANSPORT=$DPU_QUEUE_TRANSPORT
@@ -44,11 +53,9 @@ ENV GITHUB_BASE_URL=$GITHUB_BASE_URL
 ENV GITHUB_PAT=$GITHUB_PAT
 ENV PROVIDER=$PROVIDER
 
-COPY ./vibi-dpu/target/release/vibi-dpu /app/vibi-dpu
-COPY ./prompts /app/prompts
-
-# Create directory for configuration
+WORKDIR /app
+COPY --from=builder /build/target/release/vibi-dpu /app/vibi-dpu
+COPY prompts /app/prompts
 RUN mkdir /app/config
 
-# Start the Rust application
 CMD ["/app/vibi-dpu"]
