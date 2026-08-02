@@ -7,6 +7,11 @@ RUN \
   apt-get install -y ca-certificates git ripgrep libssl3 && \
   apt-get clean
 
+# Run the DPU with a stable, unprivileged identity. The fixed IDs let operators
+# grant write access to bind-mounted configuration without using root.
+RUN groupadd --gid 10001 dpu && \
+  useradd --uid 10001 --gid dpu --home-dir /app --no-create-home --shell /usr/sbin/nologin dpu
+
 ARG GCP_CREDENTIALS
 ARG TOPIC_NAME 
 ARG SUBSCRIPTION_NAME
@@ -44,11 +49,15 @@ ENV GITHUB_BASE_URL=$GITHUB_BASE_URL
 ENV GITHUB_PAT=$GITHUB_PAT
 ENV PROVIDER=$PROVIDER
 
-COPY ./vibi-dpu/target/release/vibi-dpu /app/vibi-dpu
-COPY ./prompts /app/prompts
+COPY --chown=dpu:dpu ./vibi-dpu/target/release/vibi-dpu /app/vibi-dpu
+COPY --chown=dpu:dpu ./prompts /app/prompts
 
-# Create directory for configuration
-RUN mkdir /app/config
+# The DPU persists credentials under /app/config and writes rotated logs under
+# /var/log/dpu. Repository checkouts and the embedded database use /tmp.
+RUN mkdir -p /app/config /var/log/dpu && \
+  chown -R dpu:dpu /app /var/log/dpu
+
+USER dpu:dpu
 
 # Start the Rust application
 CMD ["/app/vibi-dpu"]
