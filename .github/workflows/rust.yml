@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Test version update script
+      run: python3 -m unittest scripts/test_update.py
     - name: Build
       run: |
         cd vibi-dpu
