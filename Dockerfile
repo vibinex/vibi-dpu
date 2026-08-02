@@ -6,9 +6,9 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-COPY vibi-dpu/Cargo.toml ./
+COPY vibi-dpu/Cargo.toml vibi-dpu/Cargo.lock ./
 COPY vibi-dpu/src ./src
-RUN cargo build --release
+RUN cargo build --release --locked
 
 # Keep the existing Ubuntu runtime and its required command-line tools/libraries.
 FROM ubuntu:24.04
