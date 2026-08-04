@@ -17,6 +17,7 @@ jobs:
     if: >-
       github.event.pull_request.merged == true &&
       github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref != 'automation/version-bump'
     runs-on: ubuntu-latest
     steps:
@@ -26,12 +27,17 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      - name: Set up pinned Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
       - name: Update manifest and lockfile
-        run: python3 scripts/update.py
+        run: python scripts/update.py
 
       - name: Validate release automation and proposed package metadata
         run: |
-          python3 -m unittest scripts/test_update.py scripts/test_verify_release.py
+          python -m unittest scripts/test_update.py scripts/test_verify_release.py
           cargo metadata --manifest-path vibi-dpu/Cargo.toml --locked --no-deps --format-version 1 >/dev/null
 
       - name: Open or update version-bump pull request
@@ -41,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           branch="automation/version-bump"
-          version="$(python3 -c 'import tomllib; print(tomllib.load(open("vibi-dpu/Cargo.toml", "rb"))["package"]["version"])')"
+          version="$(python -c 'import tomllib; print(tomllib.load(open("vibi-dpu/Cargo.toml", "rb"))["package"]["version"])')"
           git config user.name "nia-sg-bot"
           git config user.email "nia-sg-bot@users.noreply.github.com"
           git fetch origin "$branch" || true
@@ -62,7 +68,7 @@ jobs:
 
           Review and merge this PR before deliberately creating tag \`v${version}\`; merging an ordinary PR does not publish a release. The trusted-main generation run validated the synchronized manifest and lockfile: ${run_url}
           EOF
-          existing="$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty')"
+          existing="$(gh pr list --state open --head "$branch" --json number,headRepository --jq '[.[] | select(.headRepository.nameWithOwner == env.GITHUB_REPOSITORY)][0].number // empty')"
           if [[ -n "$existing" ]]; then
             gh pr edit "$existing" \
               --title "chore: release vibi-dpu ${version}" \
