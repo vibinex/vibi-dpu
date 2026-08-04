@@ -51,7 +51,7 @@ jobs:
           git config user.name "nia-sg-bot"
           git config user.email "nia-sg-bot@users.noreply.github.com"
           git fetch origin "$branch" || true
-          previous="$(git rev-parse "origin/${branch}" 2>/dev/null || true)"
+          previous="$(git rev-parse --verify "refs/remotes/origin/${branch}" 2>/dev/null || true)"
           git switch -C "$branch"
           git add vibi-dpu/Cargo.toml vibi-dpu/Cargo.lock
           git commit -m "chore: propose vibi-dpu ${version}"
