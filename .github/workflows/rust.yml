@@ -2,27 +2,30 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-    - name: Test version update script
-      run: python3 -m unittest scripts/test_update.py
-    - name: Build
-      run: |
-        cd vibi-dpu
-        cargo build --verbose
-    - name: Run tests
-      run: |
-        cd vibi-dpu
-        cargo test --verbose
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up pinned Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+      - name: Test release automation scripts
+        run: python -m unittest scripts/test_update.py scripts/test_verify_release.py
+      - name: Check locked metadata
+        run: cargo metadata --manifest-path vibi-dpu/Cargo.toml --locked --no-deps --format-version 1 >/dev/null
+      - name: Build
+        run: cargo build --manifest-path vibi-dpu/Cargo.toml --locked --verbose
+      - name: Run tests
+        run: cargo test --manifest-path vibi-dpu/Cargo.toml --locked --verbose
