@@ -1,81 +1,90 @@
-
-name: Auto-version
+name: Release version tag
 
 on:
-  pull_request:
-    types:
-      - closed
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'update-cargo-toml'
-    runs-on: ubuntu-latest
-
+  release:
+    # Pin the package build environment so the generated .deb does not silently
+    # raise its minimum glibc version when ubuntu-latest advances.
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Run Build Script
-        run: |
-           git config user.name "GitHub Actions Bot"
-           git config user.email "<>"
-           
-      - name: run script
-        run: |
-           python scripts/update.py
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v3
+      - name: Check out tagged source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Updated code"
-          title: "Update Cargo.toml"
-          body: "This pull request updates the Cargo.toml file."
-          branch: update-cargo-toml
-          reviewers: tapishr
+          fetch-depth: 0
 
-      - name: Build Rust CLI
-        run: |
-          cd vibi-dpu
-          cargo build --release
-          
-      - name: Get version from Cargo.toml
-        id: get_version
-        run: |
-          cd vibi-dpu
-          echo "::set-output name=version::$(grep -Po '(?<=version = ")[\d.]+(?=")' Cargo.toml)"
-          
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Verify tag, source, manifest, and lockfile
+        id: version
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          release_name: Release ${{ steps.get_version.outputs.version }}
-          draft: false
-          prerelease: false
-          
-      - name: cargo deb
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
-          cargo install  cargo-deb
-          
-      - name: build binary
-        run: |
-          cd vibi-dpu
-          cargo deb
-          
-      - name: Rename Debian Package
-        run: mv ./vibi-dpu/target/debian/*.deb ./vibi-dpu/target/debian/vibi-dpu.deb
-        
-      - name: Upload .deb Package
-        id: upload_deb
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./vibi-dpu/target/debian/vibi-dpu.deb
-          asset_name: vibi-dpu.deb
-          asset_content_type: application/octet-stream
+          set -euo pipefail
+          test "$(git rev-parse "${TAG}^{commit}")" = "$GITHUB_SHA"
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "A release already exists for $TAG" >&2
+            exit 1
+          fi
+          version="$(python3 scripts/verify_release.py --tag "$TAG")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Validate package
+        run: |
+          set -euo pipefail
+          cargo metadata --manifest-path vibi-dpu/Cargo.toml --locked --no-deps --format-version 1 >/dev/null
+          cargo test --manifest-path vibi-dpu/Cargo.toml --locked
+          cargo build --manifest-path vibi-dpu/Cargo.toml --release --locked
+          git diff --exit-code
+
+      - name: Install pinned cargo-deb
+        run: cargo install cargo-deb --version 3.7.0 --locked
+
+      - name: Build, inspect, and checksum Debian package
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          rm -rf vibi-dpu/target/debian
+          cargo deb --manifest-path vibi-dpu/Cargo.toml --locked
+          mapfile -t packages < <(find vibi-dpu/target/debian -maxdepth 1 -type f -name '*.deb')
+          test "${#packages[@]}" -eq 1
+          package="${packages[0]}"
+          test "$(dpkg-deb --field "$package" Package)" = "vibi-dpu"
+          test "$(dpkg-deb --field "$package" Version)" = "${VERSION}-1"
+          test "$(dpkg-deb --field "$package" Architecture)" = "amd64"
+          dpkg-deb --contents "$package" | grep -Eq '[[:space:]]\./usr/bin/vibi-dpu$'
+          mkdir -p dist
+          asset="dist/vibi-dpu_${VERSION}_amd64.deb"
+          cp "$package" "$asset"
+          sha256sum "$asset" > "${asset}.sha256"
+          sha256sum --check "${asset}.sha256"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft with assets, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          ASSET: ${{ steps.package.outputs.asset }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --verify-tag \
+            --draft \
+            --generate-notes \
+            --title "vibi-dpu $TAG" \
+            "$ASSET" "${ASSET}.sha256"
+          gh release edit "$TAG" --draft=false

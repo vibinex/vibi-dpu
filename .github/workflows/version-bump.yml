@@ -1,0 +1,76 @@
+name: Propose version bump
+
+on:
+  pull_request_target:
+    types: [closed]
+
+concurrency:
+  group: version-bump-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  propose:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.ref != 'automation/version-bump'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out merged main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Update manifest and lockfile
+        run: python3 scripts/update.py
+
+      - name: Validate release automation and proposed package metadata
+        run: |
+          python3 -m unittest scripts/test_update.py scripts/test_verify_release.py
+          cargo metadata --manifest-path vibi-dpu/Cargo.toml --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Open or update version-bump pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGED_PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          branch="automation/version-bump"
+          version="$(python3 -c 'import tomllib; print(tomllib.load(open("vibi-dpu/Cargo.toml", "rb"))["package"]["version"])')"
+          git config user.name "nia-sg-bot"
+          git config user.email "nia-sg-bot@users.noreply.github.com"
+          git fetch origin "$branch" || true
+          previous="$(git rev-parse "origin/${branch}" 2>/dev/null || true)"
+          git switch -C "$branch"
+          git add vibi-dpu/Cargo.toml vibi-dpu/Cargo.lock
+          git commit -m "chore: propose vibi-dpu ${version}"
+          if [[ -n "$previous" ]]; then
+            git push --force-with-lease="${branch}:${previous}" origin "$branch"
+          else
+            git push origin "$branch"
+          fi
+
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body_file="$(mktemp)"
+          cat >"$body_file" <<EOF
+          Automated version proposal after #${MERGED_PR}.
+
+          Review and merge this PR before deliberately creating tag \`v${version}\`; merging an ordinary PR does not publish a release. The trusted-main generation run validated the synchronized manifest and lockfile: ${run_url}
+          EOF
+          existing="$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty')"
+          if [[ -n "$existing" ]]; then
+            gh pr edit "$existing" \
+              --title "chore: release vibi-dpu ${version}" \
+              --body-file "$body_file"
+          else
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --title "chore: release vibi-dpu ${version}" \
+              --body-file "$body_file"
+          fi
