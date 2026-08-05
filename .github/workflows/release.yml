@@ -86,8 +86,12 @@ jobs:
           mkdir -p dist
           asset="dist/vibi-dpu_${VERSION}_amd64.deb"
           cp "$package" "$asset"
-          sha256sum "$asset" > "${asset}.sha256"
-          sha256sum --check "${asset}.sha256"
+          asset_name="$(basename "$asset")"
+          (
+            cd dist
+            sha256sum "$asset_name" > "${asset_name}.sha256"
+            sha256sum --check "${asset_name}.sha256"
+          )
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
 
       - name: Create or resume draft with assets, then publish
