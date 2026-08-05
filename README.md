@@ -39,7 +39,7 @@ To run Vibi-DPU locally:
 
     ```bash
     # Create an env file to keep secrets out of shell history (chmod 600 .env.dpu)
-    # .env.dpu contents:
+    # .env.dpu contents (required for queue and health API authentication):
     #   DPU_AUTH_TOKEN=your-shared-dpu-token
 
     docker run \
