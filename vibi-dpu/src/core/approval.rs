@@ -63,6 +63,7 @@ pub async fn process_approval(deserialised_msg_data: &Value, repo_config_val: &V
         return;
     }
     let relevance_vec = relevance_vec_opt.to_owned().expect("Empty coverage_opt");
+    let relevance_vec = exclude_pr_author(relevance_vec, review.author());
     let mut coverage_map_obj = CoverageMap::new(repo_provider.to_string());
     coverage_map_obj.calculate_coverage_map(relevance_vec.clone(), reviewer_handles.clone());
     // add up contribution of aliases
@@ -70,6 +71,14 @@ pub async fn process_approval(deserialised_msg_data: &Value, repo_config_val: &V
     let comment_text = approval_comment_text(&coverage_map_obj, relevance_vec, reviewer_handles);
     // get access token and call add_comment in gh/bb
     core::github::comment::add_comment(&comment_text, &review, &final_access_token).await;
+}
+
+fn exclude_pr_author(relevance_vec: Vec<Relevance>, pr_author: &str) -> Vec<Relevance> {
+    relevance_vec.into_iter().filter(|relevance| {
+        relevance.handles().as_ref().map_or(true, |handles| {
+            !handles.iter().any(|handle| handle.eq_ignore_ascii_case(pr_author))
+        })
+    }).collect()
 }
 
 fn approval_comment_text(coverage_map: &CoverageMap, relevance_vec: Vec<Relevance>, reviewer_handles: Vec<String>) -> String {
@@ -81,4 +90,45 @@ fn approval_comment_text(coverage_map: &CoverageMap, relevance_vec: Vec<Relevanc
     comment += "Relevance of the reviewer is calculated based on the git blame information of the PR. To know more, hit us up at contact@vibinex.com.\n\n";  // Added two newlines
     comment += "To change comment and auto-assign settings, go to [your Vibinex repository settings page.](https://vibinex.com/u)\n";  // Added a newline at the end
     return comment;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::exclude_pr_author;
+    use crate::utils::relevance::Relevance;
+
+    fn relevance(git_alias: &str, handles: Option<Vec<&str>>) -> Relevance {
+        Relevance::new(
+            "github".to_string(),
+            git_alias.to_string(),
+            "50.00".to_string(),
+            50.0,
+            handles.map(|values| values.into_iter().map(str::to_string).collect()),
+        )
+    }
+
+    #[test]
+    fn excludes_pr_author_from_approval_relevance() {
+        let relevance_vec = vec![
+            relevance("author@example.com", Some(vec!["PrAuthor"])),
+            relevance("reviewer@example.com", Some(vec!["reviewer"])),
+        ];
+
+        let filtered = exclude_pr_author(relevance_vec, "prauthor");
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].git_alias(), "reviewer@example.com");
+    }
+
+    #[test]
+    fn keeps_unmapped_aliases_and_other_contributors() {
+        let relevance_vec = vec![
+            relevance("unmapped@example.com", None),
+            relevance("reviewer@example.com", Some(vec!["reviewer", "other"])),
+        ];
+
+        let filtered = exclude_pr_author(relevance_vec, "pr-author");
+
+        assert_eq!(filtered.len(), 2);
+    }
 }
