@@ -17,3 +17,4 @@ pub mod aliases;
 pub mod relevance;
 pub mod coverage;
 pub mod parsing;
+pub mod http;

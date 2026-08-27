@@ -2,7 +2,7 @@ use std::{env, collections::HashMap};
 use reqwest::{Response, header::{HeaderMap, HeaderValue, AUTHORIZATION, ACCEPT, USER_AGENT}, header};
 use serde_json::Value;
 
-use crate::utils::reqwest_client::get_client;
+use crate::utils::{http::deserialize_response, reqwest_client::get_client};
 
 pub fn github_base_url() -> String {
     env::var("GITHUB_BASE_URL").expect("BITBUCKET_BASE_URL must be set")
@@ -68,17 +68,6 @@ async fn get_api_response(url: &str, headers_opt: Option<reqwest::header::Header
         return None;
     }
     return Some(response);
-}
-
-async fn deserialize_response(response: Response) -> Option<Value> {
-    let res_val = response.json::<Value>().await;
-    if res_val.is_err() {
-        let e = res_val.expect_err("Empty error in res_val");
-        log::error!("[deserialize_response] Unable to deserialize response, error: {:?}", e);
-        return None;
-    }
-    let deserialized = res_val.expect("Uncaught error in res_val");
-    return Some(deserialized);
 }
 
 fn get_headers(headers_opt: &Option<reqwest::header::HeaderMap>, access_token: &str) -> Option<reqwest::header::HeaderMap> {
