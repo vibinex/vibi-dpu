@@ -2,7 +2,7 @@ use std::env;
 
 use reqwest::{Response, header::{HeaderMap, HeaderValue}};
 use serde_json::Value;
-use crate::utils::reqwest_client::get_client;
+use crate::utils::{http::deserialize_response, reqwest_client::get_client};
 
 pub fn bitbucket_base_url() -> String {
     env::var("BITBUCKET_BASE_URL").expect("BITBUCKET_BASE_URL must be set")
@@ -52,14 +52,9 @@ async fn deserialize_paginated_response(response_opt: Option<Response>) -> (Vec<
         return (values_vec, None);
     }
     let response = response_opt.expect("Uncaught empty response_opt");
-    let parse_res = response.json::<serde_json::Value>().await;
-    if parse_res.is_err() {
-        let e = parse_res.expect_err("No error in parse_res");
-        log::error!("[deserialize_paginated_response] Unable to deserialize response: {}", e);
+    let Some(response_json) = deserialize_response(response).await else {
         return (values_vec, None);
-    }
-    let response_json = parse_res
-        .expect("Uncaught error in parse_res in deserialize_response");
+    };
     let res_values_opt = response_json["values"].as_array();
     if res_values_opt.is_none() {
         log::error!("[deserialize_paginated_response] response_json[values] is empty");
