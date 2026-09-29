@@ -18,7 +18,7 @@ To run Vibi-DPU locally:
 1. Generate public url using ngrok - `ngrok http 3000`. We will run our next server locally on port 3000 in later steps.
 2. Paste this in OAuth consumers in callback_url field.
 3. Clone [vibinex-server](https://github.com/vibinex/vibinex-server/) locally.
-4. Paste the client id and secret in vibinex-server in .env.local in root directory. Also use them in the docker command below.
+4. Paste the client ID and secret in vibinex-server in `.env.local` in the root directory. Keep DPU runtime configuration in a separate local env file; do not pass credentials to `docker build`.
 5. Fire up cloud sql proxy - `./cloud-sql-proxy --port 5432 vibi-test-394606:asia-south1:test-db`
 6. Change url in vibinex-server in .env.local - `NEXTAUTH_URL=https://example.ngrok-free.app`
 7. Start vibinex-server - `npm run dev`
@@ -26,27 +26,24 @@ To run Vibi-DPU locally:
 9. **Build the Docker image**: Run the following command to build a Docker image with the name "dpu".
 
     ```bash
-    docker build \
-      --build-arg DPU_QUEUE_TRANSPORT=http \
-      --build-arg BITBUCKET_CLIENT_ID=your-bitbucket-client-id \
-      --build-arg BITBUCKET_CLIENT_SECRET=your-bitbucket-client-secret \
-      --build-arg BITBUCKET_BASE_URL=your-bitbucket-base-url \
-      --build-arg INSTALL_ID=your-install-id \
-      --build-arg SERVER_URL=your-server-url \
-      -t dpu .
+    docker build -t dpu .
     ```
 10. **Run the Docker container**: After building the image, you can run it using the following command.
 
     ```bash
-    # Create an env file to keep secrets out of shell history (chmod 600 .env.dpu)
-    # .env.dpu contents (required for queue and health API authentication):
+    # Create an env file to keep runtime configuration and secrets out of image
+    # metadata and shell history (chmod 600 .env.dpu; never commit it).
+    # For the HTTP queue transport, .env.dpu contains at least:
+    #   DPU_QUEUE_TRANSPORT=http
     #   DPU_AUTH_TOKEN=your-shared-dpu-token
+    #   INSTALL_ID=your-install-id
+    #   SERVER_URL=https://your-vibinex-server.example
+    # Add provider credentials (for example BITBUCKET_CLIENT_SECRET) only when
+    # that provider flow requires them. For the Pub/Sub transport, provide
+    # GCP_CREDENTIALS through this runtime env file as well.
 
     docker run \
       --env-file .env.dpu \
-      -e DPU_QUEUE_TRANSPORT=http \
-      -e INSTALL_ID=your-install-id \
-      -e SERVER_URL=your-server-url \
       dpu
     ```
 
